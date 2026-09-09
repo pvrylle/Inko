@@ -1,18 +1,47 @@
 "use client";
 
-import { Flame, Pause, Play, RotateCcw, Sparkles, Square, Target } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
+import {
+  Calendar,
+  CheckCircle2,
+  Clock3,
+  Flame,
+  ListChecks,
+  Pause,
+  Pencil,
+  Play,
+  Sparkles,
+  Square,
+  Target,
+  TimerReset,
+  TreePine,
+  Waves,
+  X,
+  XCircle,
+  Zap,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeading } from "@/components/ui/page-heading";
 import { useMascot } from "@/features/mascot/mascot-provider";
 import { useToasts } from "@/features/toast/toast-provider";
-import { focusScenes, defaultSceneId } from "./focus-scenes";
+import { FocusMascot } from "./focus-mascot";
+import { focusScenes, defaultSceneId, type FocusScene } from "./focus-scenes";
 import { focusProgress, formatFocusTime } from "./focus-timer";
 import { useDailyGoal, useSelectedScene } from "./use-daily-goal";
 import { useFocusSession } from "./use-focus-session";
 
-const presets = [25, 45, 60];
+const presets = [15, 25, 45, 60];
+const spring = { type: "spring" as const, stiffness: 240, damping: 24 };
 
 type RingStyle = React.CSSProperties & { "--focus-progress": string };
+
+const sceneIcons: Record<FocusScene["id"], LucideIcon> = {
+  aurora: Sparkles,
+  ocean: Waves,
+  forest: TreePine,
+  ember: Flame,
+};
 
 function todayMinutes(sessions: { completed_at: string | null; duration_minutes: number; status: string }[]) {
   const dayStart = new Date();
@@ -29,6 +58,8 @@ export function FocusView() {
   const { celebrate } = useToasts();
   const { goalMinutes, setGoalMinutes } = useDailyGoal();
   const { scene, setScene } = useSelectedScene(defaultSceneId);
+  const reduced = useReducedMotion();
+
   const [minutes, setMinutes] = useState(25);
   const lastCompletedIdRef = useRef<string | null>(null);
   const [editingGoal, setEditingGoal] = useState(false);
@@ -36,10 +67,18 @@ export function FocusView() {
 
   const activeScene = focusScenes.find((option) => option.id === scene) ?? focusScenes[0];
   const progress = current ? focusProgress(current, clock) : 100;
-  const completedCount = sessions.filter((session) => session.status === "completed").length;
+  const completedSessions = useMemo(() => sessions.filter((session) => session.status === "completed"), [sessions]);
+  const completedCount = completedSessions.length;
+  const totalMinutes = completedSessions.reduce((sum, session) => sum + session.duration_minutes, 0);
+  const averageMinutes = completedCount ? Math.round(totalMinutes / completedCount) : 0;
   const minutesToday = useMemo(() => todayMinutes(sessions), [sessions]);
   const goalPercent = Math.max(0, Math.min(100, Math.round((minutesToday / goalMinutes) * 100)));
-  const history = useMemo(() => sessions.filter((session) => session.status === "completed" || session.status === "cancelled").slice(0, 6), [sessions]);
+  const history = useMemo(() => sessions.filter((session) => session.status === "completed" || session.status === "cancelled").slice(0, 5), [sessions]);
+  const displaySeconds = current ? remaining : minutes * 60;
+  const status = current?.status === "paused" ? "Paused" : current ? "Focusing" : "Ready";
+  const endsAtLabel = current?.status === "active"
+    ? new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(Date.parse(current.target_ends_at)))
+    : null;
 
   useEffect(() => {
     dispatch({ type: "SET_MODE", mode: current ? "focus" : "normal" });
@@ -68,90 +107,237 @@ export function FocusView() {
     setEditingGoal(false);
   };
 
+  const breathing = current?.status === "active" && !reduced;
+
   return (
-    <div className="content-page page-enter" data-scene={activeScene.id} style={{ ["--scene-gradient" as string]: activeScene.gradient, ["--scene-accent" as string]: activeScene.accent }}>
+    <div className="focus-page page-enter">
       <PageHeading eyebrow="One thing at a time" title="Focus with Inko" description="Your timer follows real timestamps, so reloads and sleeping tabs never lose your place." />
 
-      <section className="focus-goal" aria-label="Daily focus goal">
-        <div className="focus-goal-header">
-          <span className="focus-goal-icon"><Target size={18} /></span>
-          <div>
-            <p className="eyebrow">Daily goal</p>
-            <strong>{minutesToday} of {goalMinutes} minutes</strong>
-          </div>
-          {!editingGoal ? (
-            <button className="text-button" onClick={beginEditingGoal} type="button">Edit</button>
-          ) : (
-            <form className="goal-editor" onSubmit={saveGoal}>
-              <label className="sr-only" htmlFor="goal-minutes">Focus goal in minutes</label>
-              <input id="goal-minutes" max={360} min={15} onChange={(event) => setGoalDraft(Math.max(15, Math.min(360, Number(event.target.value) || 0)))} step={5} type="number" value={goalDraft} />
-              <button className="secondary-button" type="submit">Save</button>
-            </form>
-          )}
-        </div>
-        <div className="focus-goal-track" aria-hidden="true"><span style={{ width: `${goalPercent}%` }} /></div>
-        <small className="focus-goal-caption">{goalPercent >= 100 ? "Goal hit — anything else is bonus." : `${goalPercent}% there — one 25 minute block gets you to ${Math.min(100, goalPercent + Math.round((25 / goalMinutes) * 100))}%.`}</small>
-      </section>
+      <div className="focus-layout">
+        <motion.section
+          className="focus-hero focus-glass"
+          data-status={current?.status ?? "ready"}
+          initial={reduced ? { opacity: 0 } : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...spring }}
+          style={{ ["--scene-gradient" as string]: activeScene.gradient, ["--scene-accent" as string]: activeScene.accent }}
+        >
+          <div className="focus-hero-scene" aria-hidden="true" />
 
-      <section className="focus-scenes" aria-label="Ambient scene">
-        {focusScenes.map((option) => (
-          <button
-            aria-pressed={scene === option.id}
-            className="focus-scene"
-            data-active={scene === option.id}
-            key={option.id}
-            onClick={() => setScene(option.id)}
-            style={{ background: option.gradient, ["--scene-accent" as string]: option.accent }}
-            type="button"
+          <motion.div
+            aria-label={`${formatFocusTime(displaySeconds)} ${status}`}
+            className="focus-ring"
+            role="timer"
+            style={{ "--focus-progress": `${progress}%` } as RingStyle}
+            animate={breathing ? { scale: [1, 1.015, 1] } : { scale: 1 }}
+            transition={breathing ? { duration: 4.2, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3 }}
           >
-            <strong>{option.label}</strong>
-            <small>{option.description}</small>
-          </button>
-        ))}
-      </section>
-
-      <section className="timer-card" aria-busy={loading}>
-        <div aria-label={`${formatFocusTime(current ? remaining : minutes * 60)} ${current?.status ?? "ready"}`} className="timer-ring" data-paused={current?.status === "paused"} role="timer" style={{ "--focus-progress": `${progress}%` } as RingStyle}>
-          <div><strong>{formatFocusTime(current ? remaining : minutes * 60)}</strong><span>{current?.status === "paused" ? "paused" : current ? "focus" : "ready"}</span></div>
-        </div>
-
-        {!current ? (
-          <>
-            <div className="timer-presets" aria-label="Focus duration">
-              {presets.map((preset) => <button aria-pressed={minutes === preset} key={preset} data-active={minutes === preset} disabled={working} onClick={() => setMinutes(preset)}>{preset} min</button>)}
+            <div className="focus-ring-face">
+              <span className="focus-status-chip" data-status={current?.status ?? "ready"}>
+                {current?.status === "paused" ? <Pause size={11} /> : current ? <Sparkles size={11} /> : <Play size={11} />}
+                {status}
+              </span>
+              <strong className="focus-time">{formatFocusTime(displaySeconds)}</strong>
+              {endsAtLabel ? (
+                <span className="focus-ends-at">Ends around {endsAtLabel}</span>
+              ) : current?.status === "paused" ? (
+                <span className="focus-ends-at">Timer held — resume when ready</span>
+              ) : (
+                <span className="focus-ends-at">{minutes} minute block</span>
+              )}
             </div>
-            <button className="primary-button large" disabled={loading || working} onClick={() => void start(minutes).catch(() => undefined)}><Play size={20} fill="currentColor" /> {working ? "Starting…" : "Start focus"}</button>
-          </>
-        ) : (
-          <div className="focus-controls">
-            {current.status === "active" ? <button className="primary-button large" disabled={working} onClick={() => runControl("pause")}><Pause size={19} fill="currentColor" /> Pause</button> : <button className="primary-button large" disabled={working} onClick={() => runControl("resume")}><Play size={19} fill="currentColor" /> Resume</button>}
-            <button className="secondary-button" disabled={working} onClick={() => runControl("stop")}><Square size={17} fill="currentColor" /> End session</button>
-          </div>
-        )}
+          </motion.div>
 
-        <p className="focus-persistence"><RotateCcw size={14} /> {current ? "Safe to close this tab — your session will continue." : completedCount ? `${completedCount} focus session${completedCount === 1 ? "" : "s"} completed.` : "Choose a duration and settle into one task."}</p>
-        {error && <p className="form-error" role="alert">{error}</p>}
-      </section>
+          {!current ? (
+            <>
+              <div className="focus-presets" role="group" aria-label="Focus duration">
+                {presets.map((preset) => (
+                  <motion.button
+                    key={preset}
+                    aria-pressed={minutes === preset}
+                    className="focus-preset"
+                    data-active={minutes === preset}
+                    disabled={working}
+                    onClick={() => setMinutes(preset)}
+                    type="button"
+                    whileTap={reduced ? undefined : { scale: 0.94 }}
+                  >
+                    <strong>{preset}</strong>
+                    <small>min</small>
+                  </motion.button>
+                ))}
+              </div>
+              <button
+                aria-busy={loading || working}
+                aria-label="Start focus"
+                className="focus-start"
+                disabled={loading || working}
+                onClick={() => void start(minutes).catch(() => undefined)}
+                type="button"
+              >
+                <span className="focus-start-icon"><Play size={16} fill="currentColor" /></span>
+                <span className="focus-start-label">
+                  {working ? "Starting…" : "Start Focus"}
+                  <small>{minutes} minute block</small>
+                </span>
+              </button>
+            </>
+          ) : (
+            <div className="focus-controls" role="group" aria-label="Session controls">
+              {current.status === "active" ? (
+                <button className="focus-primary-btn" disabled={working} onClick={() => runControl("pause")} type="button">
+                  <Pause size={18} fill="currentColor" /> Pause
+                </button>
+              ) : (
+                <button className="focus-primary-btn" disabled={working} onClick={() => runControl("resume")} type="button">
+                  <Play size={18} fill="currentColor" /> Resume
+                </button>
+              )}
+              <button className="focus-secondary-btn" disabled={working} onClick={() => runControl("stop")} type="button">
+                <Square size={16} fill="currentColor" /> End session
+              </button>
+            </div>
+          )}
 
-      {history.length > 0 && (
-        <section className="focus-history" aria-label="Recent focus sessions">
-          <div className="section-title-row">
-            <div><p className="eyebrow">Momentum</p><h2>Recent sessions</h2></div>
-            <span className="focus-history-summary"><Flame size={14} /> {completedCount} completed</span>
-          </div>
-          <div className="focus-history-grid">
-            {history.map((session) => (
-              <article className="focus-history-item" data-status={session.status} key={session.id}>
-                <span className="focus-history-icon"><Sparkles size={14} /></span>
-                <div>
-                  <strong>{session.duration_minutes}m {session.status === "completed" ? "focused" : "ended"}</strong>
-                  <small>{new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(session.completed_at ?? session.updated_at))}</small>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
+          <p className="focus-hint">
+            <TimerReset size={13} />
+            {current ? "Safe to close this tab — your session will keep going." : "Choose a duration and settle into one task."}
+          </p>
+          {error && <p className="form-error" role="alert">{error}</p>}
+        </motion.section>
+
+        <aside className="focus-aside" aria-label="Focus workspace">
+          <motion.div
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...spring, delay: 0.04 }}
+          >
+            <FocusMascot current={current} sessions={sessions} clock={clock} scene={activeScene} />
+          </motion.div>
+
+          <motion.section
+            className="focus-goal-card focus-glass"
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...spring, delay: 0.08 }}
+          >
+            <div className="focus-goal-hero">
+              <div className="focus-goal-ring" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={goalPercent} aria-label="Daily goal progress" style={{ ["--goal-progress" as string]: `${goalPercent}%` }}>
+                <span>{goalPercent}%</span>
+              </div>
+              <div className="focus-goal-info">
+                {!editingGoal ? (
+                  <>
+                    <p className="focus-goal-title">
+                      <Target size={13} /> Daily Goal: <strong>{minutesToday}</strong> <span>/ {goalMinutes} min</span>
+                    </p>
+                    <div className="focus-goal-bar" aria-hidden="true"><span style={{ width: `${goalPercent}%` }} /></div>
+                  </>
+                ) : (
+                  <form className="focus-goal-editor" onSubmit={saveGoal}>
+                    <label className="sr-only" htmlFor="goal-minutes">Focus goal in minutes</label>
+                    <input
+                      id="goal-minutes"
+                      max={360}
+                      min={15}
+                      onChange={(event) => setGoalDraft(Math.max(15, Math.min(360, Number(event.target.value) || 0)))}
+                      step={5}
+                      type="number"
+                      value={goalDraft}
+                    />
+                    <span>min goal</span>
+                    <button className="focus-goal-save" type="submit">Save</button>
+                    <button aria-label="Cancel" className="focus-goal-cancel" onClick={() => setEditingGoal(false)} type="button"><X size={13} /></button>
+                  </form>
+                )}
+              </div>
+              {!editingGoal && (
+                <button aria-label="Adjust daily goal" className="focus-goal-edit" onClick={beginEditingGoal} type="button">
+                  <Pencil size={12} />
+                </button>
+              )}
+            </div>
+            <div className="focus-goal-stats">
+              <span><Clock3 size={11} /> Total Mins: <strong>{totalMinutes}</strong></span>
+              <span><Zap size={11} /> Avg Session: <strong>{averageMinutes}</strong></span>
+              <span><CheckCircle2 size={11} /> Sessions Completed: <strong>{completedCount}</strong></span>
+            </div>
+          </motion.section>
+
+          <motion.section
+            className="focus-scene-card focus-glass"
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...spring, delay: 0.14 }}
+          >
+            <p className="eyebrow"><Sparkles size={11} /> Ambient scene</p>
+            <div className="focus-scene-grid">
+              {focusScenes.map((option) => {
+                const Icon = sceneIcons[option.id];
+                return (
+                  <motion.button
+                    aria-pressed={scene === option.id}
+                    className="focus-scene-swatch"
+                    data-active={scene === option.id}
+                    key={option.id}
+                    onClick={() => setScene(option.id)}
+                    style={{ background: option.gradient, ["--scene-accent" as string]: option.accent }}
+                    title={option.description}
+                    type="button"
+                    whileHover={reduced ? undefined : { y: -3 }}
+                    whileTap={reduced ? undefined : { scale: 0.95 }}
+                  >
+                    <span className="focus-scene-icon" aria-hidden="true"><Icon size={16} /></span>
+                    <strong>{option.label}</strong>
+                  </motion.button>
+                );
+              })}
+            </div>
+            <small className="focus-scene-caption">{activeScene.description}</small>
+          </motion.section>
+
+          <motion.section
+            className="focus-activity-card focus-glass"
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...spring, delay: 0.2 }}
+          >
+            <p className="eyebrow"><ListChecks size={11} /> Activity log</p>
+            {history.length > 0 ? (
+              <ol className="focus-activity-list">
+                {history.map((session, index) => {
+                  const StatusIcon = session.status === "completed" ? CheckCircle2 : XCircle;
+                  return (
+                    <motion.li
+                      data-status={session.status}
+                      key={session.id}
+                      initial={reduced ? { opacity: 0 } : { opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ ...spring, delay: 0.24 + index * 0.05 }}
+                    >
+                      <span className="focus-activity-status" data-status={session.status} aria-hidden="true">
+                        <StatusIcon size={13} />
+                      </span>
+                      <div>
+                        <strong>
+                          <Clock3 size={11} />
+                          {session.duration_minutes}m {session.status === "completed" ? "completed" : "ended early"}
+                        </strong>
+                        <small>
+                          <Calendar size={10} />
+                          {new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(session.completed_at ?? session.updated_at))}
+                        </small>
+                      </div>
+                    </motion.li>
+                  );
+                })}
+              </ol>
+            ) : (
+              <p className="focus-activity-empty">Your first session will land here.</p>
+            )}
+          </motion.section>
+        </aside>
+      </div>
     </div>
   );
 }

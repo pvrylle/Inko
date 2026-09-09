@@ -7,6 +7,10 @@ type InkoMascotProps = {
   state: MascotState;
   amplitude?: number;
   className?: string;
+  /** Override eye scale (0–1). Ignored if undefined; lets focus mode dim eyes without changing global presence. */
+  eyeOpenness?: number;
+  /** Optional prop worn on the mascot. */
+  accessory?: "headphones";
 };
 
 const bodyMotion = {
@@ -18,7 +22,7 @@ const bodyMotion = {
   error: { x: [-3, 3, -2, 2, 0], scale: 0.98 },
 };
 
-export function InkoMascot({ state, amplitude = 0, className = "" }: InkoMascotProps) {
+export function InkoMascot({ state, amplitude = 0, className = "", eyeOpenness, accessory }: InkoMascotProps) {
   const isHappy = state.mood === "happy";
   const isSleeping = state.presence === "sleeping";
   const isThinking = state.presence === "thinking";
@@ -27,6 +31,7 @@ export function InkoMascot({ state, amplitude = 0, className = "" }: InkoMascotP
   const pupilX = isThinking ? 4 : 0;
   const pupilY = isThinking ? -4 : 0;
   const mouthScale = isSpeaking ? 0.8 + amplitude * 1.8 : 1;
+  const eyeScale = eyeOpenness !== undefined ? eyeOpenness : isSleeping ? 0.1 : isListening ? 1.14 : 1;
 
   return (
     <div className={`inko-mascot-wrap ${className}`} data-mode={state.mode} data-mood={state.mood} data-presence={state.presence} role="img" aria-label={`Inko is ${state.presence}`}>
@@ -75,7 +80,7 @@ export function InkoMascot({ state, amplitude = 0, className = "" }: InkoMascotP
           <path d="M160 45C103 45 66 87 68 157C69 221 105 258 161 259C218 260 254 222 253 157C252 88 217 45 160 45Z" fill="url(#inkoBody)" filter="url(#inkoShadow)" />
           <path d="M115 58C86 75 76 111 79 156C81 196 96 218 116 232C94 195 96 91 137 52C129 53 122 55 115 58Z" fill="url(#inkoHighlight)" />
 
-          <motion.g animate={{ scaleY: isSleeping ? 0.1 : isListening ? 1.14 : 1 }} style={{ transformOrigin: "160px 132px" }}>
+          <motion.g animate={{ scaleY: eyeScale }} style={{ transformOrigin: "160px 132px" }}>
             <ellipse cx="122" cy="132" fill="white" rx="27" ry="31" />
             <ellipse cx="199" cy="132" fill="white" rx="27" ry="31" />
             <ellipse cx={122 + pupilX} cy={134 + pupilY} fill="#151A4B" rx="12" ry="15" />
@@ -93,6 +98,23 @@ export function InkoMascot({ state, amplitude = 0, className = "" }: InkoMascotP
             <path d="M149 195H174" fill="none" stroke="#151A4B" strokeLinecap="round" strokeWidth="5" />
           ) : (
             <motion.ellipse cx="161" cy="191" fill="#8C2358" rx="14" ry="9" stroke="#151A4B" strokeWidth="4" animate={{ scaleY: mouthScale }} style={{ transformOrigin: "161px 191px" }} transition={{ duration: 0.08 }} />
+          )}
+
+          {accessory === "headphones" && (
+            <motion.g
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              initial={{ opacity: 0, y: -8, scale: 0.92 }}
+              transition={{ type: "spring", stiffness: 220, damping: 18, delay: 0.15 }}
+            >
+              <path d="M 66 106 Q 160 58 254 106" fill="none" stroke="#151A4B" strokeLinecap="round" strokeWidth="10" />
+              <path d="M 66 106 Q 160 62 254 106" fill="none" stroke="#7357F6" strokeLinecap="round" strokeWidth="4" />
+              <ellipse cx="66" cy="140" fill="#151A4B" rx="14" ry="21" />
+              <ellipse cx="66" cy="140" fill="#7357F6" rx="8" ry="14" />
+              <ellipse cx="63" cy="132" fill="white" opacity="0.55" rx="3" ry="4" />
+              <ellipse cx="254" cy="140" fill="#151A4B" rx="14" ry="21" />
+              <ellipse cx="254" cy="140" fill="#7357F6" rx="8" ry="14" />
+              <ellipse cx="251" cy="132" fill="white" opacity="0.55" rx="3" ry="4" />
+            </motion.g>
           )}
         </motion.g>
       </motion.svg>
