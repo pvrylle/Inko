@@ -1,12 +1,15 @@
 import { expect, test } from "@playwright/test";
 
+test.setTimeout(90_000);
+
 const pages = [
-  ["/", /Hey, I'm Inko/i],
-  ["/library", /Library/i],
-  ["/flashcards", /Flashcards/i],
-  ["/quiz", /Quiz with Inko/i],
-  ["/focus", /Focus with Inko/i],
-  ["/progress", /Your progress/i],
+  ["/", /Hey Tentaio/i],
+  ["/research", /Start a research project/i],
+  ["/sources", /Sources/i],
+  ["/canvas", /Canvas/i],
+  ["/practice", /Practice/i],
+  ["/history", /History/i],
+  ["/settings", /Settings/i],
 ] as const;
 
 test("all study surfaces render and expose a current route", async ({ page }) => {

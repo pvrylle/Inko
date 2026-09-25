@@ -1,4 +1,4 @@
-import { LibraryView } from "@/features/notes/library-view";
+import { LibraryView } from "@/features/library/library-view";
 
 export const metadata = { title: "Library" };
 

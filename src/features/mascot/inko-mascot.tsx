@@ -20,6 +20,8 @@ const bodyMotion = {
   speaking: { y: [0, -3, 0], scale: [1, 1.012, 1], rotate: 0 },
   sleeping: { y: 8, scale: 0.97, rotate: -3 },
   error: { x: [-3, 3, -2, 2, 0], scale: 0.98 },
+  working: { y: [0, -4, 0], scale: [1, 1.02, 1], rotate: [-0.5, 0.5, -0.5] },
+  researching: { y: [0, -3, 0], scale: 1, rotate: [-1, 1, -1] },
 };
 
 export function InkoMascot({ state, amplitude = 0, className = "", eyeOpenness, accessory }: InkoMascotProps) {

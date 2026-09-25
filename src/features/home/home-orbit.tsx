@@ -2,283 +2,161 @@
 
 import { motion, useReducedMotion } from "motion/react";
 import {
-  ArrowUpRight,
-  Award,
-  BookOpen,
-  Brain,
-  Clock3,
-  Compass,
-  Flame,
-  Layers3,
-  MicVocal,
-  Sparkles,
+  ArrowRight,
+  AudioLines,
+  Bell,
+  FileText,
+  FolderClosed,
+  Globe,
+  LayoutGrid,
+  Lightbulb,
+  Search,
+  Share2,
+  StickyNote,
   Target,
-  Zap,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { useFlashcards } from "@/features/flashcards/use-flashcards";
-import { useFocusSession } from "@/features/focus/use-focus-session";
+import { InkoMascot } from "@/features/mascot/inko-mascot";
 import { useMascot } from "@/features/mascot/mascot-provider";
-import { MascotStage } from "@/features/mascot/mascot-stage";
-import { useNotes } from "@/features/notes/use-notes";
-import { useProgress } from "@/features/progress/use-progress";
-import { buildStudyPlan } from "@/features/study-plan/plan";
-import { VoicePanel } from "@/features/voice/voice-panel";
+import { useResearch } from "@/features/research/use-research";
+import { VoiceCapsule } from "@/features/voice/voice-capsule";
+import { useOptionalVoiceAgent } from "@/features/voice/voice-agent-provider";
 
-const spring = { type: "spring" as const, stiffness: 240, damping: 24 };
+const prompts = [
+  { text: "Research the effects of AI on education", icon: Search, tone: "blue" },
+  { text: "Find studies that contradict each other", icon: FileText, tone: "teal" },
+  { text: "Show me the sources for this claim", icon: LayoutGrid, tone: "purple" },
+  { text: "Challenge my conclusion", icon: Globe, tone: "coral" },
+  { text: "Put the findings on the canvas", icon: Share2, tone: "violet" },
+  { text: "Save this as a research note", icon: StickyNote, tone: "indigo" },
+] as const;
 
-const voicePrompts: Array<{ text: string; icon: LucideIcon }> = [
-  { text: "Quiz me on mitosis", icon: Brain },
-  { text: "Focus 25 minutes", icon: Clock3 },
-  { text: "What should I study?", icon: Compass },
-  { text: "Read my progress", icon: Flame },
-];
+const quickTips = [
+  { text: "Be specific with your topic for better results.", icon: Search, tone: "blue" },
+  { text: "You can interrupt me anytime.", icon: AudioLines, tone: "teal" },
+  { text: "I'll always cite my sources.", icon: FileText, tone: "purple" },
+] as const;
 
-const portals = [
-  { href: "/library", label: "New note", icon: BookOpen, tone: "violet" as const },
-  { href: "/flashcards", label: "Cards", icon: Layers3, tone: "coral" as const },
-  { href: "/quiz", label: "Quiz", icon: Brain, tone: "aqua" as const },
-  { href: "/focus", label: "Focus", icon: Clock3, tone: "amber" as const },
-];
+const railFolderTones = ["blue", "teal", "purple"] as const;
 
-function useOrbitEntrance(index: number, side: "left" | "right") {
-  const reduced = useReducedMotion();
-  const from = side === "left" ? -24 : 24;
-  if (reduced) {
-    return { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: 0.2 } };
-  }
-  return {
-    initial: { opacity: 0, x: from, y: 12, scale: 0.96 },
-    animate: { opacity: 1, x: 0, y: 0, scale: 1 },
-    transition: { ...spring, delay: 0.14 + index * 0.08 },
-  };
-}
-
-function VoicePaletteCard() {
-  const entrance = useOrbitEntrance(0, "left");
-  return (
-    <motion.article className="orbit-card orbit-palette" {...entrance}>
-      <div className="orbit-card-head">
-        <span className="orbit-eyebrow"><MicVocal size={11} /> Voice palette</span>
-        <p className="orbit-title">Try saying</p>
-      </div>
-      <div className="orbit-chip-cloud">
-        {voicePrompts.map((prompt, idx) => (
-          <motion.span
-            className="orbit-chip-bubble"
-            initial={{ opacity: 0, scale: 0.7 }}
-            animate={{ opacity: 1, scale: 1 }}
-            key={prompt.text}
-            transition={{ delay: 0.32 + idx * 0.06, ...spring }}
-          >
-            <prompt.icon size={12} />
-            <span>{prompt.text}</span>
-          </motion.span>
-        ))}
-      </div>
-      <p className="orbit-caption">Shift + Space works from anywhere.</p>
-    </motion.article>
-  );
-}
-
-function PortalsCard() {
-  const entrance = useOrbitEntrance(1, "left");
-  const reduced = useReducedMotion();
-  return (
-    <motion.article className="orbit-card orbit-portals" {...entrance}>
-      <div className="orbit-card-head">
-        <span className="orbit-eyebrow"><Zap size={11} /> Shortcuts</span>
-        <p className="orbit-title">Portals</p>
-      </div>
-      <div className="orbit-portal-grid">
-        {portals.map((portal, idx) => (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            key={portal.href}
-            transition={{ delay: 0.36 + idx * 0.05, ...spring }}
-            whileHover={reduced ? undefined : { y: -3 }}
-            whileTap={reduced ? undefined : { scale: 0.94 }}
-          >
-            <Link className="orbit-portal" data-tone={portal.tone} href={portal.href}>
-              <span className="orbit-portal-icon"><portal.icon size={16} /></span>
-              <strong>{portal.label}</strong>
-              <ArrowUpRight aria-hidden="true" className="orbit-portal-arrow" size={13} />
-            </Link>
-          </motion.div>
-        ))}
-      </div>
-    </motion.article>
-  );
-}
-
-function NextStepCard() {
-  const entrance = useOrbitEntrance(0, "right");
-  const { flashcards } = useFlashcards();
-  const { notes } = useNotes();
-  const { sessions, current } = useFocusSession();
-  const { summary } = useProgress();
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const plan = useMemo(() => {
-    const dueCards = flashcards.filter((card) => Date.parse(card.due) <= now).length;
-    const quizzesCount = new Set(flashcards.map((card) => card.note_id)).size;
-    return buildStudyPlan({
-      dueCards,
-      notesCount: notes.length,
-      quizzesCount,
-      hasOpenFocus: Boolean(current) || sessions.some((session) => session.status === "active" || session.status === "paused"),
-      summary,
-    });
-  }, [current, flashcards, notes.length, now, sessions, summary]);
-
-  const step = plan.steps[0];
-  return (
-    <motion.article className="orbit-card orbit-next" {...entrance}>
-      <div className="orbit-card-head">
-        <span className="orbit-eyebrow"><Compass size={11} /> Next up</span>
-        <p className="orbit-title">{plan.headline}</p>
-      </div>
-      <p className="orbit-step-headline">{step.title}</p>
-      <p className="orbit-step-body">{step.detail}</p>
-      <div className="orbit-step-actions">
-        <span className="orbit-time-badge"><Clock3 size={11} /> {step.minutes} min</span>
-        <Link className="orbit-step-cta" href={step.href}>
-          Begin
-          <ArrowUpRight size={14} />
-        </Link>
-      </div>
-    </motion.article>
-  );
-}
-
-function PulseCard() {
-  const entrance = useOrbitEntrance(1, "right");
-  const { summary } = useProgress();
-  const max = Math.max(1, ...summary.weekly.map((day) => day.count));
-  return (
-    <motion.article className="orbit-card orbit-pulse" {...entrance}>
-      <div className="orbit-card-head">
-        <div className="orbit-pulse-head">
-          <span className="orbit-eyebrow"><Flame size={11} /> Today&apos;s pulse</span>
-          <p className="orbit-title">{summary.streak}d streak</p>
-        </div>
-        <div className="orbit-pulse-bars" aria-hidden="true">
-          {summary.weekly.map((day, idx) => (
-            <motion.span
-              animate={{ scaleY: Math.max(0.12, day.count / max) }}
-              initial={{ scaleY: 0.1 }}
-              key={day.date}
-              style={{ transformOrigin: "bottom" }}
-              transition={{ delay: 0.4 + idx * 0.04, duration: 0.55, ease: "easeOut" }}
-            />
-          ))}
-        </div>
-      </div>
-      <div className="orbit-pulse-stats">
-        <div>
-          <strong>{summary.today.cardsReviewed}</strong>
-          <small><Layers3 size={11} /> cards</small>
-        </div>
-        <div>
-          <strong>{summary.today.focusMinutes}m</strong>
-          <small><Clock3 size={11} /> focused</small>
-        </div>
-        <div>
-          <strong>{summary.quizAccuracy === null ? "—" : `${summary.quizAccuracy}%`}</strong>
-          <small><Target size={11} /> quiz</small>
-        </div>
-      </div>
-    </motion.article>
-  );
-}
-
-function AchievementCard() {
-  const entrance = useOrbitEntrance(2, "right");
-  const { summary } = useProgress();
-  const closest = useMemo(() => {
-    const unfinished = summary.achievements.filter((achievement) => !achievement.achieved);
-    if (!unfinished.length) return summary.achievements[0] ?? null;
-    return [...unfinished].sort((a, b) => (b.progress / b.target) - (a.progress / a.target))[0];
-  }, [summary.achievements]);
-  if (!closest) return null;
-  const percent = Math.max(0, Math.min(100, Math.round((closest.progress / closest.target) * 100)));
-
-  return (
-    <motion.article className="orbit-card orbit-achievement" {...entrance}>
-      <div className="orbit-card-head">
-        <span className="orbit-eyebrow"><Award size={11} /> Milestone</span>
-        <p className="orbit-title">{closest.label}</p>
-      </div>
-      <div className="orbit-achievement-body">
-        <div className="orbit-ring" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-label={`${closest.label} progress`} style={{ ["--orbit-ring" as string]: `${percent}%` }}>
-          <span>{percent}%</span>
-        </div>
-        <div>
-          <small>{closest.description}</small>
-          <div className="orbit-achievement-track" aria-hidden="true">
-            <motion.span animate={{ width: `${percent}%` }} initial={{ width: 0 }} transition={{ delay: 0.5, duration: 0.7 }} />
-          </div>
-          <span className="orbit-achievement-count">{closest.progress}/{closest.target}</span>
-        </div>
-      </div>
-    </motion.article>
-  );
-}
-
-function MascotAmbience() {
-  const reduced = useReducedMotion();
-  const { state, amplitude } = useMascot();
-  return (
-    <div className="mascot-ambience" aria-hidden="true">
-      <motion.span
-        animate={reduced ? { opacity: 0.5 } : { opacity: [0.42, 0.5 + Math.min(1, amplitude) * 0.18, 0.42], scale: [0.96, 1 + Math.min(1, amplitude) * 0.04, 0.96] }}
-        className="mascot-ambience-glow"
-        data-presence={state.presence}
-        transition={{ duration: 4.2, repeat: Infinity, ease: "easeInOut" }}
-      />
-      <span className="mascot-ambience-stage" />
-    </div>
-  );
+function relativeTime(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.round(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  return `${days}d ago`;
 }
 
 export function HomeOrbit() {
+  const reduced = useReducedMotion();
+  const { state, amplitude } = useMascot();
+  const controller = useOptionalVoiceAgent();
+  const { sessions } = useResearch();
+  const today = new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" }).format(new Date());
+  const recent = sessions.slice(0, 3);
+
+  const onPrompt = (text: string) => {
+    if (!controller) return;
+    if (controller.connection === "connected") void controller.sendText(text);
+    else void controller.start();
+  };
+
   return (
-    <section className="home-orbit" aria-label="Inko workspace">
-      <div className="orbit-column orbit-left" aria-label="Voice palette and shortcuts">
-        <VoicePaletteCard />
-        <PortalsCard />
+    <div className="home-screen page-enter">
+      <div className="content-topbar">
+        <span className="topbar-date">{today}</span>
+        <button className="topbar-icon" type="button" aria-label="Notifications"><Bell size={17} /></button>
+        <span className="topbar-avatar" aria-hidden="true">JD</span>
       </div>
 
-      <div className="orbit-center">
-        <div className="mascot-shell">
-          <MascotAmbience />
-          <MascotStage />
-        </div>
-        <VoicePanel />
-      </div>
+      <div className="home-screen-grid">
+        <section className="home-console" aria-label="Talk to Inko">
+          <motion.div
+            className="home-console-mascot"
+            animate={{ opacity: 1, y: 0 }}
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 10 }}
+            transition={{ duration: 0.4 }}
+          >
+            <span className="mascot-droplets" aria-hidden="true">
+              {Array.from({ length: 6 }, (_, index) => <span key={index} data-drop={index} />)}
+            </span>
+            <InkoMascot state={state} amplitude={amplitude} className="home-mascot" />
+          </motion.div>
 
-      <div className="orbit-column orbit-right" aria-label="Live study status">
-        <NextStepCard />
-        <PulseCard />
-        <AchievementCard />
-      </div>
+          <h1 className="home-console-title">Hey <span>Tentaio!</span></h1>
+          <p className="home-console-sub">What would you like to investigate today?</p>
 
-      <motion.span
-        animate={{ opacity: 1, y: 0 }}
-        className="orbit-hint"
-        initial={{ opacity: 0, y: 6 }}
-        transition={{ delay: 0.9, ...spring }}
-      >
-        <Sparkles size={12} /> Say a topic or press Shift + Space
-      </motion.span>
-    </section>
+          <VoiceCapsule />
+
+          <div className="home-prompts" aria-label="Try saying">
+            <p className="home-prompts-label">Try saying…</p>
+            <div className="prompt-grid">
+              {prompts.map(({ text, icon: Icon, tone }) => (
+                <button className="prompt-card" data-tone={tone} key={text} onClick={() => onPrompt(text)} type="button">
+                  <span className="prompt-card-icon"><Icon size={17} /></span>
+                  <span className="prompt-card-text">&ldquo;{text}&rdquo;</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <p className="home-console-footer">Better questions. Deeper understanding.</p>
+        </section>
+
+        <aside className="home-rail" aria-label="Your research overview">
+          <article className="rail-card">
+            <div className="rail-card-head">
+              <span className="rail-card-title"><FolderClosed size={15} /> Recent Research</span>
+              <Link className="rail-view-all" href="/research">View all <ArrowRight size={12} /></Link>
+            </div>
+            {recent.length === 0 ? (
+              <p className="rail-empty">No research yet. Ask a question to begin your first project.</p>
+            ) : (
+              <ul className="recent-research-list">
+                {recent.map((session, index) => {
+                  const subtitle = "Research project";
+                  return (
+                    <li key={session.id}>
+                      <Link className="recent-research-item" href={`/research?session=${session.id}`}>
+                        <span className="recent-research-folder" data-tone={railFolderTones[index % railFolderTones.length]}><FolderClosed size={16} /></span>
+                        <span className="recent-research-body">
+                          <strong>{session.title ?? session.question}</strong>
+                          <small>{subtitle}</small>
+                        </span>
+                        <span className="recent-research-time">{relativeTime(session.updated_at)}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </article>
+
+          <article className="rail-card your-focus-card">
+            <span className="rail-card-title"><Target size={15} /> Your Focus</span>
+            <div className="your-focus-quote">
+              <span className="your-focus-mascot" aria-hidden="true"><InkoMascot state={state} className="your-focus-inko" /></span>
+              <p>&ldquo;Small steps in research lead to big breakthroughs.&rdquo;</p>
+              <cite>— Tentaio</cite>
+            </div>
+          </article>
+
+          <article className="rail-card">
+            <span className="rail-card-title"><Lightbulb size={15} /> Quick Tips</span>
+            <ul className="quick-tips-list">
+              {quickTips.map(({ text, icon: Icon, tone }) => (
+                <li key={text}>
+                  <span className="quick-tip-icon" data-tone={tone}><Icon size={14} /></span>
+                  <span>{text}</span>
+                </li>
+              ))}
+            </ul>
+          </article>
+        </aside>
+      </div>
+    </div>
   );
 }

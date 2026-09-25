@@ -1,0 +1,1091 @@
+{
+  "pbtResults": {
+    "1.2 Write property test for mascot state machine — `WORK_STARTED` label propagation (Property 3)": {
+      "status": "passed",
+      "lastRunTimestamp": 1790106847061
+    },
+    "1.3 Write property test for mascot state machine — overlay visibility predicate (Property 4)": {
+      "status": "passed",
+      "lastRunTimestamp": 1790106918507
+    },
+    "9.2 Write property test for research question length validation (Property 12)": {
+      "status": "passed",
+      "lastRunTimestamp": 1790107763847
+    },
+    "4.2 Write property test for overlay message round-trip (Property 5)": {
+      "status": "passed",
+      "lastRunTimestamp": 1790107900877
+    },
+    "3.2 Write property test for `NavMascotAvatar` — label mapping (Property 2)": {
+      "status": "passed",
+      "lastRunTimestamp": 1790107920481
+    },
+    "12.2 Write property test for class name length constraint (Property 15)": {
+      "status": "passed",
+      "lastRunTimestamp": 1790108025654
+    },
+    "5.2 Write property test for nav active-state — `aria-current` follows pathname (Property 1)": {
+      "status": "passed",
+      "lastRunTimestamp": 1790108734269
+    },
+    "7.2 Write property test for session name max-length constraint (Property 6)": {
+      "status": "passed",
+      "lastRunTimestamp": 1790108919920
+    },
+    "7.3 Write property test for valid session name accepted and stored (Property 7)": {
+      "status": "passed",
+      "lastRunTimestamp": 1790108924217
+    },
+    "7.4 Write property test for whitespace session name rejected (Property 8)": {
+      "status": "passed",
+      "lastRunTimestamp": 1790109053022
+    },
+    "7.6 Write property test for home feedback text maps presence (Property 9)": {
+      "status": "passed",
+      "lastRunTimestamp": 1790109099920
+    },
+    "10.2 Write property test for research session sidebar ordering (Property 10)": {
+      "status": "passed",
+      "lastRunTimestamp": 1790109282223
+    },
+    "10.3 Write property test for new session appears and activates (Property 20)": {
+      "status": "passed",
+      "lastRunTimestamp": 1790109286911
+    },
+    "13.3 Write property test for file grouping by class (Property 14)": {
+      "status": "passed",
+      "lastRunTimestamp": 1790112590302
+    },
+    "13.4 Write property test for empty class shows indicator (Property 19)": {
+      "status": "passed",
+      "lastRunTimestamp": 1790112594393
+    },
+    "10.6 Write property test for research session selection shows correct question (Property 11)": {
+      "status": "passed",
+      "lastRunTimestamp": 1790112687697
+    },
+    "13.6 Write property test for upload failure surfaces file name and reason (Property 16)": {
+      "status": "passed",
+      "lastRunTimestamp": 1790113929988
+    },
+    "13.7 Write property test for uploaded file card shows all metadata (Property 17)": {
+      "status": "passed",
+      "lastRunTimestamp": 1790113933982
+    },
+    "10.8 Write property test for research sources displayed with tag (Property 13)": {
+      "status": "passed",
+      "lastRunTimestamp": 1790114014382
+    },
+    "15.2 Write property test for sequential workflow messages (Property 18)": {
+      "status": "passed",
+      "lastRunTimestamp": 1790121904410
+    }
+  },
+  "executionHistory": {
+    "1.1 Add `working` and `researching` to the `MascotPresence` union in `mascot-state.ts`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106045835
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106074686
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106292264
+      }
+    ],
+    "1.2 Write property test for mascot state machine — `WORK_STARTED` label propagation (Property 3)": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106046246
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106297390
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106985786
+      }
+    ],
+    "1.3 Write property test for mascot state machine — overlay visibility predicate (Property 4)": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106046583
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106301516
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106990105
+      }
+    ],
+    "1.4 Add `working` and `researching` body-motion variants to `inko-mascot.tsx`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106046904
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106305628
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106994782
+      }
+    ],
+    "2. Checkpoint — Ensure mascot state machine tests pass": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106047157
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107000797
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107045135
+      }
+    ],
+    "3.1 Create `src/features/mascot/mascot-avatar.tsx`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106047478
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107050915
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107594287
+      }
+    ],
+    "3.2 Write property test for `NavMascotAvatar` — label mapping (Property 2)": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106047903
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107664947
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107937350
+      }
+    ],
+    "3.3 Add CSS for `.nav-mascot`, `.nav-mascot-sprite`, `.nav-mascot-inko`, `.nav-mascot-label` and presence-keyed colour overrides to `globals.css`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106048241
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107671199
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107944079
+      }
+    ],
+    "4.1 Create `src/features/mascot/mascot-overlay.tsx`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106048697
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107055317
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107598949
+      }
+    ],
+    "4.2 Write property test for overlay message round-trip (Property 5)": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106048925
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107675548
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107948950
+      }
+    ],
+    "4.3 Add CSS for `.mascot-overlay`, `.mascot-overlay-backdrop`, `.mascot-overlay-stage`, `.mascot-overlay-message` to `globals.css`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106049215
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107680535
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107955136
+      }
+    ],
+    "5.1 Replace the navigation array in `app-shell.tsx` with the seven required items": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106049517
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108158959
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108623124
+      }
+    ],
+    "5.2 Write property test for nav active-state — `aria-current` follows pathname (Property 1)": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106049936
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108643007
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108945137
+      }
+    ],
+    "5.3 Mount `NavMascotAvatar` in the desktop sidebar (after `<nav>`, before `.progress-link`) and in the mobile nav (as a visually separate slot)": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106050322
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108647792
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108950891
+      }
+    ],
+    "5.4 Mount `MascotOverlay` as a sibling to `<main>` inside `.app-frame`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106050818
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108652142
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108955835
+      }
+    ],
+    "6. Checkpoint — Ensure nav and overlay render correctly; all tests pass": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106051282
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790117641041
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790121530786
+      }
+    ],
+    "7.1 Create `src/features/home/session-name-form.tsx`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106052342
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108163707
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108628184
+      }
+    ],
+    "7.2 Write property test for session name max-length constraint (Property 6)": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106052743
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108657116
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108961628
+      }
+    ],
+    "7.3 Write property test for valid session name accepted and stored (Property 7)": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106053146
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108661781
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108966861
+      }
+    ],
+    "7.4 Write property test for whitespace session name rejected (Property 8)": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106053559
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108974627
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790109307972
+      }
+    ],
+    "7.5 Create `src/features/home/home-feedback-text.tsx`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106053993
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108168356
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108633172
+      }
+    ],
+    "7.6 Write property test for home feedback text maps presence (Property 9)": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106054298
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108980266
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790109313556
+      }
+    ],
+    "7.7 Update `home-orbit.tsx` to replace `VoicePaletteCard` with `SessionNameForm` and the static Jarvis prompt chips": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106054630
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790109341440
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790112310619
+      }
+    ],
+    "7.8 Apply typography guard to `globals.css` — add `text-transform: none` to `.home-copy h1`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106054891
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108985177
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790109318803
+      }
+    ],
+    "8. Checkpoint — Ensure home page updates pass all tests": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106055262
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790117645815
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790121535372
+      }
+    ],
+    "9.1 Create `src/features/research/research-schema.ts`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106055625
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107059799
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107603191
+      }
+    ],
+    "9.2 Write property test for research question length validation (Property 12)": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106056054
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107684991
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107961647
+      }
+    ],
+    "9.3 Create `src/features/research/research-repository.ts`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106056345
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107966275
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108142343
+      }
+    ],
+    "10.1 Create `src/features/research/use-research.ts`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106056621
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108172819
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108637944
+      }
+    ],
+    "10.2 Write property test for research session sidebar ordering (Property 10)": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106056874
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108990374
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790109324074
+      }
+    ],
+    "10.3 Write property test for new session appears and activates (Property 20)": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106057187
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108996192
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790109329522
+      }
+    ],
+    "10.4 Create `src/features/research/research-session-form.tsx`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106057563
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790109348094
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790112315735
+      }
+    ],
+    "10.5 Create `src/features/research/research-sidebar.tsx`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106057928
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790109353664
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790112320693
+      }
+    ],
+    "10.6 Write property test for research session selection shows correct question (Property 11)": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106058284
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790112331477
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790113644702
+      }
+    ],
+    "10.7 Create `src/features/research/research-tabs.tsx`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106058615
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790112336452
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790113649650
+      }
+    ],
+    "10.8 Write property test for research sources displayed with tag (Property 13)": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106058832
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790113669000
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790117477657
+      }
+    ],
+    "10.9 Create `src/features/research/research-view.tsx`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106059090
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790113673294
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790117482484
+      }
+    ],
+    "10.10 Create `src/app/research/page.tsx`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106059491
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790117509519
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790117620460
+      }
+    ],
+    "11. Checkpoint — Ensure research feature tests pass": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106059817
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790117650232
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790121704121
+      }
+    ],
+    "12.1 Create `src/features/library/library-schema.ts`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106060206
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107063562
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107659810
+      }
+    ],
+    "12.2 Write property test for class name length constraint (Property 15)": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106060583
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107970822
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108148326
+      }
+    ],
+    "12.3 Create `src/features/library/library-repository.ts`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106060980
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107975105
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108153216
+      }
+    ],
+    "13.1 Create `src/features/library/use-library.ts`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106061827
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790109001576
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790109335372
+      }
+    ],
+    "13.2 Create `src/features/library/class-group.tsx`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106062264
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790109359332
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790112325993
+      }
+    ],
+    "13.3 Write property test for file grouping by class (Property 14)": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106062640
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790112341029
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790113654524
+      }
+    ],
+    "13.4 Write property test for empty class shows indicator (Property 19)": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106063050
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790112346064
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790113659342
+      }
+    ],
+    "13.5 Create `src/features/library/file-upload-zone.tsx`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106063444
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790112351106
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790113664264
+      }
+    ],
+    "13.6 Write property test for upload failure surfaces file name and reason (Property 16)": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106063805
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790113677721
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790117487434
+      }
+    ],
+    "13.7 Write property test for uploaded file card shows all metadata (Property 17)": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106064154
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790113681983
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790117492948
+      }
+    ],
+    "13.8 Create `src/features/library/library-view.tsx`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106064421
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790113686317
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790117504276
+      }
+    ],
+    "13.9 Update `src/app/library/page.tsx` to import `LibraryView` from `@/features/library/library-view` instead of the current `notes` library view": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106064960
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790117514589
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790117625551
+      }
+    ],
+    "14. Checkpoint — Ensure library feature tests pass": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106065266
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790117654938
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790121539913
+      }
+    ],
+    "15.1 Update the voice agent dispatch sites to emit `WORK_STARTED` and `RESEARCH_STARTED` actions at the appropriate workflow phases": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106065638
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790117659980
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790121810722
+      }
+    ],
+    "15.2 Write property test for sequential workflow messages (Property 18)": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106065986
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790121815650
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790121919163
+      }
+    ],
+    "16. Final checkpoint — Ensure all tests pass": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106066345
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790121924081
+      },
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790121977676
+      }
+    ],
+    "1. Extend mascot state machine with `working` and `researching` presence states": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790106995203
+      }
+    ],
+    "3. Implement `NavMascotAvatar` compact nav component": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107944531
+      }
+    ],
+    "4. Implement `MascotOverlay` full-screen component": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790107955623
+      }
+    ],
+    "9. Research feature — data layer": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108142846
+      }
+    ],
+    "12. Library page reframe — data layer": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108153578
+      }
+    ],
+    "5. Update `AppShell` with new nav, `NavMascotAvatar`, and `MascotOverlay`": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790108956427
+      }
+    ],
+    "7. Home page session naming and Jarvis feedback": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790112310819
+      }
+    ],
+    "10. Research feature — hook and UI components": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790117620701
+      }
+    ],
+    "13. Library page reframe — hook and UI components": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790117625755
+      }
+    ],
+    "15. Wire sequential workflow messages through existing voice agent dispatch": [
+      {
+        "executionId": "ba378d9c-7b1a-461a-b320-a898a584afc1",
+        "chatSessionId": "sess_65f85de3-024f-4a28-a632-2cdf33512621",
+        "timestamp": 1790121919280
+      }
+    ]
+  }
+}
