@@ -56,6 +56,7 @@ function buildMascotState(presence: MascotPresence): MascotState {
   return {
     presence,
     mood: "neutral",
+    emotion: "neutral",
     mode: "normal",
     message: "test message",
   };
@@ -96,6 +97,7 @@ vi.mock("motion/react", () => ({
     },
   ),
   AnimatePresence: ({ children }: { children: React.ReactNode }) => children,
+  useReducedMotion: () => true,
 }));
 
 import { useMascot } from "./mascot-provider";
@@ -117,6 +119,8 @@ describe("Property 2: NavMascotAvatar maps MascotPresence to Nav State Label", (
           vi.mocked(useMascot).mockReturnValue({
             state: mockedState,
             amplitude: 0,
+            character: "octopus",
+            setCharacter: vi.fn(),
             dispatch: vi.fn() as React.Dispatch<MascotAction>,
             setAmplitude: vi.fn(),
             celebrate: vi.fn(),
@@ -144,6 +148,8 @@ describe("Property 2: NavMascotAvatar maps MascotPresence to Nav State Label", (
           vi.mocked(useMascot).mockReturnValue({
             state: mockedState,
             amplitude: 0,
+            character: "octopus",
+            setCharacter: vi.fn(),
             dispatch: vi.fn() as React.Dispatch<MascotAction>,
             setAmplitude: vi.fn(),
             celebrate: vi.fn(),
@@ -174,6 +180,8 @@ describe("Property 2: NavMascotAvatar maps MascotPresence to Nav State Label", (
           vi.mocked(useMascot).mockReturnValue({
             state: buildMascotState(p1),
             amplitude: 0,
+            character: "octopus",
+            setCharacter: vi.fn(),
             dispatch: vi.fn() as React.Dispatch<MascotAction>,
             setAmplitude: vi.fn(),
             celebrate: vi.fn(),
@@ -185,6 +193,8 @@ describe("Property 2: NavMascotAvatar maps MascotPresence to Nav State Label", (
           vi.mocked(useMascot).mockReturnValue({
             state: buildMascotState(p2),
             amplitude: 0,
+            character: "octopus",
+            setCharacter: vi.fn(),
             dispatch: vi.fn() as React.Dispatch<MascotAction>,
             setAmplitude: vi.fn(),
             celebrate: vi.fn(),
@@ -206,6 +216,8 @@ describe("Property 2: NavMascotAvatar maps MascotPresence to Nav State Label", (
     vi.mocked(useMascot).mockReturnValue({
       state: buildMascotState("idle"),
       amplitude: 0,
+      character: "octopus",
+      setCharacter: vi.fn(),
       dispatch: vi.fn() as React.Dispatch<MascotAction>,
       setAmplitude: vi.fn(),
       celebrate: vi.fn(),
@@ -219,6 +231,8 @@ describe("Property 2: NavMascotAvatar maps MascotPresence to Nav State Label", (
     vi.mocked(useMascot).mockReturnValue({
       state: buildMascotState("sleeping"),
       amplitude: 0,
+      character: "octopus",
+      setCharacter: vi.fn(),
       dispatch: vi.fn() as React.Dispatch<MascotAction>,
       setAmplitude: vi.fn(),
       celebrate: vi.fn(),
@@ -232,6 +246,8 @@ describe("Property 2: NavMascotAvatar maps MascotPresence to Nav State Label", (
     vi.mocked(useMascot).mockReturnValue({
       state: buildMascotState("error"),
       amplitude: 0,
+      character: "octopus",
+      setCharacter: vi.fn(),
       dispatch: vi.fn() as React.Dispatch<MascotAction>,
       setAmplitude: vi.fn(),
       celebrate: vi.fn(),
@@ -245,6 +261,8 @@ describe("Property 2: NavMascotAvatar maps MascotPresence to Nav State Label", (
     vi.mocked(useMascot).mockReturnValue({
       state: buildMascotState("listening"),
       amplitude: 0,
+      character: "octopus",
+      setCharacter: vi.fn(),
       dispatch: vi.fn() as React.Dispatch<MascotAction>,
       setAmplitude: vi.fn(),
       celebrate: vi.fn(),
@@ -258,6 +276,8 @@ describe("Property 2: NavMascotAvatar maps MascotPresence to Nav State Label", (
     vi.mocked(useMascot).mockReturnValue({
       state: buildMascotState("thinking"),
       amplitude: 0,
+      character: "octopus",
+      setCharacter: vi.fn(),
       dispatch: vi.fn() as React.Dispatch<MascotAction>,
       setAmplitude: vi.fn(),
       celebrate: vi.fn(),
@@ -271,6 +291,8 @@ describe("Property 2: NavMascotAvatar maps MascotPresence to Nav State Label", (
     vi.mocked(useMascot).mockReturnValue({
       state: buildMascotState("working"),
       amplitude: 0,
+      character: "octopus",
+      setCharacter: vi.fn(),
       dispatch: vi.fn() as React.Dispatch<MascotAction>,
       setAmplitude: vi.fn(),
       celebrate: vi.fn(),
@@ -284,6 +306,8 @@ describe("Property 2: NavMascotAvatar maps MascotPresence to Nav State Label", (
     vi.mocked(useMascot).mockReturnValue({
       state: buildMascotState("researching"),
       amplitude: 0,
+      character: "octopus",
+      setCharacter: vi.fn(),
       dispatch: vi.fn() as React.Dispatch<MascotAction>,
       setAmplitude: vi.fn(),
       celebrate: vi.fn(),
@@ -297,6 +321,8 @@ describe("Property 2: NavMascotAvatar maps MascotPresence to Nav State Label", (
     vi.mocked(useMascot).mockReturnValue({
       state: buildMascotState("speaking"),
       amplitude: 0,
+      character: "octopus",
+      setCharacter: vi.fn(),
       dispatch: vi.fn() as React.Dispatch<MascotAction>,
       setAmplitude: vi.fn(),
       celebrate: vi.fn(),

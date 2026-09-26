@@ -1,0 +1,219 @@
+{
+  "fps": 24,
+  "characters": {
+    "octopus": {
+      "conversation-loop": {
+        "key": "conversation-loop",
+        "url": "/mascots/generated/octopus/conversation-loop.webp",
+        "frameWidth": 512,
+        "frameHeight": 288,
+        "cols": 9,
+        "rows": 9,
+        "count": 78,
+        "fps": 24
+      },
+      "ideal-sleeping-state": {
+        "key": "ideal-sleeping-state",
+        "url": "/mascots/generated/octopus/ideal-sleeping-state.webp",
+        "frameWidth": 512,
+        "frameHeight": 288,
+        "cols": 12,
+        "rows": 12,
+        "count": 144,
+        "fps": 24
+      },
+      "ideal-state": {
+        "key": "ideal-state",
+        "url": "/mascots/generated/octopus/ideal-state.webp",
+        "frameWidth": 512,
+        "frameHeight": 288,
+        "cols": 14,
+        "rows": 14,
+        "count": 192,
+        "fps": 24
+      },
+      "idle-state": {
+        "key": "idle-state",
+        "url": "/mascots/generated/octopus/idle-state.webp",
+        "frameWidth": 512,
+        "frameHeight": 288,
+        "cols": 14,
+        "rows": 14,
+        "count": 192,
+        "fps": 24
+      },
+      "inko-pdf": {
+        "key": "inko-pdf",
+        "url": "/mascots/generated/octopus/inko-pdf.webp",
+        "frameWidth": 512,
+        "frameHeight": 288,
+        "cols": 14,
+        "rows": 14,
+        "count": 192,
+        "fps": 24
+      },
+      "reading": {
+        "key": "reading",
+        "url": "/mascots/generated/octopus/reading.webp",
+        "frameWidth": 512,
+        "frameHeight": 288,
+        "cols": 16,
+        "rows": 15,
+        "count": 240,
+        "fps": 24
+      },
+      "research-pdf": {
+        "key": "research-pdf",
+        "url": "/mascots/generated/octopus/research-pdf.webp",
+        "frameWidth": 512,
+        "frameHeight": 288,
+        "cols": 14,
+        "rows": 14,
+        "count": 192,
+        "fps": 24
+      },
+      "sleeping-keme": {
+        "key": "sleeping-keme",
+        "url": "/mascots/generated/octopus/sleeping-keme.webp",
+        "frameWidth": 512,
+        "frameHeight": 288,
+        "cols": 12,
+        "rows": 12,
+        "count": 144,
+        "fps": 24
+      },
+      "talking-debate": {
+        "key": "talking-debate",
+        "url": "/mascots/generated/octopus/talking-debate.webp",
+        "frameWidth": 512,
+        "frameHeight": 288,
+        "cols": 12,
+        "rows": 12,
+        "count": 144,
+        "fps": 24
+      },
+      "research-pdf-standalone": {
+        "key": "research-pdf-standalone",
+        "url": "/mascots/generated/octopus/research-pdf-standalone.webp",
+        "frameWidth": 512,
+        "frameHeight": 288,
+        "cols": 14,
+        "rows": 14,
+        "count": 192,
+        "fps": 24
+      },
+      "thinking": {
+        "key": "thinking",
+        "url": "/mascots/generated/octopus/thinking.webp",
+        "frameWidth": 512,
+        "frameHeight": 288,
+        "cols": 8,
+        "rows": 8,
+        "count": 60,
+        "fps": 24
+      },
+      "happy": {
+        "key": "happy",
+        "url": "/mascots/generated/octopus/happy.webp",
+        "frameWidth": 196,
+        "frameHeight": 256,
+        "cols": 10,
+        "rows": 10,
+        "count": 96,
+        "fps": 24
+      }
+    },
+    "mrclaws": {
+      "checking-details": {
+        "key": "checking-details",
+        "url": "/mascots/generated/mrclaws/checking-details.webp",
+        "frameWidth": 256,
+        "frameHeight": 181,
+        "cols": 10,
+        "rows": 10,
+        "count": 96,
+        "fps": 24
+      },
+      "compare-results": {
+        "key": "compare-results",
+        "url": "/mascots/generated/mrclaws/compare-results.webp",
+        "frameWidth": 256,
+        "frameHeight": 181,
+        "cols": 10,
+        "rows": 10,
+        "count": 96,
+        "fps": 24
+      },
+      "listening-yuh": {
+        "key": "listening-yuh",
+        "url": "/mascots/generated/mrclaws/listening-yuh.webp",
+        "frameWidth": 256,
+        "frameHeight": 181,
+        "cols": 10,
+        "rows": 10,
+        "count": 96,
+        "fps": 24
+      },
+      "paper-verification": {
+        "key": "paper-verification",
+        "url": "/mascots/generated/mrclaws/paper-verification.webp",
+        "frameWidth": 256,
+        "frameHeight": 181,
+        "cols": 10,
+        "rows": 10,
+        "count": 96,
+        "fps": 24
+      },
+      "question": {
+        "key": "question",
+        "url": "/mascots/generated/mrclaws/question.webp",
+        "frameWidth": 256,
+        "frameHeight": 181,
+        "cols": 10,
+        "rows": 10,
+        "count": 96,
+        "fps": 24
+      },
+      "research": {
+        "key": "research",
+        "url": "/mascots/generated/mrclaws/research.webp",
+        "frameWidth": 256,
+        "frameHeight": 181,
+        "cols": 10,
+        "rows": 10,
+        "count": 96,
+        "fps": 24
+      },
+      "research-paper": {
+        "key": "research-paper",
+        "url": "/mascots/generated/mrclaws/research-paper.webp",
+        "frameWidth": 256,
+        "frameHeight": 181,
+        "cols": 10,
+        "rows": 10,
+        "count": 96,
+        "fps": 24
+      },
+      "talking": {
+        "key": "talking",
+        "url": "/mascots/generated/mrclaws/talking.webp",
+        "frameWidth": 256,
+        "frameHeight": 181,
+        "cols": 10,
+        "rows": 10,
+        "count": 96,
+        "fps": 24
+      },
+      "talking-debate": {
+        "key": "talking-debate",
+        "url": "/mascots/generated/mrclaws/talking-debate.webp",
+        "frameWidth": 256,
+        "frameHeight": 181,
+        "cols": 10,
+        "rows": 10,
+        "count": 96,
+        "fps": 24
+      }
+    }
+  }
+}

@@ -1,14 +1,21 @@
+"use client";
+
 import Link from "next/link";
+import { getMascotLogoUrl } from "@/features/mascot/sprite-manifest";
+import { useMascot } from "@/features/mascot/mascot-provider";
 
 export function InkoLogo({ compact = false }: { compact?: boolean }) {
+  const { character } = useMascot();
+  const logoSrc = getMascotLogoUrl(character);
+
   return (
-    <Link className="inko-logo" href="/" aria-label="Tentaio home">
+    <Link className="inko-logo" href="/" aria-label="Inko home">
       <span className="logo-mark" aria-hidden="true">
-        <span className="logo-eye logo-eye-left" />
-        <span className="logo-eye logo-eye-right" />
+        {/* eslint-disable-next-line @next/next/no-img-element -- small static brand mark from generated sprites */}
+        <img className="logo-mark-img" src={logoSrc} alt="" width={36} height={36} />
       </span>
       <span className="logo-text">
-        <span className="logo-word">Tentaio</span>
+        <span className="logo-word">Inko</span>
         {!compact && <span className="logo-tagline">Research. Think. Grow.</span>}
       </span>
     </Link>

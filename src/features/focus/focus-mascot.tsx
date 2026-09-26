@@ -260,6 +260,7 @@ export function FocusMascot({
                 amplitude={amplitude}
                 eyeOpenness={eyeOpenness}
                 state={state}
+                fit="contain"
               />
             </motion.div>
           </motion.div>

@@ -17,6 +17,7 @@
     "test:e2e": "playwright test",
     "test:db": "supabase test db",
     "voice:provision": "node scripts/provision-agent.mjs",
+    "build:mascots": "node scripts/build-mascot-sprites.mjs",
     "validate": "npm run lint && npm run typecheck && npm run test && npm run build",
     "validate:release": "npm run validate && npm run test:e2e"
   },

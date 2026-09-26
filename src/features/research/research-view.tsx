@@ -69,9 +69,9 @@ export function ResearchView() {
   const derivedActivity = activeSession
     ? [
         { key: "created", tone: "teal", text: "You started this research project", time: relativeTime(activeSession.created_at) },
-        research.sources.length ? { key: "sources", tone: "blue", text: `Tentaio found ${research.sources.length} relevant source${research.sources.length === 1 ? "" : "s"}.`, time: relativeTime(activeSession.updated_at) } : null,
-        research.contradictions.length ? { key: "contradictions", tone: "coral", text: `Tentaio identified ${research.contradictions.length} contradiction${research.contradictions.length === 1 ? "" : "s"}.`, time: relativeTime(activeSession.updated_at) } : null,
-        research.findings.length ? { key: "findings", tone: "blue", text: `Tentaio saved ${research.findings.length} key finding${research.findings.length === 1 ? "" : "s"}.`, time: relativeTime(activeSession.updated_at) } : null,
+        research.sources.length ? { key: "sources", tone: "blue", text: `Inko found ${research.sources.length} relevant source${research.sources.length === 1 ? "" : "s"}.`, time: relativeTime(activeSession.updated_at) } : null,
+        research.contradictions.length ? { key: "contradictions", tone: "coral", text: `Inko identified ${research.contradictions.length} contradiction${research.contradictions.length === 1 ? "" : "s"}.`, time: relativeTime(activeSession.updated_at) } : null,
+        research.findings.length ? { key: "findings", tone: "blue", text: `Inko saved ${research.findings.length} key finding${research.findings.length === 1 ? "" : "s"}.`, time: relativeTime(activeSession.updated_at) } : null,
         research.openQuestions.length ? { key: "questions", tone: "amber", text: `${research.openQuestions.length} open question${research.openQuestions.length === 1 ? "" : "s"} to explore.`, time: relativeTime(activeSession.updated_at) } : null,
       ].filter(Boolean)
     : [];
@@ -97,9 +97,9 @@ export function ResearchView() {
 
         <div className="research-start">
           <div className="research-start-card">
-            <span className="research-start-mascot" aria-hidden="true"><InkoMascot state={state} className="research-start-inko" /></span>
+            <span className="research-start-mascot" aria-hidden="true"><InkoMascot state={state} className="research-start-inko" fit="contain" /></span>
             <h1>Start a research project</h1>
-            <p>Ask a question worth investigating. Tentaio gathers sources, weighs findings, and surfaces contradictions with you.</p>
+            <p>Ask a question worth investigating. Inko gathers sources, weighs findings, and surfaces contradictions with you.</p>
             <ResearchSessionForm createSession={research.createSession} sessionError={research.sessionError} />
           </div>
 
@@ -136,7 +136,7 @@ export function ResearchView() {
             <span className="project-folder" aria-hidden="true"><FolderOpen size={24} /></span>
             <div className="project-heading">
               <h1>{activeSession.title ?? shortTitle(activeSession.question)}</h1>
-              <p>{activeSession.description ?? "Tentaio is helping you gather evidence, weigh findings, and track open questions for this research."}</p>
+              <p>{activeSession.description ?? "Inko is helping you gather evidence, weigh findings, and track open questions for this research."}</p>
               <div className="project-meta">
                 <span className="meta-chip"><Mic2 size={12} /> Research Project</span>
                 <span className="meta-chip"><Calendar size={12} /> Last updated {relativeTime(activeSession.updated_at)}</span>
@@ -145,7 +145,7 @@ export function ResearchView() {
             </div>
             <div className="project-mascot">
               <span className="project-mascot-bubble">I&apos;ve gathered some sources for your research!</span>
-              <InkoMascot state={state} className="project-mascot-inko" />
+              <InkoMascot state={state} className="project-mascot-inko" fit="contain" />
             </div>
           </header>
 
@@ -170,7 +170,7 @@ export function ResearchView() {
               <button className="rail-view-all" onClick={() => research.setActiveTab("sources")} type="button">View all <ArrowRight size={12} /></button>
             </div>
             {research.sources.length === 0 ? (
-              <p className="rail-empty">Tentaio will list gathered sources here.</p>
+              <p className="rail-empty">Inko will list gathered sources here.</p>
             ) : (
               <ul className="recent-sources-list">
                 {research.sources.slice(0, 4).map((source) => (
@@ -204,7 +204,7 @@ export function ResearchView() {
           </article>
 
           <article className="rail-card keep-going-card">
-            <span className="keep-going-mascot" aria-hidden="true"><InkoMascot state={state} className="keep-going-inko" /></span>
+            <span className="keep-going-mascot" aria-hidden="true"><InkoMascot state={state} className="keep-going-inko" fit="cover" /></span>
             <div className="keep-going-body">
               <strong>Keep going!</strong>
               <span>Explore the contradictions or open the full source list.</span>

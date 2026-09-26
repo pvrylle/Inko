@@ -83,10 +83,10 @@ export function HomeOrbit() {
             <span className="mascot-droplets" aria-hidden="true">
               {Array.from({ length: 6 }, (_, index) => <span key={index} data-drop={index} />)}
             </span>
-            <InkoMascot state={state} amplitude={amplitude} className="home-mascot" />
+            <InkoMascot state={state} amplitude={amplitude} className="home-mascot" fit="contain" />
           </motion.div>
 
-          <h1 className="home-console-title">Hey <span>Tentaio!</span></h1>
+          <h1 className="home-console-title">Hey <span>Inko!</span></h1>
           <p className="home-console-sub">What would you like to investigate today?</p>
 
           <VoiceCapsule />
@@ -138,9 +138,9 @@ export function HomeOrbit() {
           <article className="rail-card your-focus-card">
             <span className="rail-card-title"><Target size={15} /> Your Focus</span>
             <div className="your-focus-quote">
-              <span className="your-focus-mascot" aria-hidden="true"><InkoMascot state={state} className="your-focus-inko" /></span>
+              <span className="your-focus-mascot" aria-hidden="true"><InkoMascot state={state} className="your-focus-inko" fit="cover" /></span>
               <p>&ldquo;Small steps in research lead to big breakthroughs.&rdquo;</p>
-              <cite>— Tentaio</cite>
+              <cite>— Inko</cite>
             </div>
           </article>
 

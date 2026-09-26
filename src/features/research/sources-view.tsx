@@ -23,14 +23,14 @@ export function SourcesView() {
       <PageHeading
         eyebrow="Research"
         title="Sources"
-        description="Every source Tentaio has gathered, grouped by research project."
+        description="Every source Inko has gathered, grouped by research project."
         action={<Link className="secondary-button" href="/library"><Upload size={15} /> Upload files</Link>}
       />
 
       {loading ? (
         <div className="library-loading" aria-busy="true"><span /><span /><span /><p>Loading your sources…</p></div>
       ) : sessions.length === 0 ? (
-        <EmptyState icon={FolderOpen} title="No sources yet" message="Start a research project and Tentaio will collect and tag sources for you." action={<Link className="primary-button" href="/research">Start research</Link>} />
+        <EmptyState icon={FolderOpen} title="No sources yet" message="Start a research project and Inko will collect and tag sources for you." action={<Link className="primary-button" href="/research">Start research</Link>} />
       ) : (
         <div className="source-collection-grid">
           {sessions.map((session) => (

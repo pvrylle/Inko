@@ -2,10 +2,26 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { initialMascotState, mascotReducer, type MascotAction, type MascotState } from "./mascot-state";
+import type { MascotCharacter } from "./sprite-manifest";
+
+const CHARACTER_STORAGE_KEY = "inko.mascot.character";
+
+function readStoredCharacter(): MascotCharacter {
+  if (typeof window === "undefined") return "octopus";
+  try {
+    const value = window.localStorage.getItem(CHARACTER_STORAGE_KEY);
+    if (value === "octopus" || value === "mrclaws") return value;
+  } catch {
+    // ignore storage failures
+  }
+  return "octopus";
+}
 
 type MascotContextValue = {
   state: MascotState;
   amplitude: number;
+  character: MascotCharacter;
+  setCharacter: (character: MascotCharacter) => void;
   dispatch: React.Dispatch<MascotAction>;
   setAmplitude: (value: number) => void;
   celebrate: (message?: string) => void;
@@ -17,7 +33,21 @@ const SLEEP_AFTER_MS = 90_000;
 export function MascotProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(mascotReducer, initialMascotState);
   const [amplitude, setAmplitudeState] = useState(0);
+  const [character, setCharacterState] = useState<MascotCharacter>("octopus");
   const moodTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setCharacterState(readStoredCharacter());
+  }, []);
+
+  const setCharacter = useCallback((next: MascotCharacter) => {
+    setCharacterState(next);
+    try {
+      window.localStorage.setItem(CHARACTER_STORAGE_KEY, next);
+    } catch {
+      // ignore storage failures
+    }
+  }, []);
 
   const setAmplitude = useCallback((value: number) => {
     setAmplitudeState(Math.max(0, Math.min(1, value)));
@@ -46,7 +76,10 @@ export function MascotProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const value = useMemo(() => ({ state, amplitude, dispatch, setAmplitude, celebrate }), [state, amplitude, setAmplitude, celebrate]);
+  const value = useMemo(
+    () => ({ state, amplitude, character, setCharacter, dispatch, setAmplitude, celebrate }),
+    [state, amplitude, character, setCharacter, setAmplitude, celebrate],
+  );
   return <MascotContext.Provider value={value}>{children}</MascotContext.Provider>;
 }
 

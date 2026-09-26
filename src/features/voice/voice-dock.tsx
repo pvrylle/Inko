@@ -36,7 +36,7 @@ export function PersistentVoiceDock() {
   return (
     <aside className="voice-dock" data-active={active} aria-label="AssemblyAI study companion">
       <button
-        aria-label={active ? "End voice session" : "Start talking to Tentaio"}
+        aria-label={active ? "End voice session" : "Start talking to Inko"}
         aria-pressed={active}
         className="voice-dock-button"
         disabled={controller.connection === "ending"}

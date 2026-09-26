@@ -75,9 +75,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="sidebar-user" data-listening={listening}>
-          <span className="sidebar-user-avatar" aria-hidden="true"><InkoMascot state={state} className="sidebar-user-inko" /></span>
+          <span className="sidebar-user-avatar" aria-hidden="true"><InkoMascot state={state} className="sidebar-user-inko" fit="cover" /></span>
           <span className="sidebar-user-body">
-            <strong>Tentaio</strong>
+            <strong>Inko</strong>
             <small><i /> Ready to listen</small>
           </span>
           <AudioLines aria-hidden="true" className="sidebar-user-wave" size={17} />

@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test.setTimeout(90_000);
 
 const pages = [
-  ["/", /Hey Tentaio/i],
+  ["/", /Hey Inko/i],
   ["/research", /Start a research project/i],
   ["/sources", /Sources/i],
   ["/canvas", /Canvas/i],

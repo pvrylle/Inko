@@ -21,7 +21,7 @@ export function NavMascotAvatar() {
     <div className="nav-mascot" aria-hidden="true">
       <div className="nav-mascot-sprite">
         {/* No interaction handlers — non-interactive in nav position (Req 3.10) */}
-        <InkoMascot state={state} className="nav-mascot-inko" />
+        <InkoMascot state={state} className="nav-mascot-inko" fit="cover" />
       </div>
       <span className="nav-mascot-label" data-presence={state.presence}>
         {presenceLabel[state.presence]}

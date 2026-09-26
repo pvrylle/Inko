@@ -35,6 +35,7 @@ const arbitraryMascotState: fc.Arbitrary<MascotState> = fc.record({
     "researching",
   ),
   mood: fc.constantFrom<MascotMood>("neutral", "happy", "encouraging"),
+  emotion: fc.constantFrom("neutral", "happy", "curious", "focused", "concerned", "encouraging"),
   mode: fc.constantFrom<MascotMode>("normal", "focus"),
   message: fc.string(),
 });
@@ -175,6 +176,7 @@ describe("Property 18: Sequential workflow messages", () => {
         fc.record({
           presence: fc.constant("thinking" as const),
           mood: fc.constantFrom<MascotMood>("neutral", "happy", "encouraging"),
+          emotion: fc.constantFrom("neutral", "happy", "curious", "focused", "concerned", "encouraging"),
           mode: fc.constantFrom<MascotMode>("normal", "focus"),
           message: fc.string(),
         }),
@@ -201,6 +203,7 @@ describe("Property 18: Sequential workflow messages", () => {
         fc.record({
           presence: fc.constant("working" as const),
           mood: fc.constantFrom<MascotMood>("neutral", "happy", "encouraging"),
+          emotion: fc.constantFrom("neutral", "happy", "curious", "focused", "concerned", "encouraging"),
           mode: fc.constantFrom<MascotMode>("normal", "focus"),
           message: fc.string(),
         }),
@@ -224,6 +227,7 @@ describe("Property 18: Sequential workflow messages", () => {
         fc.record({
           presence: fc.constant("researching" as const),
           mood: fc.constantFrom<MascotMood>("neutral", "happy", "encouraging"),
+          emotion: fc.constantFrom("neutral", "happy", "curious", "focused", "concerned", "encouraging"),
           mode: fc.constantFrom<MascotMode>("normal", "focus"),
           message: fc.string(),
         }),
@@ -250,6 +254,7 @@ describe("Property 18: Sequential workflow messages", () => {
         fc.record({
           presence: fc.constant("working" as const),
           mood: fc.constantFrom<MascotMood>("neutral", "happy", "encouraging"),
+          emotion: fc.constantFrom("neutral", "happy", "curious", "focused", "concerned", "encouraging"),
           mode: fc.constantFrom<MascotMode>("normal", "focus"),
           message: fc.string(),
         }),
@@ -273,6 +278,7 @@ describe("Property 18: Sequential workflow messages", () => {
         fc.record({
           presence: fc.constant("speaking" as const),
           mood: fc.constantFrom<MascotMood>("neutral", "happy", "encouraging"),
+          emotion: fc.constantFrom("neutral", "happy", "curious", "focused", "concerned", "encouraging"),
           mode: fc.constant("normal" as const),
           message: fc.string(),
         }),
@@ -300,6 +306,7 @@ describe("Property 18: Sequential workflow messages", () => {
     const focusStart: MascotState = {
       presence: "speaking",
       mood: "neutral",
+      emotion: "neutral",
       mode: "focus",
       message: "Here's what I found.",
     };

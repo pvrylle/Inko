@@ -28,6 +28,7 @@ const arbitraryMascotState: fc.Arbitrary<MascotState> = fc.record({
     "researching",
   ),
   mood: fc.constantFrom("neutral", "happy", "encouraging"),
+  emotion: fc.constantFrom("neutral", "happy", "curious", "focused", "concerned", "encouraging"),
   mode: fc.constantFrom("normal", "focus"),
   message: fc.string(),
 });

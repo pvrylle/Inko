@@ -20,7 +20,7 @@ function hintFor(connection: VoiceAgentController["connection"], partial: string
     case "error":
       return "Voice needs a quick reset — tap to try again";
     default:
-      return 'Tap to speak · or say "Hey Tentaio"';
+      return 'Tap to speak · or say "Hey Inko"';
   }
 }
 
@@ -51,7 +51,7 @@ function VoiceCapsuleView({ controller }: { controller: VoiceAgentController }) 
         <Wave side="left" amp={amp} active={active} />
 
         <button
-          aria-label={active ? "End voice session" : "Start talking to Tentaio"}
+          aria-label={active ? "End voice session" : "Start talking to Inko"}
           aria-pressed={active}
           className="voice-capsule-mic"
           data-active={active}

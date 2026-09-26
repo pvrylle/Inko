@@ -86,7 +86,7 @@ afterEach(() => {
 
 /** Build a working-presence MascotState with the given message. */
 function workingState(message: string): MascotState {
-  return { presence: "working", mood: "neutral", mode: "normal", message };
+  return { presence: "working", mood: "neutral", emotion: "focused", mode: "normal", message };
 }
 
 /** Inject a MascotState into the mock and render MascotOverlay. */
@@ -94,6 +94,8 @@ function renderOverlay(state: MascotState) {
   mockUseMascot.mockReturnValue({
     state,
     amplitude: 0,
+    character: "octopus",
+    setCharacter: vi.fn(),
     dispatch: vi.fn(),
     setAmplitude: vi.fn(),
     celebrate: vi.fn(),
@@ -115,6 +117,14 @@ const arbitraryAnyMascotState: fc.Arbitrary<MascotState> = fc.record({
     "researching" as const,
   ),
   mood: fc.constantFrom("neutral" as const, "happy" as const, "encouraging" as const),
+  emotion: fc.constantFrom(
+    "neutral" as const,
+    "happy" as const,
+    "curious" as const,
+    "focused" as const,
+    "concerned" as const,
+    "encouraging" as const,
+  ),
   mode: fc.constantFrom("normal" as const, "focus" as const),
   message: fc.string(),
 });
@@ -252,7 +262,7 @@ describe("Property 5 — Leg B: render round-trip (MascotOverlay DOM)", () => {
 
   it("concrete render — 'I'm comparing the evidence.' (researching state) appears in aria-live region", () => {
     const message = "I'm comparing the evidence.";
-    const state: MascotState = { presence: "researching", mood: "neutral", mode: "normal", message };
+    const state: MascotState = { presence: "researching", mood: "neutral", emotion: "focused", mode: "normal", message };
     renderOverlay(state);
 
     const liveRegion = screen.getByRole("status");
