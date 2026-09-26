@@ -30,7 +30,7 @@ const companions: { id: MascotCharacter; name: string; blurb: string }[] = [
 function SlideMascot({ state }: { state: ReturnType<typeof useMascot>["state"] }) {
   return (
     <div className="onboarding-mascot" aria-hidden="true">
-      <InkoMascot state={state} className="onboarding-mascot-sprite" fit="contain" />
+      <InkoMascot character="octopus" state={state} className="onboarding-mascot-sprite" fit="contain" />
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { BookOpen, Brain, CalendarClock, CheckCircle2, Flame, Layers3, RotateCcw, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { BackToPractice } from "@/components/layout/content-topbar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeading } from "@/components/ui/page-heading";
 import { useMascot } from "@/features/mascot/mascot-provider";
@@ -136,6 +137,7 @@ export function FlashcardsView() {
 
   return (
     <div className="content-page page-enter">
+      <BackToPractice />
       <PageHeading eyebrow="Remember for longer" title="Flashcards" description="Inko checks meaning, then you choose the rating that advances your private FSRS schedule." />
 
       <div className="stat-strip" aria-label="Flashcard statistics">

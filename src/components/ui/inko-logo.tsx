@@ -2,11 +2,9 @@
 
 import Link from "next/link";
 import { getMascotLogoUrl } from "@/features/mascot/sprite-manifest";
-import { useMascot } from "@/features/mascot/mascot-provider";
 
 export function InkoLogo({ compact = false }: { compact?: boolean }) {
-  const { character } = useMascot();
-  const logoSrc = getMascotLogoUrl(character);
+  const logoSrc = getMascotLogoUrl("octopus");
 
   return (
     <Link className="inko-logo" href="/" aria-label="Inko home">

@@ -11,7 +11,8 @@
 //   - MR CLAWS (secondary): public/mascots/MR Claws/MR claws/tentaio_*/
 //       One packed sheet `<name>.png` + a MAKKO atlas JSON with per-frame
 //       coordinates (the JSON's `image` says .webp but the real file is .png).
-//   Videos, GIFs, and static pose PNGs are never packed.
+//   Videos, GIFs, and static pose PNGs are never packed — MP4 quality is too
+//   soft for UI, so only the PNG sprite sheets / MAKKO atlases are used.
 //
 // Output: public/mascots/generated/<character>/<key>.webp + <key>.json,
 //         and public/mascots/generated/manifest.json.

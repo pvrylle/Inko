@@ -3097,12 +3097,24 @@ body {
    Reference-accurate Home + Research redesign
    ========================================================================== */
 
-/* Shared top bar (date ┬╖ notifications ┬╖ avatar) */
+/* Shared top bar (date + account) */
 .content-topbar { align-items: center; display: flex; gap: 12px; justify-content: flex-end; padding: 2px 2px 16px; }
 .topbar-date { color: var(--color-text-secondary); font-size: 12px; font-weight: 800; letter-spacing: 0.01em; }
-.topbar-icon { align-items: center; background: white; border: 1px solid var(--color-border); border-radius: 12px; color: var(--color-text-secondary); cursor: pointer; display: flex; height: 38px; justify-content: center; transition: color 140ms ease, border-color 140ms ease; width: 38px; }
-.topbar-icon:hover { border-color: #b9cdf5; color: var(--color-primary); }
-.topbar-avatar { align-items: center; background: linear-gradient(140deg, #3568f4, #6f5cf5); border-radius: 50%; color: white; display: flex; font-size: 12px; font-weight: 900; height: 38px; justify-content: center; width: 38px; }
+.topbar-account {
+  align-items: center;
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  display: inline-flex;
+  gap: 8px;
+  padding: 3px 10px 3px 3px;
+  text-decoration: none;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.topbar-account:hover { border-color: #b9cdf5; box-shadow: 0 8px 18px rgba(53, 104, 244, 0.1); }
+.topbar-avatar { align-items: center; background: linear-gradient(140deg, #3568f4, #6f5cf5); border-radius: 50%; color: white; display: flex; flex: 0 0 auto; font-size: 11px; font-weight: 900; height: 32px; justify-content: center; width: 32px; }
+.topbar-account-name { color: #14265e; font-size: 12px; font-weight: 800; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 620px) { .topbar-account-name { display: none; } .topbar-account { padding: 3px; } }
 
 /* ΓöÇΓöÇ Home screen ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 .home-screen { display: flex; flex-direction: column; margin: 0 auto; max-width: 1240px; }
@@ -3243,7 +3255,7 @@ body {
 /* ΓöÇΓöÇ Research view ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 .research-view-page { margin: 0 auto; max-width: 1240px; }
 .research-topbar { justify-content: flex-end; }
-.back-home { align-items: center; color: var(--color-primary); display: inline-flex; font-size: 13px; font-weight: 800; gap: 6px; margin-right: auto; }
+.back-home { align-items: center; color: var(--color-primary); display: inline-flex; font-size: 13px; font-weight: 800; gap: 6px; margin: 0 auto 14px 0; }
 .back-home:hover { color: var(--color-primary-dark); }
 
 .research-workspace { align-items: start; display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }

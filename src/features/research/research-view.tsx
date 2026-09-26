@@ -3,7 +3,6 @@
 import {
   ArrowLeft,
   ArrowRight,
-  Bell,
   Calendar,
   Clock,
   FileText,
@@ -12,6 +11,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
+import { ContentTopbar } from "@/components/layout/content-topbar";
 import { InkoMascot } from "@/features/mascot/inko-mascot";
 import { useMascot } from "@/features/mascot/mascot-provider";
 import { useOptionalVoiceAgent } from "@/features/voice/voice-agent-provider";
@@ -27,18 +27,6 @@ function relativeTime(iso: string) {
   const hours = Math.round(mins / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.round(hours / 24)}d ago`;
-}
-
-function ContentTopbar({ children }: { children?: React.ReactNode }) {
-  const today = new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" }).format(new Date());
-  return (
-    <div className="content-topbar research-topbar">
-      {children}
-      <span className="topbar-date">{today}</span>
-      <button className="topbar-icon" type="button" aria-label="Notifications"><Bell size={17} /></button>
-      <span className="topbar-avatar" aria-hidden="true">JD</span>
-    </div>
-  );
 }
 
 export function ResearchView() {
@@ -80,7 +68,7 @@ export function ResearchView() {
   if (loading && !activeSession) {
     return (
       <div className="research-view-page page-enter">
-        <ContentTopbar><Link className="back-home" href="/"><ArrowLeft size={15} /> Back to Home</Link></ContentTopbar>
+        <ContentTopbar className="research-topbar"><Link className="back-home" href="/"><ArrowLeft size={15} /> Back to Home</Link></ContentTopbar>
         <div className="research-loading" aria-live="polite" aria-busy="true">
           <span className="research-loading-orb" />
           <p>Organising your research desk…</p>
@@ -92,7 +80,7 @@ export function ResearchView() {
   if (!activeSession) {
     return (
       <div className="research-view-page page-enter">
-        <ContentTopbar><Link className="back-home" href="/"><ArrowLeft size={15} /> Back to Home</Link></ContentTopbar>
+        <ContentTopbar className="research-topbar"><Link className="back-home" href="/"><ArrowLeft size={15} /> Back to Home</Link></ContentTopbar>
         {error && <p className="form-error research-error" role="alert">{error}</p>}
 
         <div className="research-start">
@@ -126,7 +114,7 @@ export function ResearchView() {
 
   return (
     <div className="research-view-page page-enter">
-      <ContentTopbar><Link className="back-home" href="/"><ArrowLeft size={15} /> Back to Home</Link></ContentTopbar>
+      <ContentTopbar className="research-topbar"><Link className="back-home" href="/"><ArrowLeft size={15} /> Back to Home</Link></ContentTopbar>
 
       {error && <p className="form-error research-error" role="alert">{error}</p>}
 

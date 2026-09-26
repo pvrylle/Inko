@@ -70,6 +70,8 @@ export function SpriteMascot({
         canvas.height = pxH;
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
       ctx.clearRect(0, 0, cw, ch);
 
       const col = frame % atlas.cols;

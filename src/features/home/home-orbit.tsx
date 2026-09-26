@@ -4,7 +4,6 @@ import { motion, useReducedMotion } from "motion/react";
 import {
   ArrowRight,
   AudioLines,
-  Bell,
   FileText,
   FolderClosed,
   Globe,
@@ -16,6 +15,7 @@ import {
   Target,
 } from "lucide-react";
 import Link from "next/link";
+import { ContentTopbar } from "@/components/layout/content-topbar";
 import { InkoMascot } from "@/features/mascot/inko-mascot";
 import { useMascot } from "@/features/mascot/mascot-provider";
 import { useResearch } from "@/features/research/use-research";
@@ -55,7 +55,6 @@ export function HomeOrbit() {
   const { state, amplitude } = useMascot();
   const controller = useOptionalVoiceAgent();
   const { sessions } = useResearch();
-  const today = new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" }).format(new Date());
   const recent = sessions.slice(0, 3);
 
   const onPrompt = (text: string) => {
@@ -66,11 +65,7 @@ export function HomeOrbit() {
 
   return (
     <div className="home-screen page-enter">
-      <div className="content-topbar">
-        <span className="topbar-date" suppressHydrationWarning>{today}</span>
-        <button className="topbar-icon" type="button" aria-label="Notifications"><Bell size={17} /></button>
-        <span className="topbar-avatar" aria-hidden="true">JD</span>
-      </div>
+      <ContentTopbar />
 
       <div className="home-screen-grid">
         <section className="home-console" aria-label="Talk to Inko">
