@@ -214,7 +214,7 @@ export function useVoiceAgent() {
       const response = await inkoFetch("/api/voice/session/end", { method: "POST", body: JSON.stringify({ voiceSessionId }), keepalive });
       if (response.ok) voiceSessionIdRef.current = null;
     } catch {
-      // The protected cleanup cron retries stale and deletion-pending sessions.
+      // Provider-session deletion is requested immediately when the call ends.
     }
   }, []);
 

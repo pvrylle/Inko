@@ -16,7 +16,6 @@ Inko is a mobile-first, voice-first AI study companion built with Next.js, Supab
 - Toast celebration system for milestones and completions.
 - `plan_study_session` and `summarize_progress` voice tools for narrated coaching.
 - Responsive desktop/mobile UI using the supplied Inko palette and animated SVG mascot.
-- Vercel-ready protected cron retries for provider-session cleanup.
 
 ## Prerequisites
 
@@ -33,20 +32,24 @@ Copy-Item .env.example .env.local
 npm run dev
 ```
 
-Without Supabase variables the browser uses isolated localStorage demo data. Gemini-backed generation still needs `GEMINI_API_KEY`; live voice intentionally requires Supabase because voice sessions are owner-audited and cleaned up server-side.
+Without Supabase variables the browser uses isolated localStorage demo data.
+
+**Plan B (Gemini only):** set `GEMINI_API_KEY` (and optionally `GEMINI_API_KEY2` as backup). Browser dictation → chat, plus notes/flashcards/quizzes. If the primary key hits quota/rate limits, Inko retries with key 2 automatically. No AssemblyAI and no cron required.
+
+**Plan A (later):** add `ASSEMBLYAI_API_KEY` + `ASSEMBLYAI_AGENT_ID` (and usually Supabase) for live voice; ending a call deletes the provider session immediately.
 
 ## Environment variables
 
 | Variable | Visibility | Purpose |
 | --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Browser-visible | Supabase project URL. |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser-visible | Publishable/anon client key. |
-| `SUPABASE_SECRET_KEY` | Server only | Atomic private quiz creation and cleanup cron administration. Never prefix with `NEXT_PUBLIC_`. |
-| `ASSEMBLYAI_API_KEY` | Server only | Temporary voice token issuance, provisioning, and provider-session deletion. |
-| `ASSEMBLYAI_AGENT_ID` | Server only | Provisioned Inko Voice Agent ID. |
-| `GEMINI_API_KEY` | Server only | Gemini generation. The provisioning script also sends this key to AssemblyAI's agent configuration so AssemblyAI can invoke Gemini's OpenAI-compatible endpoint. |
+| `GEMINI_API_KEY` | Server only | **Plan B** primary Gemini key — chat, dictation, notes/flashcards/quizzes. |
+| `GEMINI_API_KEY2` | Server only | **Plan B** optional backup Gemini key if primary is rate-limited or exhausted. |
 | `GEMINI_MODEL` | Server only | Defaults to `gemini-flash-latest`. |
-| `CRON_SECRET` | Server only | Random 32+ character bearer secret for the cleanup cron. |
+| `ASSEMBLYAI_API_KEY` | Server only | **Plan A (optional)** live voice token + session deletion. |
+| `ASSEMBLYAI_AGENT_ID` | Server only | **Plan A (optional)** provisioned Voice Agent ID. |
+| `NEXT_PUBLIC_SUPABASE_URL` | Browser-visible | Optional Supabase project URL. |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser-visible | Optional publishable/anon client key. |
+| `SUPABASE_SECRET_KEY` | Server only | Optional atomic private quiz creation on hosted Supabase. Never prefix with `NEXT_PUBLIC_`. |
 
 Restart local development or redeploy Vercel after changing environment variables.
 
@@ -84,15 +87,12 @@ The script creates an agent when `ASSEMBLYAI_AGENT_ID` is absent and updates tha
 ## Deploy to Vercel
 
 1. Import this repository into Vercel; the detected framework is Next.js and the build command is `npm run build`.
-2. Add all hosted environment variables to Production and the desired Preview scopes.
-3. Apply Supabase migrations **before** deploying code that invokes new RPCs.
-4. Provision/update the AssemblyAI agent and set `ASSEMBLYAI_AGENT_ID`.
-5. Deploy. `vercel.json` schedules `/api/cron/voice-cleanup` daily at 04:00 UTC.
-6. Verify Home, Library, Flashcards, Quiz, Focus, Progress, anonymous Auth, one voice call, and the cron invocation logs.
+2. Add environment variables (at minimum `GEMINI_API_KEY` for AI fallback; add AssemblyAI + Supabase when enabling live voice).
+3. Apply Supabase migrations **before** deploying code that invokes new RPCs (only if using Supabase).
+4. Optionally provision/update the AssemblyAI agent and set `ASSEMBLYAI_AGENT_ID`.
+5. Deploy and verify Home, Library, Flashcards, Quiz, Focus, Progress, and mic fallback (or one live voice call when configured).
 
-Vercel automatically sends `Authorization: Bearer <CRON_SECRET>` when that environment variable is configured. Use a random value of at least 16 characters; this project recommends 32+. See the official [Vercel Cron management documentation](https://vercel.com/docs/cron-jobs/manage-cron-jobs).
-
-Deployment is straightforward as one Vercel project: browser audio goes directly to AssemblyAI, while short authenticated API mutations run as Next.js functions and data persists in Supabase. No long-running custom server is required.
+Deployment is straightforward as one Vercel project: without AssemblyAI the mic falls back to browser dictation → Gemini; with AssemblyAI, browser audio goes directly to the agent. Short authenticated API mutations run as Next.js functions. No cron job and no long-running custom server are required.
 
 ## Validation
 
@@ -112,12 +112,12 @@ Set `PLAYWRIGHT_BASE_URL` to run browser tests against a deployed Preview; other
 ## Privacy and operational behavior
 
 - Inko stores transcripts and study artifacts, not raw microphone audio.
-- Audio streams directly from the browser to AssemblyAI.
-- Ending a voice call immediately requests deletion of the AssemblyAI provider session. Failed/missing-ID deletions remain `deletion_pending`; the protected cron retries them and recovers stale active rows. Strict third-party zero-retention is not guaranteed by the Voice Agent API.
+- Audio streams directly from the browser to AssemblyAI when live voice is configured; otherwise the mic uses browser SpeechRecognition and Gemini chat.
+- Ending a live voice call immediately requests deletion of the AssemblyAI provider session. Strict third-party zero-retention is not guaranteed by the Voice Agent API.
 - Supabase RLS isolates records by anonymous user ID. Local demo storage is behavior simulation, not a security boundary; browser users can inspect local quiz keys.
 - The in-process API rate limiter protects ordinary single-instance use, but high-scale production should add a distributed limiter or Vercel firewall rules.
 - Progress streaks use UTC activity days and may continue when the latest activity was yesterday.
 
 ## Release notes and rollback
 
-Database migrations are forward-only. Before production migration, back up the project and review SQL. If an application deploy must be rolled back, redeploy the previous Vercel build; do not reverse schema changes until dependencies and stored data have been assessed. Provider keys and `CRON_SECRET` can be rotated independently, followed by a redeploy and voice-agent reprovision when applicable.
+Database migrations are forward-only. Before production migration, back up the project and review SQL. If an application deploy must be rolled back, redeploy the previous Vercel build; do not reverse schema changes until dependencies and stored data have been assessed. Provider keys can be rotated independently, followed by a redeploy and voice-agent reprovision when applicable.
