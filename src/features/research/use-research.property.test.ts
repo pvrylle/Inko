@@ -30,6 +30,7 @@ vi.mock("./research-repository", () => ({
   listContradictions: vi.fn().mockResolvedValue([]),
   listOpenQuestions: vi.fn().mockResolvedValue([]),
   getCanvasNote: vi.fn().mockResolvedValue(null),
+  getResearchNote: vi.fn().mockResolvedValue(null),
   upsertCanvasNote: vi.fn().mockResolvedValue(undefined),
   subscribeToResearchSessions: vi.fn().mockReturnValue(() => undefined),
 }));

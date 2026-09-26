@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // ─── Tag ──────────────────────────────────────────────────────────────────────
 
-export type SourceTag = "supports" | "contradicts";
+export type SourceTag = "supports" | "contradicts" | "untagged";
 
 // ─── Domain types ─────────────────────────────────────────────────────────────
 
@@ -13,9 +13,10 @@ export type ResearchSession = {
   created_at: string;
   updated_at: string;
   /** Optional short project title (falls back to a derived title). */
-  title?: string;
+  title?: string | null;
   /** Optional project description shown under the title. */
-  description?: string;
+  description?: string | null;
+  status?: "draft" | "analyzing" | "ready" | "failed";
 };
 
 export type ResearchSource = {
@@ -57,6 +58,14 @@ export type OpenQuestion = {
   owner_id: string;
   text: string;
   created_at: string;
+};
+
+export type ResearchNote = {
+  id: string;
+  session_id: string;
+  owner_id: string;
+  content_markdown: string;
+  updated_at: string;
 };
 
 export type CanvasNote = {

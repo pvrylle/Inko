@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(32);
+select plan(46);
 
 select policies_are('public', 'notes', array[
   'notes_delete_own', 'notes_insert_own', 'notes_select_own', 'notes_update_own'
@@ -42,6 +42,25 @@ select is(has_table_privilege('authenticated', 'public.focus_sessions', 'DELETE'
 select is(has_function_privilege('authenticated', 'public.start_focus_session(integer,text)', 'EXECUTE'), true, 'authenticated students can start focus through the RPC');
 select is(has_function_privilege('authenticated', 'public.control_focus_timer(text,text)', 'EXECUTE'), true, 'authenticated students can control focus through the RPC');
 select is(has_function_privilege('authenticated', 'public.get_current_focus_session()', 'EXECUTE'), true, 'authenticated students can reconcile focus through the RPC');
+
+select policies_are('public', 'research_sessions', array[
+  'research_sessions_delete_own', 'research_sessions_insert_own', 'research_sessions_select_own', 'research_sessions_update_own'
+]);
+select policies_are('public', 'library_files', array[
+  'library_files_delete_own', 'library_files_insert_own', 'library_files_select_own', 'library_files_update_own'
+]);
+select policies_are('public', 'research_findings', array['research_findings_select_own']);
+select is((select relrowsecurity from pg_class where oid = 'public.research_sessions'::regclass), true, 'research sessions has RLS enabled');
+select is((select relrowsecurity from pg_class where oid = 'public.library_files'::regclass), true, 'library files has RLS enabled');
+select is((select relrowsecurity from pg_class where oid = 'public.research_findings'::regclass), true, 'research findings has RLS enabled');
+select has_index('public', 'research_sessions', 'research_sessions_owner_updated_idx', 'research sessions are indexed by owner');
+select has_index('public', 'library_files', 'library_files_owner_uploaded_idx', 'library files are indexed by owner');
+select is(has_table_privilege('authenticated', 'public.research_findings', 'INSERT'), false, 'clients cannot insert findings');
+select is(has_table_privilege('authenticated', 'public.research_notes', 'INSERT'), false, 'clients cannot insert research notes');
+select is(has_table_privilege('authenticated', 'public.research_runs', 'INSERT'), false, 'clients cannot insert research runs');
+select is(has_column_privilege('authenticated', 'public.research_sources', 'extracted_text', 'SELECT'), false, 'clients cannot read extracted source text');
+select is(has_function_privilege('authenticated', 'public.begin_research_analysis(uuid,uuid,text,text)', 'EXECUTE'), false, 'clients cannot start analysis directly');
+select is(has_function_privilege('service_role', 'public.begin_research_analysis(uuid,uuid,text,text)', 'EXECUTE'), true, 'service role can start analysis');
 
 select * from finish();
 rollback;

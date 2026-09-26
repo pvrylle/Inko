@@ -72,6 +72,72 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["tool_executions"]["Insert"]>;
         Relationships: [];
       };
+      research_sessions: {
+        Row: Owned & Timestamps & { question: string; title: string | null; description: string; status: Database["public"]["Enums"]["research_status"]; updated_at: string };
+        Insert: { id?: string; owner_id: string; question: string; title?: string | null; description?: string; status?: Database["public"]["Enums"]["research_status"]; created_at?: string; updated_at?: string };
+        Update: Partial<Database["public"]["Tables"]["research_sessions"]["Insert"]>;
+        Relationships: [];
+      };
+      library_classes: {
+        Row: Owned & Timestamps & { name: string };
+        Insert: { id?: string; owner_id: string; name: string; created_at?: string };
+        Update: Partial<Database["public"]["Tables"]["library_classes"]["Insert"]>;
+        Relationships: [];
+      };
+      library_files: {
+        Row: Owned & Timestamps & { class_id: string; name: string; type: Database["public"]["Enums"]["library_file_type"]; size_bytes: number; storage_path: string; upload_date: string };
+        Insert: { id?: string; owner_id: string; class_id: string; name: string; type: Database["public"]["Enums"]["library_file_type"]; size_bytes: number; storage_path: string; upload_date?: string; created_at?: string };
+        Update: Partial<Database["public"]["Tables"]["library_files"]["Insert"]>;
+        Relationships: [];
+      };
+      research_sources: {
+        Row: Owned & Timestamps & { session_id: string; title: string; url: string | null; type: Database["public"]["Enums"]["research_source_type"]; tag: Database["public"]["Enums"]["research_source_tag"]; library_file_id: string | null; extracted_text: string | null; meta: string | null };
+        Insert: { id?: string; owner_id: string; session_id: string; title: string; url?: string | null; type: Database["public"]["Enums"]["research_source_type"]; tag?: Database["public"]["Enums"]["research_source_tag"]; library_file_id?: string | null; extracted_text?: string | null; meta?: string | null; created_at?: string };
+        Update: Partial<Database["public"]["Tables"]["research_sources"]["Insert"]>;
+        Relationships: [];
+      };
+      research_sources_public: {
+        Row: Owned & Timestamps & { session_id: string; title: string; url: string | null; type: Database["public"]["Enums"]["research_source_type"]; tag: Database["public"]["Enums"]["research_source_tag"]; library_file_id: string | null; meta: string | null };
+        Insert: { id?: string; owner_id: string; session_id: string; title: string; url?: string | null; type: Database["public"]["Enums"]["research_source_type"]; tag?: Database["public"]["Enums"]["research_source_tag"]; library_file_id?: string | null; meta?: string | null; created_at?: string };
+        Update: Partial<Database["public"]["Tables"]["research_sources_public"]["Insert"]>;
+        Relationships: [];
+      };
+      research_findings: {
+        Row: Owned & Timestamps & { session_id: string; statement: string; source_id: string | null };
+        Insert: { id?: string; owner_id: string; session_id: string; statement: string; source_id?: string | null; created_at?: string };
+        Update: Partial<Database["public"]["Tables"]["research_findings"]["Insert"]>;
+        Relationships: [];
+      };
+      research_contradictions: {
+        Row: Owned & Timestamps & { session_id: string; explanation: string; source_ids: string[] };
+        Insert: { id?: string; owner_id: string; session_id: string; explanation: string; source_ids: string[]; created_at?: string };
+        Update: Partial<Database["public"]["Tables"]["research_contradictions"]["Insert"]>;
+        Relationships: [];
+      };
+      research_open_questions: {
+        Row: Owned & Timestamps & { session_id: string; text: string };
+        Insert: { id?: string; owner_id: string; session_id: string; text: string; created_at?: string };
+        Update: Partial<Database["public"]["Tables"]["research_open_questions"]["Insert"]>;
+        Relationships: [];
+      };
+      research_canvas: {
+        Row: Owned & { session_id: string; content: string; updated_at: string };
+        Insert: { id?: string; owner_id: string; session_id: string; content?: string; updated_at?: string };
+        Update: Partial<Database["public"]["Tables"]["research_canvas"]["Insert"]>;
+        Relationships: [];
+      };
+      research_notes: {
+        Row: Owned & { session_id: string; content_markdown: string; updated_at: string };
+        Insert: { id?: string; owner_id: string; session_id: string; content_markdown: string; updated_at?: string };
+        Update: Partial<Database["public"]["Tables"]["research_notes"]["Insert"]>;
+        Relationships: [];
+      };
+      research_runs: {
+        Row: Owned & Timestamps & { session_id: string; status: Database["public"]["Enums"]["research_run_status"]; error: string | null; input_hash: string | null; call_id: string | null; updated_at: string };
+        Insert: { id?: string; owner_id: string; session_id: string; status?: Database["public"]["Enums"]["research_run_status"]; error?: string | null; input_hash?: string | null; call_id?: string | null; created_at?: string; updated_at?: string };
+        Update: Partial<Database["public"]["Tables"]["research_runs"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -117,12 +183,29 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: Json;
       };
+      begin_research_analysis: {
+        Args: { p_owner_id: string; p_session_id: string; p_input_hash: string; p_call_id: string | null };
+        Returns: Json;
+      };
+      replace_research_analysis: {
+        Args: { p_owner_id: string; p_session_id: string; p_run_id: string; p_description: string; p_note_markdown: string; p_findings: Json; p_contradictions: Json; p_questions: Json; p_source_tags: Json };
+        Returns: Json;
+      };
+      fail_research_run: {
+        Args: { p_owner_id: string; p_session_id: string; p_run_id: string; p_error: string };
+        Returns: Json;
+      };
     };
     Enums: {
       note_source: "voice" | "text" | "photo" | "pdf";
       voice_session_status: "active" | "completed" | "failed" | "deletion_pending" | "deleted";
       study_rating: "again" | "hard" | "good" | "easy";
       focus_status: "active" | "paused" | "completed" | "cancelled";
+      research_status: "draft" | "analyzing" | "ready" | "failed";
+      research_source_type: "document" | "url" | "file";
+      research_source_tag: "supports" | "contradicts" | "untagged";
+      research_run_status: "analyzing" | "ready" | "failed";
+      library_file_type: "pdf" | "doc" | "docx" | "txt" | "md";
     };
     CompositeTypes: Record<string, never>;
   };

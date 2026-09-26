@@ -1,5 +1,7 @@
 "use client";
 
+import { inkoFetch } from "@/lib/auth/api-client";
+import { readDemo, removeDemo, saveDemo } from "@/lib/data/demo-memory";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 import { classNameSchema, type LibraryClass, type LibraryFile } from "./library-schema";
 
@@ -19,22 +21,6 @@ const ACCEPTED_MIME_TYPES = new Set([
 ]);
 
 /**
- * Derives the extension-based type label stored in the `library_files` row.
- * Falls back to the raw MIME type when the extension is unrecognised.
- */
-function resolveFileType(file: File): string {
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-  const knownExtensions: Record<string, string> = {
-    pdf: "pdf",
-    doc: "doc",
-    docx: "docx",
-    txt: "txt",
-    md: "md",
-  };
-  return knownExtensions[ext] ?? file.type;
-}
-
-/**
  * Returns `true` when the file's MIME type or extension is in the accepted set.
  * The extension check provides a safety net for browsers that report an empty
  * `file.type` for .md files.
@@ -52,17 +38,16 @@ function isAcceptedFile(file: File): boolean {
  */
 export async function listClasses(userId: string): Promise<LibraryClass[]> {
   const supabase = getBrowserSupabaseClient();
-  if (!supabase) return [];
+  if (!supabase) return readDemo<LibraryClass>("library-classes", userId);
 
   const { data, error } = await supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("library_classes" as any)
-    .select("*")
+    .from("library_classes")
+    .select("id, owner_id, name, created_at")
     .eq("owner_id", userId)
     .order("created_at", { ascending: true });
 
   if (error) throw error;
-  return (data ?? []) as unknown as LibraryClass[];
+  return data ?? [];
 }
 
 /**
@@ -71,19 +56,14 @@ export async function listClasses(userId: string): Promise<LibraryClass[]> {
  */
 export async function createClass(userId: string, name: string): Promise<LibraryClass> {
   classNameSchema.parse(name.trim());
-
-  const supabase = getBrowserSupabaseClient();
-  if (!supabase) throw new Error("Supabase client unavailable");
-
-  const { data, error } = await supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("library_classes" as any)
-    .insert({ owner_id: userId, name: name.trim() })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data as unknown as LibraryClass;
+  const response = await inkoFetch("/api/library/classes", {
+    method: "POST",
+    body: JSON.stringify({ name: name.trim() }),
+  });
+  if (!response.ok) throw new Error("Failed to create class.");
+  const created = (await response.json()) as LibraryClass;
+  if (!getBrowserSupabaseClient()) saveDemo("library-classes", userId, created);
+  return created;
 }
 
 /**
@@ -91,17 +71,9 @@ export async function createClass(userId: string, name: string): Promise<Library
  * Associated files should be removed separately before calling this.
  */
 export async function deleteClass(userId: string, classId: string): Promise<void> {
-  const supabase = getBrowserSupabaseClient();
-  if (!supabase) throw new Error("Supabase client unavailable");
-
-  const { error } = await supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("library_classes" as any)
-    .delete()
-    .eq("id", classId)
-    .eq("owner_id", userId);
-
-  if (error) throw error;
+  const response = await inkoFetch(`/api/library/classes/${classId}`, { method: "DELETE" });
+  if (!response.ok) throw new Error("Failed to delete class.");
+  if (!getBrowserSupabaseClient()) removeDemo("library-classes", userId, classId);
 }
 
 // ─── Files ────────────────────────────────────────────────────────────────────
@@ -112,17 +84,16 @@ export async function deleteClass(userId: string, classId: string): Promise<void
  */
 export async function listFiles(userId: string): Promise<LibraryFile[]> {
   const supabase = getBrowserSupabaseClient();
-  if (!supabase) return [];
+  if (!supabase) return readDemo<LibraryFile>("library-files", userId);
 
   const { data, error } = await supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("library_files" as any)
-    .select("*")
+    .from("library_files")
+    .select("id, owner_id, class_id, name, type, size_bytes, storage_path, upload_date, created_at")
     .eq("owner_id", userId)
     .order("upload_date", { ascending: false });
 
   if (error) throw error;
-  return (data ?? []) as unknown as LibraryFile[];
+  return data ?? [];
 }
 
 /**
@@ -137,7 +108,7 @@ export async function listFiles(userId: string): Promise<LibraryFile[]> {
  * - The database insert fails (Req 9.5)
  */
 export async function uploadFile(
-  userId: string,
+  _userId: string,
   classId: string,
   file: File,
 ): Promise<LibraryFile> {
@@ -148,50 +119,15 @@ export async function uploadFile(
     );
   }
 
-  const supabase = getBrowserSupabaseClient();
-  if (!supabase) throw new Error("Supabase client unavailable");
-
-  // Generate a stable file ID to use as part of the storage path
-  const fileId = crypto.randomUUID();
-  const storagePath = `${userId}/${classId}/${fileId}/${file.name}`;
-
-  // Upload to storage (Req 9.2)
-  const { error: storageError } = await supabase.storage
-    .from("library-files")
-    .upload(storagePath, file, { upsert: false });
-
-  if (storageError) {
-    throw new Error(
-      `Failed to upload "${file.name}": ${storageError.message}`,
-    );
+  const body = new FormData();
+  body.set("classId", classId);
+  body.set("file", file);
+  const response = await inkoFetch("/api/library/files", { method: "POST", body });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(`Failed to upload "${file.name}": ${payload?.error ?? "UPLOAD_FAILED"}`);
   }
-
-  const now = new Date().toISOString();
-
-  // Insert the metadata row (Req 9.2)
-  const { data, error: dbError } = await supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("library_files" as any)
-    .insert({
-      id: fileId,
-      owner_id: userId,
-      class_id: classId,
-      name: file.name,
-      type: resolveFileType(file),
-      size_bytes: file.size,
-      storage_path: storagePath,
-      upload_date: now,
-    })
-    .select()
-    .single();
-
-  if (dbError) {
-    // Best-effort cleanup: remove the orphaned storage object
-    await supabase.storage.from("library-files").remove([storagePath]);
-    throw new Error(`Failed to upload "${file.name}": ${dbError.message}`);
-  }
-
-  return data as unknown as LibraryFile;
+  return (await response.json()) as LibraryFile;
 }
 
 /**
@@ -199,26 +135,7 @@ export async function uploadFile(
  * Both operations are scoped to `userId` (Req 9.9).
  */
 export async function deleteFile(userId: string, file: LibraryFile): Promise<void> {
-  const supabase = getBrowserSupabaseClient();
-  if (!supabase) throw new Error("Supabase client unavailable");
-
-  // Remove from storage first
-  const { error: storageError } = await supabase.storage
-    .from("library-files")
-    .remove([file.storage_path]);
-
-  // Log but don't block on storage errors — the row deletion is authoritative
-  if (storageError) {
-    console.warn(`library-repository: storage removal warning for "${file.name}":`, storageError.message);
-  }
-
-  // Delete the metadata row, scoped to owner for safety (Req 9.9)
-  const { error: dbError } = await supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("library_files" as any)
-    .delete()
-    .eq("id", file.id)
-    .eq("owner_id", userId);
-
-  if (dbError) throw new Error(`Failed to delete "${file.name}": ${dbError.message}`);
+  const response = await inkoFetch(`/api/library/files/${file.id}`, { method: "DELETE" });
+  if (!response.ok) throw new Error(`Failed to delete "${file.name}".`);
+  if (!getBrowserSupabaseClient()) removeDemo("library-files", userId, file.id);
 }

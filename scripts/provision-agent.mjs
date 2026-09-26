@@ -33,11 +33,21 @@ const tools = [
   tool("control_focus_timer", "Pause, resume, or stop the current focus timer. Stop cancels the current session.", { action: { type: "string", enum: ["pause", "resume", "stop"], description: "Timer action." } }, ["action"]),
   tool("plan_study_session", "Recommend the student's next few study steps using their real due cards, notes, quizzes, focus history, and streak. Return the resulting plan verbatim before offering to run the first step.", {}),
   tool("summarize_progress", "Read back a warm summary of the student's progress: streak, cards reviewed, quiz accuracy, focus minutes, and any recent achievement.", {}),
+  tool("start_research", "Start a research session from the student's question. Call this before adding sources or analyzing.", { question: { type: "string", description: "The research question, 10 to 500 characters." } }, ["question"]),
+  tool("add_research_source", "Attach a source to a research session. Use a library_file_id when the student names an uploaded file, otherwise pass an https URL.", {
+    session_id: { type: "string", description: "The research session UUID." },
+    title: { type: "string", description: "Short source title." },
+    url: { type: "string", description: "Optional https URL." },
+    library_file_id: { type: "string", description: "Optional owned library file UUID." },
+    tag: { type: "string", enum: ["supports", "contradicts", "untagged"], description: "How the source relates to the question." },
+  }, ["session_id", "title"]),
+  tool("analyze_sources", "Compare the session sources and save findings, contradictions, notes, and open questions. If the result status is analyzing, tell the student the comparison is still running.", { session_id: { type: "string", description: "The research session UUID." } }, ["session_id"]),
+  tool("summarize_findings", "Read back the saved findings, contradictions, and open questions for a research session. Do not invent findings that are not in the tool result.", { session_id: { type: "string", description: "The research session UUID." } }, ["session_id"]),
 ];
 
 const agent = {
   name: "Inko Study Companion",
-  system_prompt: `You are Inko, a warm, playful study companion. Speak in short, natural sentences. Never be condescending. Use tools whenever the student asks to save a note, make cards, review, take a quiz, control focus time, plan what to study next, or hear their progress. Start flashcard review by requesting the next due card, ask only its question, semantically grade the student's answer, then ask the student to confirm Again, Hard, Good, or Easy before committing the rating. For quizzes, ask one returned question at a time, submit exactly one answer before giving feedback, and use the tool's result instead of guessing correctness. Focus timers persist across reloads; if start returns an existing session, report its current state instead of claiming it restarted, and explain that stop cancels it. When asked what to study, call plan_study_session and read back the returned steps in order before offering to run the first one; do not invent extra tasks. When asked about progress, call summarize_progress and read the streak, cards reviewed, quiz accuracy, focus minutes, and any new achievement warmly. Never reveal an answer before the student attempts it and never commit a suggested rating without confirmation. Never claim an artifact was saved until its tool succeeds. Ask one concise clarifying question when a required note or card is missing. For ordinary study chat, explain clearly in no more than three spoken sentences unless the student asks for detail.`,
+  system_prompt: `You are Inko, a warm, playful study companion. Speak in short, natural sentences. Never be condescending. Use tools whenever the student asks to save a note, make cards, review, take a quiz, control focus time, plan what to study next, hear their progress, or research a question. Start flashcard review by requesting the next due card, ask only its question, semantically grade the student's answer, then ask the student to confirm Again, Hard, Good, or Easy before committing the rating. For quizzes, ask one returned question at a time, submit exactly one answer before giving feedback, and use the tool's result instead of guessing correctness. Focus timers persist across reloads; if start returns an existing session, report its current state instead of claiming it restarted, and explain that stop cancels it. When asked what to study, call plan_study_session and read back the returned steps in order before offering to run the first one; do not invent extra tasks. When asked about progress, call summarize_progress and read the streak, cards reviewed, quiz accuracy, focus minutes, and any new achievement warmly. For research, call start_research before analysis, add sources the student names, then call analyze_sources. Read tool results instead of inventing findings. If analysis returns status analyzing, say the comparison is still running. Never reveal an answer before the student attempts it and never commit a suggested rating without confirmation. Never claim an artifact was saved until its tool succeeds. Ask one concise clarifying question when a required note, card, or research session is missing. For ordinary study chat, explain clearly in no more than three spoken sentences unless the student asks for detail.`,
   greeting: "Hey! I'm Inko. What are we studying today?",
   voice: "anna",
   input: {
@@ -65,7 +75,8 @@ const response = await fetch(url, {
 });
 
 if (!response.ok) {
-  console.error(`Agent provisioning failed (${response.status}):`, await response.text());
+  const body = (await response.text()).replaceAll(assemblyKey, "[redacted]").replaceAll(geminiKey, "[redacted]");
+  console.error(`Agent provisioning failed (${response.status}):`, body);
   process.exit(1);
 }
 

@@ -13,7 +13,7 @@ export async function inkoFetch(input: RequestInfo | URL, init: RequestInit = {}
   const headers = new Headers(init.headers);
   const demoUserId = window.localStorage.getItem(DEMO_USER_KEY);
   if (demoUserId) headers.set("x-inko-demo-user", demoUserId);
-  if (!headers.has("content-type") && init.body) headers.set("content-type", "application/json");
+  if (!headers.has("content-type") && init.body && !(init.body instanceof FormData)) headers.set("content-type", "application/json");
 
   if (isAiCall(input)) {
     incrementGuestUsage("aiCalls");

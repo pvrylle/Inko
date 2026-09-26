@@ -20,6 +20,7 @@ type Props = {
   contradictions: ResearchContradiction[];
   openQuestions: OpenQuestion[];
   canvasContent: string;
+  noteMarkdown?: string;
   saveCanvas: (content: string) => Promise<void>;
   activeTab: ResearchTab;
   setActiveTab: (tab: ResearchTab) => void;
@@ -146,9 +147,9 @@ function SourceCard({ source }: { source: ResearchSource }) {
         <span
           className="source-tag-badge"
           data-tag={source.tag}
-          aria-label={source.tag === "supports" ? "Supports" : "Contradicts"}
+          aria-label={source.tag === "supports" ? "Supports" : source.tag === "contradicts" ? "Contradicts" : "Untagged"}
         >
-          {source.tag === "supports" ? "Supports" : "Contradicts"}
+          {source.tag === "supports" ? "Supports" : source.tag === "contradicts" ? "Contradicts" : "Untagged"}
         </span>
       </div>
       <h3 className="source-card-title">{source.title}</h3>
@@ -369,17 +370,14 @@ function CanvasPanel({
 }
 
 /** Notes tab — structured markdown display (Requirement 8.14). */
-function NotesPanel({ session }: { session: ResearchSession }) {
-  // Notes are AI-generated or saved markdown. For now we render a placeholder
-  // until the notes generation feature is wired up.
+function NotesPanel({ session, noteMarkdown }: { session: ResearchSession; noteMarkdown?: string }) {
   return (
     <div className="research-panel research-notes-panel">
       <p className="research-notes-hint">
-        Structured notes for this session will appear here once generated.
+        {noteMarkdown ? "Notes Inko wrote from the sources in this session." : "Structured notes for this session will appear here once generated."}
       </p>
       <pre className="research-notes-pre" aria-label="Session notes">
-        {/* Future: render session notes markdown here */}
-        {`Session: ${session.question}`}
+        {noteMarkdown || `Session: ${session.question}`}
       </pre>
     </div>
   );
@@ -425,6 +423,7 @@ export function ResearchTabs({
   contradictions,
   openQuestions,
   canvasContent,
+  noteMarkdown,
   saveCanvas,
   activeTab,
   setActiveTab,
@@ -477,6 +476,7 @@ export function ResearchTabs({
             contradictions,
             openQuestions,
             canvasContent,
+            noteMarkdown,
             saveCanvas,
             setActiveTab,
             onAsk,
@@ -498,6 +498,7 @@ function renderPanel(
     contradictions,
     openQuestions,
     canvasContent,
+    noteMarkdown,
     saveCanvas,
     setActiveTab,
     onAsk,
@@ -536,7 +537,7 @@ function renderPanel(
         />
       );
     case "notes":
-      return <NotesPanel session={activeSession} />;
+      return <NotesPanel session={activeSession} noteMarkdown={noteMarkdown} />;
     case "open-questions":
       return <OpenQuestionsPanel openQuestions={openQuestions} />;
     default:

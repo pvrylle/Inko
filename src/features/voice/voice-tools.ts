@@ -51,6 +51,17 @@ function enrichDemoArguments(call: ToolCall) {
   return args;
 }
 
+async function postResearch(path: string, body: Record<string, unknown>) {
+  try {
+    const response = await inkoFetch(path, { method: "POST", body: JSON.stringify(body) });
+    const result = (await response.json()) as Record<string, unknown>;
+    delete result.extracted_text;
+    return { isError: !response.ok, result };
+  } catch {
+    return { isError: true, result: { error: "The research tool could not be reached. Ask the student to try again." } };
+  }
+}
+
 function startDemoReview(userId: string) {
   const cards = readLocalCollection<Flashcard>("flashcards", userId);
   const dueCards = cards.filter((card) => Date.parse(card.due) <= Date.now()).sort((a, b) => Date.parse(a.due) - Date.parse(b.due));
@@ -126,6 +137,38 @@ export async function executeVoiceTool(call: ToolCall) {
       return { isError: !response.ok, result: payload };
     } catch {
       return { isError: true, result: { error: "A plan could not be built just now." } };
+    }
+  }
+
+  if (call.name === "start_research" || call.name === "research_topic") {
+    return postResearch("/api/research/sessions", { question: call.arguments.question, callId: call.call_id });
+  }
+  if (call.name === "add_research_source") {
+    const sessionId = String(call.arguments.session_id ?? "");
+    const libraryFileId = call.arguments.library_file_id;
+    if (typeof libraryFileId === "string" && libraryFileId) {
+      return postResearch(`/api/research/sessions/${sessionId}/sources/attach`, { libraryFileId, tag: call.arguments.tag, callId: call.call_id });
+    }
+    return postResearch(`/api/research/sessions/${sessionId}/sources`, {
+      title: call.arguments.title,
+      url: call.arguments.url ?? null,
+      tag: call.arguments.tag,
+      callId: call.call_id,
+    });
+  }
+  if (call.name === "analyze_sources" || call.name === "compare_sources") {
+    const sessionId = String(call.arguments.session_id ?? "");
+    return postResearch(`/api/research/sessions/${sessionId}/analyze`, { callId: call.call_id });
+  }
+  if (call.name === "summarize_findings" || call.name === "organize_findings") {
+    const sessionId = String(call.arguments.session_id ?? "");
+    try {
+      const response = await inkoFetch(`/api/research/sessions/${sessionId}/bundle`);
+      const payload = (await response.json()) as Record<string, unknown>;
+      const summary = payload.summary;
+      return { isError: !response.ok, result: response.ok && summary && typeof summary === "object" ? summary as Record<string, unknown> : payload };
+    } catch {
+      return { isError: true, result: { error: "The findings could not be summarized just now." } };
     }
   }
 

@@ -1,22 +1,22 @@
 "use client";
 
-import { getBrowserSupabaseClient } from "@/lib/supabase/client";
+import { inkoFetch } from "@/lib/auth/api-client";
 import { upsertLocalRecord } from "@/lib/data/local-store";
+import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 import type { VoiceMessage } from "./voice-types";
 
 export async function persistChatTurn(userId: string, voiceSessionId: string | null, message: VoiceMessage) {
-  const supabase = getBrowserSupabaseClient();
-  if (supabase) {
-    const { error } = await supabase.from("chat_turns").insert({
-      id: message.id,
-      owner_id: userId,
-      voice_session_id: voiceSessionId,
-      role: message.role,
-      transcript: message.text,
-      interrupted: message.interrupted ?? false,
-      created_at: message.createdAt,
+  if (getBrowserSupabaseClient() && voiceSessionId) {
+    const response = await inkoFetch("/api/voice/turns", {
+      method: "POST",
+      body: JSON.stringify({
+        voiceSessionId,
+        role: message.role,
+        transcript: message.text,
+        interrupted: message.interrupted ?? false,
+      }),
     });
-    if (error) throw error;
+    if (!response.ok) throw new Error("TURN_SAVE_FAILED");
     return;
   }
   upsertLocalRecord("chat-turns", userId, { ...message, owner_id: userId, voice_session_id: voiceSessionId });

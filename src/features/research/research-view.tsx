@@ -31,9 +31,23 @@ function relativeTime(iso: string) {
 
 export function ResearchView() {
   const research = useResearch();
-  const { state } = useMascot();
-  const controller = useOptionalVoiceAgent();
+  const { state, dispatch } = useMascot();
   const { sessions, activeSession, loading, error, setActive } = research;
+  const previousStatus = useRef<string | null>(null);
+
+  useEffect(() => {
+    const status = activeSession?.status ?? null;
+    if (!status || status === previousStatus.current) return;
+    const prior = previousStatus.current;
+    previousStatus.current = status;
+    if (status === "analyzing") dispatch({ type: "RESEARCH_STARTED" });
+    if (prior === "analyzing" && status === "ready") {
+      dispatch({ type: "WORK_STARTED", label: "Organising the findings." });
+      const done = window.setTimeout(() => dispatch({ type: "REPLY_DONE" }), 700);
+      return () => window.clearTimeout(done);
+    }
+  }, [activeSession?.status, dispatch]);
+  const controller = useOptionalVoiceAgent();
   const appliedParam = useRef(false);
 
   // Open a specific session when navigated from Home ("/research?session=<id>").
@@ -124,7 +138,7 @@ export function ResearchView() {
             <span className="project-folder" aria-hidden="true"><FolderOpen size={24} /></span>
             <div className="project-heading">
               <h1>{activeSession.title ?? shortTitle(activeSession.question)}</h1>
-              <p>{activeSession.description ?? "Inko is helping you gather evidence, weigh findings, and track open questions for this research."}</p>
+              <p>{activeSession.description?.trim() ? activeSession.description : "Inko is helping you gather evidence, weigh findings, and track open questions for this research."}</p>
               <div className="project-meta">
                 <span className="meta-chip"><Mic2 size={12} /> Research Project</span>
                 <span className="meta-chip"><Calendar size={12} /> Last updated {relativeTime(activeSession.updated_at)}</span>
@@ -144,6 +158,7 @@ export function ResearchView() {
             contradictions={research.contradictions}
             openQuestions={research.openQuestions}
             canvasContent={research.canvasContent}
+            noteMarkdown={research.noteMarkdown}
             saveCanvas={research.saveCanvas}
             activeTab={research.activeTab}
             setActiveTab={research.setActiveTab}

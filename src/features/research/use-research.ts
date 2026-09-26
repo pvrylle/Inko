@@ -10,6 +10,7 @@ import {
   listContradictions,
   listOpenQuestions,
   getCanvasNote,
+  getResearchNote,
   upsertCanvasNote,
   subscribeToResearchSessions,
 } from "./research-repository";
@@ -48,6 +49,7 @@ export type UseResearchReturn = {
   contradictions: ResearchContradiction[];
   openQuestions: OpenQuestion[];
   canvasContent: string;
+  noteMarkdown: string;
   saveCanvas: (content: string) => Promise<void>;
   activeTab: ResearchTab;
   setActiveTab: (tab: ResearchTab) => void;
@@ -76,6 +78,7 @@ export function useResearch(): UseResearchReturn {
   const [contradictions, setContradictions] = useState<ResearchContradiction[]>([]);
   const [openQuestions, setOpenQuestions] = useState<OpenQuestion[]>([]);
   const [canvasContent, setCanvasContent] = useState("");
+  const [noteMarkdown, setNoteMarkdown] = useState("");
 
   // ── UI state ────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<ResearchTab>("overview");
@@ -125,6 +128,7 @@ export function useResearch(): UseResearchReturn {
           contradictionsData,
           openQuestionsData,
           canvasData,
+          noteData,
         ] = await Promise.all([
           listResearchSessions(userId).then(
             (list) => list.find((s) => s.id === sessionId) ?? null,
@@ -134,6 +138,7 @@ export function useResearch(): UseResearchReturn {
           listContradictions(userId, sessionId),
           listOpenQuestions(userId, sessionId),
           getCanvasNote(userId, sessionId),
+          getResearchNote(userId, sessionId),
         ]);
 
         setActiveSession(sessionData);
@@ -142,6 +147,7 @@ export function useResearch(): UseResearchReturn {
         setContradictions(contradictionsData);
         setOpenQuestions(openQuestionsData);
         setCanvasContent(canvasData?.content ?? "");
+        setNoteMarkdown(noteData?.content_markdown ?? "");
         setActivity([]);
       } catch {
         setError("Failed to load session data.");
@@ -155,6 +161,12 @@ export function useResearch(): UseResearchReturn {
     const kickoff = window.setTimeout(() => void loadSessionData(activeSessionId), 0);
     return () => window.clearTimeout(kickoff);
   }, [activeSessionId, loadSessionData]);
+
+  useEffect(() => {
+    if (!activeSessionId || activeSession?.status !== "analyzing") return;
+    const timer = window.setInterval(() => void loadSessionData(activeSessionId), 2500);
+    return () => window.clearInterval(timer);
+  }, [activeSession?.status, activeSessionId, loadSessionData]);
 
   // ── setActive: pick a session from the sidebar (Requirement 8.3) ────────────
   const setActive = useCallback((id: string) => {
@@ -218,6 +230,7 @@ export function useResearch(): UseResearchReturn {
     contradictions,
     openQuestions,
     canvasContent,
+    noteMarkdown,
     saveCanvas,
     activeTab,
     setActiveTab,

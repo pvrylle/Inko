@@ -1,11 +1,14 @@
 "use client";
 
+import { inkoFetch } from "@/lib/auth/api-client";
+import { readDemo, saveDemo } from "@/lib/data/demo-memory";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 import type {
   CanvasNote,
   OpenQuestion,
   ResearchContradiction,
   ResearchFinding,
+  ResearchNote,
   ResearchSession,
   ResearchSource,
   SourceTag,
@@ -21,17 +24,16 @@ export async function listResearchSessions(
   userId: string,
 ): Promise<ResearchSession[]> {
   const supabase = getBrowserSupabaseClient();
-  if (!supabase) return [];
+  if (!supabase) return readDemo<ResearchSession>("research-sessions", userId);
 
   const { data, error } = await supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("research_sessions" as any)
-    .select("*")
+    .from("research_sessions")
+    .select("id, owner_id, question, title, description, status, created_at, updated_at")
     .eq("owner_id", userId)
     .order("updated_at", { ascending: false });
 
   if (error) throw error;
-  return (data ?? []) as unknown as ResearchSession[];
+  return data ?? [];
 }
 
 /**
@@ -43,18 +45,14 @@ export async function createResearchSession(
   userId: string,
   question: string,
 ): Promise<ResearchSession> {
-  const supabase = getBrowserSupabaseClient();
-  if (!supabase) throw new Error("SUPABASE_UNAVAILABLE");
-
-  const { data, error } = await supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("research_sessions" as any)
-    .insert({ owner_id: userId, question })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data as unknown as ResearchSession;
+  const response = await inkoFetch("/api/research/sessions", {
+    method: "POST",
+    body: JSON.stringify({ question }),
+  });
+  if (!response.ok) throw new Error("CREATE_FAILED");
+  const session = (await response.json()) as ResearchSession;
+  if (!getBrowserSupabaseClient()) saveDemo("research-sessions", userId, session);
+  return session;
 }
 
 /**
@@ -66,18 +64,17 @@ export async function getResearchSession(
   sessionId: string,
 ): Promise<ResearchSession | null> {
   const supabase = getBrowserSupabaseClient();
-  if (!supabase) return null;
+  if (!supabase) return readDemo<ResearchSession>("research-sessions", userId).find((session) => session.id === sessionId) ?? null;
 
   const { data, error } = await supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("research_sessions" as any)
-    .select("*")
+    .from("research_sessions")
+    .select("id, owner_id, question, title, description, status, created_at, updated_at")
     .eq("id", sessionId)
     .eq("owner_id", userId)
     .maybeSingle();
 
   if (error) throw error;
-  return (data as unknown as ResearchSession) ?? null;
+  return data;
 }
 
 /**
@@ -120,18 +117,17 @@ export async function listSources(
   sessionId: string,
 ): Promise<ResearchSource[]> {
   const supabase = getBrowserSupabaseClient();
-  if (!supabase) return [];
+  if (!supabase) return readDemo<ResearchSource>(`research-sources:${sessionId}`, userId);
 
   const { data, error } = await supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("research_sources" as any)
-    .select("*")
+    .from("research_sources_public")
+    .select("id, session_id, owner_id, title, url, type, tag, meta, created_at")
     .eq("owner_id", userId)
     .eq("session_id", sessionId)
     .order("created_at", { ascending: true });
 
   if (error) throw error;
-  return (data ?? []) as unknown as ResearchSource[];
+  return (data ?? []) as ResearchSource[];
 }
 
 /**
@@ -147,18 +143,14 @@ export async function createSource(
     tag: SourceTag;
   },
 ): Promise<ResearchSource> {
-  const supabase = getBrowserSupabaseClient();
-  if (!supabase) throw new Error("SUPABASE_UNAVAILABLE");
-
-  const { data, error } = await supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("research_sources" as any)
-    .insert({ owner_id: userId, session_id: sessionId, ...source })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data as unknown as ResearchSource;
+  const response = await inkoFetch(`/api/research/sessions/${sessionId}/sources`, {
+    method: "POST",
+    body: JSON.stringify(source),
+  });
+  if (!response.ok) throw new Error("SOURCE_CREATE_FAILED");
+  const created = (await response.json()) as ResearchSource;
+  if (!getBrowserSupabaseClient()) saveDemo(`research-sources:${sessionId}`, userId, created);
+  return created;
 }
 
 /**
@@ -168,17 +160,8 @@ export async function deleteSource(
   userId: string,
   sourceId: string,
 ): Promise<void> {
-  const supabase = getBrowserSupabaseClient();
-  if (!supabase) throw new Error("SUPABASE_UNAVAILABLE");
-
-  const { error } = await supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("research_sources" as any)
-    .delete()
-    .eq("id", sourceId)
-    .eq("owner_id", userId);
-
-  if (error) throw error;
+  const response = await inkoFetch(`/api/research/sources/${sourceId}`, { method: "DELETE" });
+  if (!response.ok) throw new Error("SOURCE_DELETE_FAILED");
 }
 
 // ─── Findings ─────────────────────────────────────────────────────────────────
@@ -194,15 +177,14 @@ export async function listFindings(
   if (!supabase) return [];
 
   const { data, error } = await supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("research_findings" as any)
+    .from("research_findings")
     .select("*")
     .eq("owner_id", userId)
     .eq("session_id", sessionId)
     .order("created_at", { ascending: true });
 
   if (error) throw error;
-  return (data ?? []) as unknown as ResearchFinding[];
+  return data ?? [];
 }
 
 // ─── Contradictions ───────────────────────────────────────────────────────────
@@ -218,15 +200,14 @@ export async function listContradictions(
   if (!supabase) return [];
 
   const { data, error } = await supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("research_contradictions" as any)
+    .from("research_contradictions")
     .select("*")
     .eq("owner_id", userId)
     .eq("session_id", sessionId)
     .order("created_at", { ascending: true });
 
   if (error) throw error;
-  return (data ?? []) as unknown as ResearchContradiction[];
+  return data ?? [];
 }
 
 // ─── Open Questions ───────────────────────────────────────────────────────────
@@ -242,15 +223,14 @@ export async function listOpenQuestions(
   if (!supabase) return [];
 
   const { data, error } = await supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("research_open_questions" as any)
+    .from("research_open_questions")
     .select("*")
     .eq("owner_id", userId)
     .eq("session_id", sessionId)
     .order("created_at", { ascending: true });
 
   if (error) throw error;
-  return (data ?? []) as unknown as OpenQuestion[];
+  return data ?? [];
 }
 
 // ─── Canvas ───────────────────────────────────────────────────────────────────
@@ -264,18 +244,19 @@ export async function getCanvasNote(
   sessionId: string,
 ): Promise<CanvasNote | null> {
   const supabase = getBrowserSupabaseClient();
-  if (!supabase) return null;
+  if (!supabase) {
+    return readDemo<CanvasNote>("research-canvas", userId).find((note) => note.session_id === sessionId) ?? null;
+  }
 
   const { data, error } = await supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("research_canvas" as any)
-    .select("*")
+    .from("research_canvas")
+    .select("id, session_id, owner_id, content, updated_at")
     .eq("owner_id", userId)
     .eq("session_id", sessionId)
     .maybeSingle();
 
   if (error) throw error;
-  return (data as unknown as CanvasNote) ?? null;
+  return data;
 }
 
 /**
@@ -287,21 +268,33 @@ export async function upsertCanvasNote(
   sessionId: string,
   content: string,
 ): Promise<void> {
+  const response = await inkoFetch(`/api/research/sessions/${sessionId}/canvas`, {
+    method: "PUT",
+    body: JSON.stringify({ content }),
+  });
+  if (!response.ok) throw new Error("CANVAS_SAVE_FAILED");
+  if (!getBrowserSupabaseClient()) {
+    saveDemo("research-canvas", userId, {
+      id: sessionId,
+      session_id: sessionId,
+      owner_id: userId,
+      content,
+      updated_at: new Date().toISOString(),
+    });
+  }
+}
+
+export async function getResearchNote(userId: string, sessionId: string): Promise<ResearchNote | null> {
   const supabase = getBrowserSupabaseClient();
-  if (!supabase) throw new Error("SUPABASE_UNAVAILABLE");
-
-  const { error } = await supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("research_canvas" as any)
-    .upsert(
-      {
-        owner_id: userId,
-        session_id: sessionId,
-        content,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "owner_id,session_id" },
-    );
-
+  if (!supabase) {
+    return readDemo<ResearchNote>("research-notes", userId).find((note) => note.session_id === sessionId) ?? null;
+  }
+  const { data, error } = await supabase
+    .from("research_notes")
+    .select("id, session_id, owner_id, content_markdown, updated_at")
+    .eq("owner_id", userId)
+    .eq("session_id", sessionId)
+    .maybeSingle();
   if (error) throw error;
+  return data;
 }

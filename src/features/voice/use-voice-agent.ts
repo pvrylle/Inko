@@ -235,9 +235,9 @@ export function useVoiceAgent() {
     // Research phase: Inko is comparing evidence from sources.
     // Organising phase: Inko is pulling together the findings into a coherent output.
     // All other tools: generic working indicator.
-    if (call.name === "plan_study_session") {
+    if (call.name === "plan_study_session" || call.name === "start_research" || call.name === "research_topic") {
       dispatch({ type: "WORK_STARTED", label: "Planning the approach." });
-    } else if (call.name === "research_topic" || call.name === "compare_sources" || call.name === "analyze_sources") {
+    } else if (call.name === "compare_sources" || call.name === "analyze_sources") {
       dispatch({ type: "RESEARCH_STARTED" });
     } else if (call.name === "organize_findings" || call.name === "summarize_findings") {
       dispatch({ type: "WORK_STARTED", label: "Organising the findings." });
