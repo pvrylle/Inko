@@ -7,6 +7,10 @@ function geminiKeys() {
     .filter((key): key is string => Boolean(key));
 }
 
+export function isGeminiConfigured() {
+  return geminiKeys().length > 0;
+}
+
 export function getGeminiClient() {
   const [primary] = geminiKeys();
   return primary ? new GoogleGenAI({ apiKey: primary }) : null;

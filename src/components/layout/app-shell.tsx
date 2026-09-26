@@ -10,6 +10,7 @@ import { useMascot } from "@/features/mascot/mascot-provider";
 import { MascotOverlay } from "@/features/mascot/mascot-overlay";
 import { PersistentVoiceDock } from "@/features/voice/voice-dock";
 import { useOptionalVoiceAgent } from "@/features/voice/voice-agent-provider";
+import { GuestBanner } from "@/features/guest/guest-banner";
 
 type NavItem = { href: string; label: string; icon: LucideIcon };
 type NavGroup = { label?: string; items: NavItem[] };
@@ -46,10 +47,15 @@ function isActive(pathname: string, href: string) {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const { state } = useMascot();
   const controller = useOptionalVoiceAgent();
   const listening = controller?.connection === "connected" || controller?.connection === "connecting";
+
+  const isOnboarding = pathname === "/welcome";
+  if (isOnboarding) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="app-frame">
@@ -87,6 +93,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="mobile-header">
         <InkoLogo compact />
       </header>
+
+      <GuestBanner />
 
       <main className="main-content" id="main-content" tabIndex={-1}>{children}</main>
 

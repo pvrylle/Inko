@@ -52,7 +52,7 @@ export function MascotOverlay() {
               state={state}
               amplitude={amplitude}
               className="mascot-overlay-large"
-              fit="cover"
+              fit="contain"
             />
 
             {/* Message region — accessible to screen readers (Req 5.3, 5.6) */}

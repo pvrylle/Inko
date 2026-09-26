@@ -83,8 +83,12 @@ export function SpriteMascot({
           : Math.min(cw / atlas.frameWidth, ch / atlas.frameHeight);
       const dw = atlas.frameWidth * scale;
       const dh = atlas.frameHeight * scale;
-      const dx = (cw - dw) / 2;
-      const dy = (ch - dh) / 2;
+      const extraX = dw - cw;
+      const extraY = dh - ch;
+      // Cover crops the cinematic 16:9 stage; characters sit lower in that frame,
+      // so bias the crop downward instead of taking the empty center.
+      const dx = extraX > 0 ? -extraX * 0.5 : (cw - dw) / 2;
+      const dy = extraY > 0 ? -extraY * 0.72 : (ch - dh) / 2;
       ctx.drawImage(img, sx, sy, atlas.frameWidth, atlas.frameHeight, dx, dy, dw, dh);
     };
 

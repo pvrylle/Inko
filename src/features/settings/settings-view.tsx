@@ -1,11 +1,12 @@
 "use client";
 
-import { Palette, Radio, ShieldCheck } from "lucide-react";
+import { Palette, Radio, ShieldCheck, User } from "lucide-react";
 import { PageHeading } from "@/components/ui/page-heading";
 import { InkoMascot } from "@/features/mascot/inko-mascot";
 import { useMascot } from "@/features/mascot/mascot-provider";
 import { initialMascotState } from "@/features/mascot/mascot-state";
 import type { MascotCharacter } from "@/features/mascot/sprite-manifest";
+import { AuthForm } from "@/features/auth/auth-form";
 
 const sections = [
   {
@@ -50,7 +51,15 @@ export function SettingsView() {
 
   return (
     <div className="content-page page-enter">
-      <PageHeading eyebrow="History" title="Settings" description="How Inko listens, looks, and protects your work." />
+      <PageHeading eyebrow="Preferences" title="Settings" description="How Inko listens, looks, and protects your work." />
+
+      <section className="settings-card" aria-labelledby="account-heading">
+        <div className="settings-card-head">
+          <span className="settings-card-icon" data-tone="blue"><User size={17} /></span>
+          <h2 id="account-heading">Account</h2>
+        </div>
+        <AuthForm />
+      </section>
 
       <section className="settings-card settings-companion-card" aria-labelledby="companion-heading">
         <div className="settings-card-head">

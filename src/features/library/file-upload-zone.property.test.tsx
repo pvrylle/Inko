@@ -90,7 +90,7 @@ describe("Property 16: Upload failure surfaces file name and reason", () => {
           const view = within(container);
           const alert = view.getByRole("alert");
           expect(alert).toBeInTheDocument();
-          expect(alert).toHaveTextContent(errorMessage);
+          expect(alert).toHaveTextContent(errorMessage, { normalizeWhitespace: false });
 
           unmount();
           document.body.removeChild(container);

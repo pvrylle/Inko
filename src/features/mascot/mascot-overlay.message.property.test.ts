@@ -243,7 +243,7 @@ describe("Property 5 — Leg B: render round-trip (MascotOverlay DOM)", () => {
     ];
 
     for (const presence of nonOverlayPresences) {
-      renderOverlay({ presence, mood: "neutral", mode: "normal", message: "should not render" });
+      renderOverlay({ presence, mood: "neutral", emotion: "neutral", mode: "normal", message: "should not render" });
       expect(screen.queryByRole("status")).toBeNull();
       cleanup();
     }

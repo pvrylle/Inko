@@ -67,7 +67,7 @@ export function HomeOrbit() {
   return (
     <div className="home-screen page-enter">
       <div className="content-topbar">
-        <span className="topbar-date">{today}</span>
+        <span className="topbar-date" suppressHydrationWarning>{today}</span>
         <button className="topbar-icon" type="button" aria-label="Notifications"><Bell size={17} /></button>
         <span className="topbar-avatar" aria-hidden="true">JD</span>
       </div>

@@ -1,6 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { MascotProvider } from "@/features/mascot/mascot-provider";
+import { vi } from "vitest";
 import HomePage from "./page";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+}));
 
 describe("HomePage", () => {
   it("presents voice as the primary action", () => {

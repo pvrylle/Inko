@@ -1,25 +1,33 @@
 "use client";
 
 import type { User } from "@supabase/supabase-js";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 
 const DEMO_USER_KEY = "inko.demo-user-id";
 
-type AuthState = {
+export type AuthState = {
   user: User | null;
   userId: string | null;
   isReady: boolean;
   isDemo: boolean;
+  isGuest: boolean;
   error: string | null;
 };
 
-const AuthContext = createContext<AuthState>({
+type AuthContextValue = AuthState & {
+  signOut: () => Promise<void>;
+};
+
+const AuthContext = createContext<AuthContextValue>({
   user: null,
   userId: null,
   isReady: false,
   isDemo: false,
+  isGuest: false,
   error: null,
+  signOut: async () => {},
 });
 
 function getDemoUserId() {
@@ -31,13 +39,33 @@ function getDemoUserId() {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>({ user: null, userId: null, isReady: false, isDemo: false, error: null });
+  const router = useRouter();
+  const [state, setState] = useState<AuthState>({
+    user: null,
+    userId: null,
+    isReady: false,
+    isDemo: false,
+    isGuest: false,
+    error: null,
+  });
+
+  const signOut = useCallback(async () => {
+    const supabase = getBrowserSupabaseClient();
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    window.localStorage.removeItem(DEMO_USER_KEY);
+    router.push("/");
+    router.refresh();
+  }, [router]);
 
   useEffect(() => {
     const supabase = getBrowserSupabaseClient();
     if (!supabase) {
       const demoUserId = getDemoUserId();
-      queueMicrotask(() => setState({ user: null, userId: demoUserId, isReady: true, isDemo: true, error: null }));
+      queueMicrotask(() =>
+        setState({ user: null, userId: demoUserId, isReady: true, isDemo: true, isGuest: true, error: null }),
+      );
       return;
     }
 
@@ -45,25 +73,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const establishSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        if (active) setState({ user: session.user, userId: session.user.id, isReady: true, isDemo: false, error: null });
+        if (active)
+          setState({
+            user: session.user,
+            userId: session.user.id,
+            isReady: true,
+            isDemo: false,
+            isGuest: false,
+            error: null,
+          });
         return;
       }
 
-      const { data, error } = await supabase.auth.signInAnonymously();
-      if (!active) return;
-      setState({
-        user: data.user,
-        userId: data.user?.id ?? null,
-        isReady: true,
-        isDemo: false,
-        error: error ? "Inko couldn't start a private guest session." : null,
-      });
+      // No anonymous auto-sign-in anymore: new users are guests until they choose to sign up.
+      const demoUserId = getDemoUserId();
+      if (active)
+        setState({
+          user: null,
+          userId: demoUserId,
+          isReady: true,
+          isDemo: false,
+          isGuest: true,
+          error: null,
+        });
     };
 
     void establishSession();
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return;
-      setState((current) => ({ ...current, user: session?.user ?? null, userId: session?.user.id ?? null, isReady: true }));
+      setState((current) => ({
+        ...current,
+        user: session?.user ?? null,
+        userId: session?.user.id ?? current.userId,
+        isGuest: !session?.user,
+        isReady: true,
+      }));
     });
 
     return () => {
@@ -72,7 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const value = useMemo(() => state, [state]);
+  const value = useMemo(() => ({ ...state, signOut }), [state, signOut]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

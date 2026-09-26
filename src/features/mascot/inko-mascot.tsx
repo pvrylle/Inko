@@ -54,7 +54,7 @@ export function InkoMascot({
       data-fit={fit}
       role="img"
       aria-label={`${characterName[character]} is ${state.presence}`}
-      style={aspect ? { aspectRatio: aspect } : undefined}
+      style={fit === "contain" && aspect ? { aspectRatio: aspect } : undefined}
     >
       {isHappy && (
         <div className="mascot-particles" aria-hidden="true">
