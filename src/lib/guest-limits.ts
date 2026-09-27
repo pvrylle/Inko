@@ -10,7 +10,7 @@ export const GUEST_LIMITS = {
   voicePreviews: 3,
 } as const;
 
-const STORAGE_KEY = "inko.guest.usage";
+const STORAGE_KEY = "inko.guest.usage.v2";
 
 type GuestUsage = {
   aiCalls: number;

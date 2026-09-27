@@ -130,7 +130,7 @@ function getDictationErrorMessage(code: string) {
     case "no-speech":
       return "I didn't catch anything — tap the microphone and speak again.";
     case "network":
-      return "Voice capture needs an internet connection right now. Check your connection and retry.";
+      return "Voice capture hiccuped. Tap the microphone to try again.";
     case "aborted":
       return ""; // The student stopped on purpose; not an error.
     default:
@@ -138,8 +138,23 @@ function getDictationErrorMessage(code: string) {
   }
 }
 
+function replyErrorMessage() {
+  return "Inko is not ready";
+}
+
+const cuteVoiceNames = [/ana/i, /aria/i, /jenny/i, /samantha/i, /google uk english female/i, /zira/i];
+
+function pickCuteVoice(voices: SpeechSynthesisVoice[]) {
+  const english = voices.filter((voice) => voice.lang.toLowerCase().startsWith("en"));
+  for (const pattern of cuteVoiceNames) {
+    const match = english.find((voice) => pattern.test(voice.name));
+    if (match) return match;
+  }
+  return english[0];
+}
+
 export function useVoiceAgent() {
-  const { userId } = useAuth();
+  const { userId, isGuest } = useAuth();
   const { dispatch, setAmplitude, celebrate } = useMascot();
   const [connection, setConnection] = useState<VoiceConnectionState>("idle");
   const [messages, setMessages] = useState<VoiceMessage[]>([]);
@@ -159,7 +174,20 @@ export function useVoiceAgent() {
   const latestEventRef = useRef("");
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const dictationFinalRef = useRef("");
+  const interimRef = useRef("");
+  const handsFreeRef = useRef(false);
+  const pauseForReplyRef = useRef(false);
+  const silenceTimerRef = useRef<number | null>(null);
+  const recoverableErrorsRef = useRef(0);
   const sendTextRef = useRef<(text: string) => void>(() => {});
+  const resumeListeningRef = useRef<() => void>(() => {});
+  const startDictationRef = useRef<() => boolean>(() => false);
+
+  const clearSilenceTimer = useCallback(() => {
+    if (silenceTimerRef.current === null) return;
+    window.clearTimeout(silenceTimerRef.current);
+    silenceTimerRef.current = null;
+  }, []);
 
   const addMessage = useCallback((message: VoiceMessage) => {
     setMessages((current) => [...current.slice(-39), message]);
@@ -169,6 +197,66 @@ export function useVoiceAgent() {
   const send = useCallback((payload: object) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify(payload));
   }, []);
+
+  const speakReply = useCallback((text: string) => {
+    setPartialTranscript(text);
+    dispatch({ type: "AGENT_AUDIO" });
+    const synth = window.speechSynthesis;
+    if (!synth) {
+      dispatch({ type: "REPLY_DONE" });
+      resumeListeningRef.current();
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "en-US";
+    utterance.rate = 0.96;
+    utterance.pitch = 1.25;
+    let finished = false;
+    let watchdog = 0;
+    const finishSpeaking = () => {
+      if (finished) return;
+      finished = true;
+      window.clearTimeout(watchdog);
+      dispatch({ type: "REPLY_DONE" });
+      resumeListeningRef.current();
+    };
+    utterance.onstart = () => {
+      window.clearTimeout(watchdog);
+      watchdog = window.setTimeout(finishSpeaking, Math.min(30_000, 1200 + text.length * 90));
+    };
+    utterance.onend = finishSpeaking;
+    utterance.onerror = finishSpeaking;
+    watchdog = window.setTimeout(finishSpeaking, 2500);
+    const begin = () => {
+      if (finished) return;
+      const voice = pickCuteVoice(synth.getVoices());
+      if (voice) {
+        utterance.voice = voice;
+        if (/ana|aria|jenny|samantha/i.test(voice.name)) utterance.pitch = 1.12;
+      }
+      const kick = () => {
+        if (!finished) synth.speak(utterance);
+      };
+      if (synth.speaking || synth.pending) {
+        synth.cancel();
+        window.setTimeout(kick, 60);
+      } else {
+        kick();
+      }
+    };
+    if (synth.getVoices().length > 0) begin();
+    else {
+      const onVoices = () => {
+        synth.removeEventListener("voiceschanged", onVoices);
+        begin();
+      };
+      synth.addEventListener("voiceschanged", onVoices);
+      window.setTimeout(() => {
+        synth.removeEventListener("voiceschanged", onVoices);
+        begin();
+      }, 300);
+    }
+  }, [dispatch, setPartialTranscript]);
 
   const flushToolResults = useCallback(() => {
     if (latestEventRef.current !== "reply.done") return;
@@ -316,8 +404,8 @@ export function useVoiceAgent() {
     }
   }, [addMessage, cleanUpMedia, dispatch, finalizeProviderSession, flushToolResults, handleToolCall, playAudio, stopPlayback]);
 
-  // ChatGPT-style dictation: capture speech in the browser, stream the live
-  // transcript into the hint, and send it to Inko when recording stops.
+  // Browser speech stays open. A short pause ends the sentence and Inko answers,
+  // then listening starts again until the student taps to hang up.
   const startDictation = useCallback(() => {
     const RecognitionCtor = getSpeechRecognitionConstructor();
     if (!RecognitionCtor) {
@@ -327,36 +415,78 @@ export function useVoiceAgent() {
       dispatch({ type: "ERROR", message });
       return false;
     }
+    if (recognitionRef.current) return true;
 
     try {
       const recognition = new RecognitionCtor();
-      recognition.lang = navigator.language || "en-US";
-      recognition.continuous = true;
+      const language = navigator.language || "en-US";
+      recognition.lang = language.toLowerCase().startsWith("en") ? "en-US" : language;
+      // One utterance at a time. Chrome's continuous mode drops the Google
+      // speech service and reports that as a network error.
+      recognition.continuous = false;
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
       dictationFinalRef.current = "";
+      interimRef.current = "";
+
+      const commitUtterance = () => {
+        clearSilenceTimer();
+        const text = `${dictationFinalRef.current} ${interimRef.current}`.trim();
+        if (text.replace(/[^\p{L}\p{N}]/gu, "").length < 2 || !handsFreeRef.current) return;
+        dictationFinalRef.current = "";
+        interimRef.current = "";
+        pauseForReplyRef.current = true;
+        setPartialTranscript("");
+        setConnection("connected");
+        dispatch({ type: "USER_STOPPED" });
+        try { recognition.stop(); } catch {}
+        sendTextRef.current(text);
+      };
 
       recognition.onstart = () => {
-        setError(null);
         setDictating(true);
         setConnection("connected");
         setPartialTranscript("");
         dispatch({ type: "USER_STARTED" });
       };
 
+      // Rebuild the whole transcript from every result on each event. Chrome
+      // resends and revises earlier results, so appending duplicates words.
       recognition.onresult = (event) => {
+        let finalText = "";
         let interim = "";
-        for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        let endsFinal = false;
+        for (let index = 0; index < event.results.length; index += 1) {
           const result = event.results[index];
-          const transcript = result[0]?.transcript ?? "";
-          if (result.isFinal) dictationFinalRef.current += transcript;
-          else interim += transcript;
+          const transcript = (result[0]?.transcript ?? "").trim();
+          if (!transcript) continue;
+          if (result.isFinal) finalText += ` ${transcript}`;
+          else interim += ` ${transcript}`;
+          endsFinal = result.isFinal;
         }
-        setPartialTranscript(`${dictationFinalRef.current} ${interim}`.trim());
+        dictationFinalRef.current = finalText.trim();
+        interimRef.current = interim.trim();
+        const spoken = `${dictationFinalRef.current} ${interimRef.current}`.trim();
+        setPartialTranscript(spoken);
+        setError(null);
+        clearSilenceTimer();
+        if (spoken.replace(/[^\p{L}\p{N}]/gu, "").length < 2) return;
+        recoverableErrorsRef.current = 0;
+        silenceTimerRef.current = window.setTimeout(commitUtterance, endsFinal ? 700 : 1200);
       };
 
       recognition.onerror = (event) => {
+        if (event.error === "no-speech" || event.error === "aborted") return;
+        // Chrome reports "network" when its speech service blips, even while
+        // the page is online. Keep the session open and let onend restart it.
+        if (event.error === "network" && navigator.onLine) {
+          recoverableErrorsRef.current += 1;
+          return;
+        }
         const message = getDictationErrorMessage(event.error);
+        handsFreeRef.current = false;
+        pauseForReplyRef.current = false;
+        clearSilenceTimer();
         setDictating(false);
         if (message) {
           setError(message);
@@ -367,30 +497,59 @@ export function useVoiceAgent() {
 
       recognition.onend = () => {
         setDictating(false);
-        recognitionRef.current = null;
-        const finalText = dictationFinalRef.current.trim();
-        setPartialTranscript("");
-        setConnection("idle");
-        if (finalText) sendTextRef.current(finalText);
-        else dispatch({ type: "REPLY_DONE" });
+        if (recognitionRef.current === recognition) recognitionRef.current = null;
+        clearSilenceTimer();
+        const leftover = `${dictationFinalRef.current} ${interimRef.current}`.trim();
+        const meaningful = leftover.replace(/[^\p{L}\p{N}]/gu, "").length >= 2;
+        if (handsFreeRef.current && !pauseForReplyRef.current && meaningful) {
+          pauseForReplyRef.current = true;
+          dictationFinalRef.current = "";
+          interimRef.current = "";
+          setPartialTranscript("");
+          dispatch({ type: "USER_STOPPED" });
+          sendTextRef.current(leftover);
+          return;
+        }
+        if (!handsFreeRef.current || pauseForReplyRef.current) return;
+        const delay = 350 + Math.min(recoverableErrorsRef.current, 6) * 400;
+        window.setTimeout(() => {
+          if (handsFreeRef.current && !pauseForReplyRef.current && !recognitionRef.current) startDictationRef.current();
+        }, delay);
       };
 
       recognitionRef.current = recognition;
       recognition.start();
       return true;
     } catch (caught) {
+      recognitionRef.current = null;
+      if (caught instanceof DOMException && caught.name === "InvalidStateError" && handsFreeRef.current) {
+        window.setTimeout(() => {
+          if (handsFreeRef.current && !pauseForReplyRef.current && !recognitionRef.current) startDictationRef.current();
+        }, 300);
+        return true;
+      }
       const message = caught instanceof Error ? caught.message : "Voice capture could not start.";
       setError(message);
       setConnection("error");
       dispatch({ type: "ERROR", message });
       return false;
     }
-  }, [dispatch]);
+  }, [clearSilenceTimer, dispatch, setPartialTranscript]);
 
   const start = useCallback(async () => {
     if (connection === "connecting" || connection === "connected" || dictating) return;
+    window.speechSynthesis?.cancel();
     setError(null);
     setConnection("connecting");
+
+    // Guests have no account session, so AssemblyAI refuses the live token.
+    // Capture speech in the browser and answer through Gemini instead.
+    if (isGuest) {
+      handsFreeRef.current = true;
+      pauseForReplyRef.current = false;
+      startDictation();
+      return;
+    }
 
     try {
       // Secure the microphone before spinning up any audio resources, so a
@@ -443,6 +602,8 @@ export function useVoiceAgent() {
       // original live-session error.
       cleanUpMedia();
       void finalizeProviderSession();
+      handsFreeRef.current = true;
+      pauseForReplyRef.current = false;
       const dictationStarted = startDictation();
       if (dictationStarted) return;
       const message = getVoiceStartErrorMessage(caught);
@@ -450,13 +611,33 @@ export function useVoiceAgent() {
       setConnection("error");
       dispatch({ type: "ERROR", message });
     }
-  }, [cleanUpMedia, connection, dictating, dispatch, finalizeProviderSession, handleEvent, send, setAmplitude, startDictation]);
+  }, [cleanUpMedia, connection, dictating, dispatch, finalizeProviderSession, handleEvent, isGuest, send, setAmplitude, startDictation]);
+
+  const resumeListening = useCallback(() => {
+    pauseForReplyRef.current = false;
+    if (!handsFreeRef.current) {
+      setConnection("idle");
+      return;
+    }
+    startDictation();
+  }, [startDictation]);
+
+  resumeListeningRef.current = resumeListening;
+  startDictationRef.current = startDictation;
 
   const end = useCallback(() => {
-    // Dictation fallback: stopping triggers recognition.onend, which sends the
-    // captured transcript to Inko.
-    if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch {}
+    if (handsFreeRef.current || recognitionRef.current) {
+      handsFreeRef.current = false;
+      pauseForReplyRef.current = false;
+      clearSilenceTimer();
+      window.speechSynthesis?.cancel();
+      dictationFinalRef.current = "";
+      interimRef.current = "";
+      setPartialTranscript("");
+      setDictating(false);
+      setConnection("idle");
+      try { recognitionRef.current?.stop(); } catch {}
+      recognitionRef.current = null;
       return;
     }
     if (socketRef.current?.readyState === WebSocket.OPEN) {
@@ -475,7 +656,7 @@ export function useVoiceAgent() {
       setConnection("idle");
       void finalizeProviderSession();
     }
-  }, [cleanUpMedia, finalizeProviderSession, send]);
+  }, [cleanUpMedia, clearSilenceTimer, finalizeProviderSession, send, setPartialTranscript]);
 
   const sendText = useCallback(async (text: string) => {
     const trimmed = text.trim();
@@ -493,14 +674,27 @@ export function useVoiceAgent() {
     const response = await inkoFetch("/api/chat", { method: "POST", body: JSON.stringify({ message: trimmed }) });
     const payload = (await response.json()) as { text?: string; error?: string };
     if (!response.ok || !payload.text) {
-      const message = payload.error === "GEMINI_NOT_CONFIGURED" ? "Add GEMINI_API_KEY to let me answer typed questions." : "I couldn't answer that just now.";
+      const blocked = payload.error === "GUEST_LIMIT";
+      const message = blocked ? "Guest limit reached. Create a free account to keep going." : replyErrorMessage();
       setError(message);
       dispatch({ type: "ERROR", message });
+      if (blocked) {
+        handsFreeRef.current = false;
+        pauseForReplyRef.current = false;
+        clearSilenceTimer();
+        try { recognitionRef.current?.stop(); } catch {}
+        recognitionRef.current = null;
+        setDictating(false);
+        setConnection("idle");
+        window.dispatchEvent(new Event("inko:guest-limit"));
+        return;
+      }
+      resumeListeningRef.current();
       return;
     }
     addMessage({ id: crypto.randomUUID(), role: "inko", text: payload.text, createdAt: new Date().toISOString() });
-    dispatch({ type: "REPLY_DONE" });
-  }, [addMessage, dispatch, send]);
+    speakReply(payload.text);
+  }, [addMessage, clearSilenceTimer, dispatch, send, speakReply]);
 
   // Keep a stable reference so the dictation callbacks can send captured text
   // without depending on sendText's identity.

@@ -15,10 +15,18 @@ function normalizeAiError(code: string) {
   return code;
 }
 
+function guestAddress(request: NextRequest) {
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return forwarded && forwarded.length <= 64 ? forwarded : "local";
+}
+
 export async function POST(request: NextRequest) {
   const user = await getRequestUser(request);
-  if (!user) return NextResponse.json({ error: "AUTH_REQUIRED" }, { status: 401 });
-  if (!checkRateLimit(`chat:${user.userId}`, 20, 60_000).allowed) return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
+  const guest = !user || user.isDemo;
+  const limitKey = user && !user.isDemo ? `chat:${user.userId}` : `chat:guest:${guestAddress(request)}`;
+  if (!checkRateLimit(limitKey, guest ? 10 : 20, guest ? 86_400_000 : 60_000).allowed) {
+    return NextResponse.json({ error: guest ? "GUEST_LIMIT" : "RATE_LIMITED" }, { status: 429 });
+  }
   const body = bodySchema.safeParse(await request.json());
   if (!body.success) return NextResponse.json({ error: "INVALID_MESSAGE" }, { status: 400 });
 

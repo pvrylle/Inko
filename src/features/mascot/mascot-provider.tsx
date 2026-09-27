@@ -84,3 +84,8 @@ export function useMascot() {
   if (!value) throw new Error("useMascot must be used within MascotProvider");
   return value;
 }
+
+/** Safe for surfaces that pass their own character, such as the account dialog. */
+export function useOptionalMascot() {
+  return useContext(MascotContext);
+}

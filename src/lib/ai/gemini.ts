@@ -22,25 +22,29 @@ export function getGeminiModel() {
 
 function isRetryableGeminiError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  return /429|403|500|502|503|504|RESOURCE_EXHAUSTED|UNAVAILABLE|quota|rate.?limit|overloaded/i.test(message);
+  return /429|500|502|503|504|RESOURCE_EXHAUSTED|UNAVAILABLE|high demand|overloaded/i.test(message);
 }
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function withGeminiFallback<T>(run: (client: GoogleGenAI) => Promise<T>): Promise<T> {
   const keys = geminiKeys();
   if (keys.length === 0) throw new Error("GEMINI_NOT_CONFIGURED");
 
-  let lastError: unknown;
-  for (let index = 0; index < keys.length; index += 1) {
-    const client = new GoogleGenAI({ apiKey: keys[index] });
-    try {
-      return await run(client);
-    } catch (error) {
-      lastError = error;
-      const hasNext = index < keys.length - 1;
-      if (!hasNext || !isRetryableGeminiError(error)) throw error;
+  let sawRetryable = false;
+  for (const apiKey of keys) {
+    const client = new GoogleGenAI({ apiKey });
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await run(client);
+      } catch (error) {
+        if (!isRetryableGeminiError(error)) throw new Error("GEMINI_FAILED");
+        sawRetryable = true;
+        if (attempt < 2) await wait(700 * (attempt + 1));
+      }
     }
   }
-  throw lastError instanceof Error ? lastError : new Error("GEMINI_FAILED");
+  throw new Error(sawRetryable ? "GEMINI_UNAVAILABLE" : "GEMINI_FAILED");
 }
 
 export async function generateGeminiText(prompt: string) {

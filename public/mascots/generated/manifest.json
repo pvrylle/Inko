@@ -7,9 +7,9 @@
         "url": "/mascots/generated/octopus/conversation-loop.webp",
         "frameWidth": 512,
         "frameHeight": 288,
-        "cols": 9,
-        "rows": 9,
-        "count": 78,
+        "cols": 14,
+        "rows": 14,
+        "count": 192,
         "fps": 24
       },
       "ideal-sleeping-state": {
@@ -115,8 +115,8 @@
       "happy": {
         "key": "happy",
         "url": "/mascots/generated/octopus/happy.webp",
-        "frameWidth": 196,
-        "frameHeight": 256,
+        "frameWidth": 512,
+        "frameHeight": 288,
         "cols": 10,
         "rows": 10,
         "count": 96,

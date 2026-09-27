@@ -59,8 +59,7 @@ export function HomeOrbit() {
 
   const onPrompt = (text: string) => {
     if (!controller) return;
-    if (controller.connection === "connected") void controller.sendText(text);
-    else void controller.start();
+    void controller.sendText(text);
   };
 
   return (
@@ -75,9 +74,6 @@ export function HomeOrbit() {
             initial={reduced ? { opacity: 0 } : { opacity: 0, y: 10 }}
             transition={{ duration: 0.4 }}
           >
-            <span className="mascot-droplets" aria-hidden="true">
-              {Array.from({ length: 6 }, (_, index) => <span key={index} data-drop={index} />)}
-            </span>
             <InkoMascot state={state} amplitude={amplitude} className="home-mascot" fit="contain" />
           </motion.div>
 

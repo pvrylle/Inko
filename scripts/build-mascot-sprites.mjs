@@ -37,7 +37,10 @@ const CLAW_FRAME = { w: 256, h: 181 };   // source frames are 256x181 (native)
 
 // Verified layouts for legacy Inko exports that do not include an atlas JSON.
 // A 1px gutter separates cells in the numbered 4096x4096 pages.
+// These layouts win over any JSON in the folder: "Conversation Loop" ships a
+// mismatched atlas that describes 1920x1080 cells on 1280x720 pages.
 const LEGACY_OCTOPUS_LAYOUTS = {
+  "Conversation Loop": { cols: 3, rows: 5, w: 1280, h: 720, gapX: 1, gapY: 1 },
   "Ideal Sleeping state": { cols: 2, rows: 3, w: 1920, h: 1080, gapX: 1, gapY: 1 },
   "INKO PDF": { cols: 3, rows: 5, w: 1280, h: 720, gapX: 1, gapY: 1 },
   reading: { cols: 4, rows: 7, w: 960, h: 540, gapX: 1, gapY: 1 },
@@ -173,6 +176,75 @@ async function exportLogo(frameBuffer, character) {
   console.log(`  ${character}/logo.webp`);
 }
 
+/** Index range holding the middle `keep` share of a histogram's mass. */
+function massRange(hist, keep) {
+  const total = hist.reduce((sum, value) => sum + value, 0);
+  const cut = (total * (1 - keep)) / 2;
+  let start = 0;
+  let acc = 0;
+  while (start < hist.length - 1 && acc + hist[start] <= cut) acc += hist[start++];
+  let end = hist.length - 1;
+  acc = 0;
+  while (end > start && acc + hist[end] <= cut) acc += hist[end--];
+  return [start, end];
+}
+
+/**
+ * Re-frame every clip so the character fills the same share of the frame.
+ * Source exports place the mascot at different scales and offsets, so the
+ * union of the opaque area across all frames is centered and scaled to fit.
+ */
+async function normalizeFrames(buffers, frame) {
+  const decoded = [];
+  const cols = new Float64Array(frame.w);
+  const rows = new Float64Array(frame.h);
+  for (const buffer of buffers) {
+    const { data, info } = await sharp(buffer)
+      .resize(frame.w, frame.h, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    decoded.push({ data, info });
+    for (let y = 0; y < info.height; y += 1) {
+      for (let x = 0; x < info.width; x += 1) {
+        if (data[(y * info.width + x) * 4 + 3] > 60) {
+          cols[x] += 1;
+          rows[y] += 1;
+        }
+      }
+    }
+  }
+
+  const [x0, x1] = massRange(Array.from(cols), 0.995);
+  const [y0, y1] = massRange(Array.from(rows), 0.995);
+  const pad = 4;
+  const left = Math.max(0, x0 - pad);
+  const top = Math.max(0, y0 - pad);
+  const boxW = Math.min(frame.w - left, x1 - x0 + 1 + pad * 2);
+  const boxH = Math.min(frame.h - top, y1 - y0 + 1 + pad * 2);
+  const scale = Math.min((frame.h * 0.92) / boxH, (frame.w * 0.96) / boxW);
+  const outW = Math.max(1, Math.round(boxW * scale));
+  const outH = Math.max(1, Math.round(boxH * scale));
+  const offsetX = Math.round((frame.w - outW) / 2);
+  const offsetY = Math.round((frame.h - outH) / 2);
+
+  const normalized = [];
+  for (const { data, info } of decoded) {
+    const character = await sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
+      .extract({ left, top, width: boxW, height: boxH })
+      .resize(outW, outH, { fit: "fill" })
+      .png()
+      .toBuffer();
+    normalized.push(
+      await sharp({ create: { width: frame.w, height: frame.h, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+        .composite([{ input: character, left: offsetX, top: offsetY }])
+        .png()
+        .toBuffer(),
+    );
+  }
+  return normalized;
+}
+
 /** Natural sort so spritesheet_2 < spritesheet_10. */
 function naturalSort(a, b) {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
@@ -240,11 +312,11 @@ async function buildOctopus() {
     let pagePaths = sheets.map((sheet) => path.join(dir, sheet));
     let rects = [];
 
-    if (jsonFile) {
+    if (LEGACY_OCTOPUS_LAYOUTS[entry.name]) {
+      rects = layoutFrames(LEGACY_OCTOPUS_LAYOUTS[entry.name]);
+    } else if (jsonFile) {
       const atlas = JSON.parse(await readFile(path.join(dir, jsonFile), "utf8"));
       if (Array.isArray(atlas.frames)) rects = atlas.frames.map((item) => item.frame);
-    } else if (LEGACY_OCTOPUS_LAYOUTS[entry.name]) {
-      rects = layoutFrames(LEGACY_OCTOPUS_LAYOUTS[entry.name]);
     } else if (entry.name === "Tentaio" && files.includes("Research PDF.png")) {
       // Legacy Figma export: one 2721x32768 strip, exactly 3x64 cells.
       pagePaths = [path.join(dir, "Research PDF.png")];
@@ -270,7 +342,7 @@ async function buildOctopus() {
     if (opaque.length === 0) continue;
     const key = entry.name === "Tentaio" ? "research-pdf-standalone" : slugify(entry.name);
     if (key === "idle-state") await exportLogo(opaque[0], "octopus");
-    results.push(await packGrid(opaque, OCTO_FRAME, "octopus", key));
+    results.push(await packGrid(await normalizeFrames(opaque, OCTO_FRAME), OCTO_FRAME, "octopus", key));
   }
 
   // Native-transparent MAKKO portrait (celebrate / happy mood). Same packing
@@ -314,7 +386,7 @@ async function buildOctopusHappy() {
   }
   const opaque = await filterOpaqueFrames(buffers);
   if (opaque.length === 0) return null;
-  return packGrid(opaque, OCTO_HAPPY_FRAME, "octopus", "happy");
+  return packGrid(await normalizeFrames(opaque, OCTO_FRAME), OCTO_FRAME, "octopus", "happy");
 }
 
 /** Normalize an MR Claws folder name to a stable key, dropping " 2"/"2"/" (1)" dupes. */
@@ -364,7 +436,7 @@ async function buildMrClaws() {
     const opaque = await filterOpaqueFrames(buffers);
     if (opaque.length === 0) continue;
     if (key === "question") await exportLogo(opaque[0], "mrclaws");
-    results.push(await packGrid(opaque, CLAW_FRAME, "mrclaws", key));
+    results.push(await packGrid(await normalizeFrames(opaque, CLAW_FRAME), CLAW_FRAME, "mrclaws", key));
   }
   return results;
 }

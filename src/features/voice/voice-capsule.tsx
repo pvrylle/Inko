@@ -9,12 +9,26 @@ import { useOptionalVoiceAgent, type VoiceAgentController } from "./voice-agent-
 // the mic. Kept as real values because CSS calc() has no modulo operator.
 const WAVE = [7, 11, 16, 22, 18, 12, 8, 14, 20, 25, 19, 13, 9, 6];
 
+function captionFor(
+  connection: VoiceAgentController["connection"],
+  partial: string,
+  messages: VoiceAgentController["messages"],
+  error: string | null,
+) {
+  const last = messages.at(-1);
+  if (connection === "connected" && partial && partial !== (last?.role === "inko" ? last.text : undefined)) return partial;
+  if (last?.role === "inko") return last.text;
+  if (last?.role === "student" && !error) return "Thinking…";
+  if (connection === "idle" && error) return error;
+  return hintFor(connection, partial);
+}
+
 function hintFor(connection: VoiceAgentController["connection"], partial: string) {
   switch (connection) {
     case "connecting":
       return "Connecting voice…";
     case "connected":
-      return partial || "Listening — speak naturally";
+      return partial || "Listening — I’ll answer when you pause";
     case "ending":
       return "Wrapping up…";
     case "error":
@@ -39,7 +53,7 @@ function Wave({ side, amp, active }: { side: "left" | "right"; amp: number; acti
 }
 
 function VoiceCapsuleView({ controller }: { controller: VoiceAgentController }) {
-  const { connection, partialTranscript, error, start, end } = controller;
+  const { connection, messages, partialTranscript, error, start, end } = controller;
   const { amplitude } = useMascot();
   const active = connection === "connected" || connection === "connecting" || connection === "ending";
   const capturing = connection === "connected";
@@ -67,7 +81,7 @@ function VoiceCapsuleView({ controller }: { controller: VoiceAgentController }) 
       </div>
 
       <p className="voice-capsule-hint" data-partial={partialTranscript ? "true" : "false"} aria-live="polite">
-        {hintFor(connection, partialTranscript)}
+        {captionFor(connection, partialTranscript, messages, error)}
       </p>
 
       {error && <p className="voice-capsule-error" role="status">{error}</p>}

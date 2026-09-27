@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuthModal } from "@/features/auth/auth-modal-provider";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { Mic, Search, FileText, StickyNote, ArrowRight, X, Sparkles } from "lucide-react";
 import Link from "next/link";
@@ -37,6 +39,8 @@ function SlideMascot({ state }: { state: ReturnType<typeof useMascot>["state"] }
 
 export function OnboardingFlow() {
   const reduced = useReducedMotion();
+  const router = useRouter();
+  const { openAuth } = useAuthModal();
   const [slide, setSlide] = useState(0);
   const { character, setCharacter, state: liveState } = useMascot();
   const totalSlides = 5;
@@ -164,9 +168,17 @@ export function OnboardingFlow() {
             <Link href="/" className="onboarding-cta onboarding-cta-secondary" onClick={markOnboardingComplete}>
               <Sparkles size={16} /> Explore first
             </Link>
-            <Link href="/settings" className="onboarding-cta" onClick={markOnboardingComplete}>
+            <button
+              type="button"
+              className="onboarding-cta"
+              onClick={() => {
+                markOnboardingComplete();
+                openAuth("signup");
+                router.push("/");
+              }}
+            >
               Create free account
-            </Link>
+            </button>
           </div>
         </div>
       ),

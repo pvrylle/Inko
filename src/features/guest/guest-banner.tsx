@@ -1,12 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
+import { useAuthModal } from "@/features/auth/auth-modal-provider";
 import { getGuestLimitStatus } from "@/lib/guest-limits";
 
 export function GuestBanner() {
   const { isGuest } = useAuth();
+  const { openAuth } = useAuthModal();
   const status = getGuestLimitStatus();
 
   if (!isGuest) return null;
@@ -19,9 +20,9 @@ export function GuestBanner() {
           ? "Guest limit reached. Create a free account to unlock live voice and keep your work."
           : "You’re near the guest limit. Create a free account to keep going."}
       </span>
-      <Link href="/settings" className="guest-banner-action">
+      <button type="button" className="guest-banner-action" onClick={() => openAuth("signup")}>
         <Sparkles size={14} /> Unlock
-      </Link>
+      </button>
     </div>
   );
 }

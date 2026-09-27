@@ -52,8 +52,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const controller = useOptionalVoiceAgent();
   const listening = controller?.connection === "connected" || controller?.connection === "connecting";
 
-  const isOnboarding = pathname === "/welcome";
-  if (isOnboarding) {
+  const isBare = pathname === "/welcome";
+  if (isBare) {
     return <>{children}</>;
   }
 

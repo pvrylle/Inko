@@ -5,12 +5,20 @@ import { useRouter } from "next/navigation";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/providers/auth-provider";
 
-export function AuthForm() {
+export function AuthForm({
+  initialMode = "signup",
+  onModeChange,
+  hideGuestHint = false,
+}: {
+  initialMode?: "signin" | "signup";
+  onModeChange?: (mode: "signin" | "signup") => void;
+  hideGuestHint?: boolean;
+}) {
   const router = useRouter();
   const { isGuest, user, signOut } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [mode, setMode] = useState<"signin" | "signup">("signup");
+  const [mode, setMode] = useState<"signin" | "signup">(initialMode);
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
 
@@ -65,7 +73,10 @@ export function AuthForm() {
           type="button"
           className="auth-form-tab"
           data-active={mode === "signup"}
-          onClick={() => setMode("signup")}
+          onClick={() => {
+            setMode("signup");
+            onModeChange?.("signup");
+          }}
         >
           Create account
         </button>
@@ -73,13 +84,16 @@ export function AuthForm() {
           type="button"
           className="auth-form-tab"
           data-active={mode === "signin"}
-          onClick={() => setMode("signin")}
+          onClick={() => {
+            setMode("signin");
+            onModeChange?.("signin");
+          }}
         >
           Sign in
         </button>
       </div>
 
-      {isGuest && (
+      {isGuest && !hideGuestHint && (
         <p className="auth-form-hint">
           Creating an account keeps your local notes, flashcards, and progress safe.
         </p>

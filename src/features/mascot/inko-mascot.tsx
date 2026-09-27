@@ -3,7 +3,7 @@
 import type { MascotState } from "./mascot-state";
 import { getMascotAtlas, type MascotCharacter } from "./sprite-manifest";
 import { SpriteMascot } from "./sprite-mascot";
-import { useMascot } from "./mascot-provider";
+import { useOptionalMascot } from "./mascot-provider";
 
 type InkoMascotProps = {
   state: MascotState;
@@ -35,8 +35,8 @@ export function InkoMascot({
   character: characterProp,
   fit = "contain",
 }: InkoMascotProps) {
-  const { character: selected } = useMascot();
-  const character = characterProp ?? selected;
+  const mascot = useOptionalMascot();
+  const character = characterProp ?? mascot?.character ?? "octopus";
   const isHappy = state.mood === "happy" || state.emotion === "happy";
   const isSleeping = state.presence === "sleeping";
   const atlas = getMascotAtlas(character, state);
