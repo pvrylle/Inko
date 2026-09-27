@@ -1,13 +1,13 @@
 /**
- * Guest usage limits. Demo mode values are generous so hackathon judges don't
- * hit a wall; production values should be lower to drive sign-ups.
+ * Browser-side caps for guests. Signed-in accounts are not counted here;
+ * they use the server rate limits instead.
  */
 
 export const GUEST_LIMITS = {
-  aiCallsPerDay: 999, // effectively unlimited for hackathon demo
-  researchSessions: 999,
-  focusMinutes: 999,
-  voicePreviews: 999,
+  aiCallsPerDay: 10,
+  researchSessions: 2,
+  focusMinutes: 25,
+  voicePreviews: 3,
 } as const;
 
 const STORAGE_KEY = "inko.guest.usage";
@@ -51,11 +51,15 @@ export function getGuestUsage(): GuestUsage {
   return readUsage();
 }
 
-export function incrementGuestUsage(field: keyof Omit<GuestUsage, "resetAt">) {
+export function addGuestUsage(field: keyof Omit<GuestUsage, "resetAt">, amount = 1) {
   const usage = readUsage();
-  usage[field] += 1;
+  usage[field] += amount;
   writeUsage(usage);
   return usage;
+}
+
+export function incrementGuestUsage(field: keyof Omit<GuestUsage, "resetAt">) {
+  return addGuestUsage(field, 1);
 }
 
 export function getGuestLimitStatus() {
