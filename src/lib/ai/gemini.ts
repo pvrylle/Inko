@@ -20,12 +20,22 @@ export function getGeminiModel() {
   return process.env.GEMINI_MODEL || "gemini-flash-latest";
 }
 
+/** Home and spoken replies. Study work keeps GEMINI_MODEL. */
+export function getGeminiChatModel() {
+  return process.env.GEMINI_CHAT_MODEL?.trim() || "gemini-flash-lite-latest";
+}
+
 function isRetryableGeminiError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   return /429|500|502|503|504|RESOURCE_EXHAUSTED|UNAVAILABLE|high demand|overloaded/i.test(message);
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function isMissingModelError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /404|no longer available|NOT_FOUND/i.test(message);
+}
 
 async function withGeminiFallback<T>(run: (client: GoogleGenAI) => Promise<T>): Promise<T> {
   const keys = geminiKeys();
@@ -38,6 +48,7 @@ async function withGeminiFallback<T>(run: (client: GoogleGenAI) => Promise<T>): 
       try {
         return await run(client);
       } catch (error) {
+        if (isMissingModelError(error)) throw new Error("GEMINI_MODEL_UNAVAILABLE");
         if (!isRetryableGeminiError(error)) throw new Error("GEMINI_FAILED");
         sawRetryable = true;
         if (attempt < 2) await wait(700 * (attempt + 1));
@@ -47,13 +58,88 @@ async function withGeminiFallback<T>(run: (client: GoogleGenAI) => Promise<T>): 
   throw new Error(sawRetryable ? "GEMINI_UNAVAILABLE" : "GEMINI_FAILED");
 }
 
-export async function generateGeminiText(prompt: string) {
+async function generateGeminiTextWithModel(prompt: string, model: string, maxOutputTokens?: number) {
   return withGeminiFallback(async (client) => {
-    const response = await client.models.generateContent({ model: getGeminiModel(), contents: prompt });
+    const response = await client.models.generateContent({
+      model,
+      contents: prompt,
+      config: maxOutputTokens ? { maxOutputTokens, temperature: 0.7 } : undefined,
+    });
     const text = response.text?.trim();
     if (!text) throw new Error("GEMINI_EMPTY_RESPONSE");
     return text;
   });
+}
+
+export async function generateGeminiText(prompt: string) {
+  return generateGeminiTextWithModel(prompt, getGeminiModel());
+}
+
+/** Home and voice replies. Falls back to the study model if the fast model is retired. */
+export async function generateFastGeminiText(prompt: string) {
+  let text = "";
+  for await (const piece of generateFastGeminiTextStream(prompt)) text += piece;
+  const trimmed = text.trim();
+  if (!trimmed) throw new Error("GEMINI_EMPTY_RESPONSE");
+  return trimmed;
+}
+
+async function* streamModel(client: GoogleGenAI, model: string, prompt: string) {
+  const stream = await client.models.generateContentStream({
+    model,
+    contents: prompt,
+    config: { maxOutputTokens: 48, temperature: 0.4 },
+  });
+  for await (const chunk of stream) {
+    if (chunk.text) yield chunk.text;
+  }
+}
+
+/** A short study answer. Uses the fast chat model, then the study model if that id is retired. */
+export async function generateStudyAnswer(prompt: string) {
+  const models = [getGeminiChatModel(), getGeminiModel()].filter((model, index, all) => all.indexOf(model) === index);
+  let lastError: unknown;
+  for (const model of models) {
+    try {
+      return await withGeminiFallback(async (client) => {
+        const response = await client.models.generateContent({
+          model,
+          contents: prompt,
+          config: { maxOutputTokens: 360, temperature: 0.3 },
+        });
+        const text = response.text?.trim();
+        if (!text) throw new Error("GEMINI_EMPTY_RESPONSE");
+        return text;
+      });
+    } catch (error) {
+      lastError = error;
+      if (!(error instanceof Error) || error.message !== "GEMINI_MODEL_UNAVAILABLE") throw error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("GEMINI_FAILED");
+}
+
+/** Yields reply text as Gemini writes it, so the home page can leave "Thinking…" early. */
+export async function* generateFastGeminiTextStream(prompt: string) {
+  const keys = geminiKeys();
+  if (keys.length === 0) throw new Error("GEMINI_NOT_CONFIGURED");
+  const fastModel = getGeminiChatModel();
+  const client = new GoogleGenAI({ apiKey: keys[0] });
+  try {
+    yield* streamModel(client, fastModel, prompt);
+  } catch (error) {
+    if (isMissingModelError(error) && fastModel !== getGeminiModel()) {
+      yield* streamModel(client, getGeminiModel(), prompt);
+      return;
+    }
+    const backup = keys[1];
+    if (backup && isRetryableGeminiError(error)) {
+      yield* streamModel(new GoogleGenAI({ apiKey: backup }), fastModel, prompt);
+      return;
+    }
+    if (isMissingModelError(error)) throw new Error("GEMINI_MODEL_UNAVAILABLE");
+    throw new Error(isRetryableGeminiError(error) ? "GEMINI_UNAVAILABLE" : "GEMINI_FAILED");
+  }
 }
 
 type GeminiChatPart =

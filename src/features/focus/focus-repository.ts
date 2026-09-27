@@ -1,4 +1,5 @@
 import { inkoFetch } from "@/lib/auth/api-client";
+import { usesLocalStudyData } from "@/lib/data/local-study";
 import { readLocalCollection, subscribeToLocalCollection, upsertLocalRecord } from "@/lib/data/local-store";
 import type { FocusControlAction, FocusSession } from "@/lib/data/models";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
@@ -24,6 +25,16 @@ async function listHostedFocusSessions() {
 }
 
 export async function loadFocusSessions(userId: string): Promise<{ sessions: FocusSession[]; serverNow: string }> {
+  if (await usesLocalStudyData()) {
+    const sessions = readLocalCollection<FocusSession>("focus-sessions", userId).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+    const current = openSession(sessions);
+    if (current) {
+      const reconciled = reconcileFocusSession(current, new Date());
+      if (reconciled.changed) upsertLocalRecord("focus-sessions", userId, reconciled.session);
+    }
+    return { sessions: readLocalCollection<FocusSession>("focus-sessions", userId).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)), serverNow: new Date().toISOString() };
+  }
+
   const supabase = getBrowserSupabaseClient();
   if (supabase) {
     const response = await inkoFetch("/api/study/focus/current", { method: "POST" });
@@ -43,8 +54,8 @@ export async function loadFocusSessions(userId: string): Promise<{ sessions: Foc
 
 export async function startFocusSession(userId: string, minutes: number): Promise<FocusResult> {
   return withLocalFocusLock(userId, async () => {
-    const isDemo = !getBrowserSupabaseClient();
-    const current = isDemo ? openSession(readLocalCollection<FocusSession>("focus-sessions", userId)) : null;
+    const local = await usesLocalStudyData();
+    const current = local ? openSession(readLocalCollection<FocusSession>("focus-sessions", userId)) : null;
     const response = await inkoFetch("/api/study/focus/start", { method: "POST", body: JSON.stringify({ minutes, current_session: current ?? undefined, callId: crypto.randomUUID() }) });
     const payload = (await response.json()) as Partial<FocusResult> & { error?: string };
     if (!response.ok || !payload.session || !payload.server_now) throw new Error(payload.error || "FOCUS_START_FAILED");
@@ -58,8 +69,8 @@ export async function startFocusSession(userId: string, minutes: number): Promis
 
 export async function controlFocusSession(userId: string, action: FocusControlAction): Promise<FocusResult> {
   return withLocalFocusLock(userId, async () => {
-    const isDemo = !getBrowserSupabaseClient();
-    const current = isDemo ? openSession(readLocalCollection<FocusSession>("focus-sessions", userId)) : null;
+    const local = await usesLocalStudyData();
+    const current = local ? openSession(readLocalCollection<FocusSession>("focus-sessions", userId)) : null;
     const response = await inkoFetch("/api/study/focus/control", { method: "POST", body: JSON.stringify({ action, current_session: current ?? undefined, callId: crypto.randomUUID() }) });
     const payload = (await response.json()) as Partial<FocusResult> & { error?: string };
     if (!response.ok || !payload.server_now) throw new Error(payload.error || "FOCUS_CONTROL_FAILED");
@@ -69,8 +80,12 @@ export async function controlFocusSession(userId: string, action: FocusControlAc
 }
 
 export function subscribeToFocusSessions(userId: string, onChange: () => void) {
+  const unsubscribeLocal = subscribeToLocalCollection("focus-sessions", userId, onChange);
   const supabase = getBrowserSupabaseClient();
-  if (!supabase) return subscribeToLocalCollection("focus-sessions", userId, onChange);
+  if (!supabase) return unsubscribeLocal;
   const channel = supabase.channel(`focus:${userId}`).on("postgres_changes", { event: "*", schema: "public", table: "focus_sessions", filter: `owner_id=eq.${userId}` }, onChange).subscribe();
-  return () => { void supabase.removeChannel(channel); };
+  return () => {
+    unsubscribeLocal();
+    void supabase.removeChannel(channel);
+  };
 }

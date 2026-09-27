@@ -14,7 +14,7 @@ import { useEffect, useRef } from "react";
 import { ContentTopbar } from "@/components/layout/content-topbar";
 import { InkoMascot } from "@/features/mascot/inko-mascot";
 import { useMascot } from "@/features/mascot/mascot-provider";
-import { useOptionalVoiceAgent } from "@/features/voice/voice-agent-provider";
+import { PageVoiceControl } from "@/features/voice/page-voice-control";
 import { ResearchSessionForm } from "./research-session-form";
 import { ResearchTabs } from "./research-tabs";
 import { useResearch } from "./use-research";
@@ -32,7 +32,7 @@ function relativeTime(iso: string) {
 export function ResearchView() {
   const research = useResearch();
   const { state, dispatch } = useMascot();
-  const { sessions, activeSession, loading, error, setActive } = research;
+  const { sessions, activeSession, loading, error, setActive, startNewProject } = research;
   const previousStatus = useRef<string | null>(null);
 
   useEffect(() => {
@@ -47,24 +47,19 @@ export function ResearchView() {
       return () => window.clearTimeout(done);
     }
   }, [activeSession?.status, dispatch]);
-  const controller = useOptionalVoiceAgent();
   const appliedParam = useRef(false);
 
   // Open a specific session when navigated from Home ("/research?session=<id>").
   useEffect(() => {
     if (appliedParam.current) return;
-    const id = new URLSearchParams(window.location.search).get("session");
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("session");
+    const tab = params.get("tab");
     if (id) {
       appliedParam.current = true;
-      setActive(id);
+      setActive(id, tab === "sources" || tab === "findings" || tab === "contradictions" || tab === "canvas" || tab === "notes" || tab === "open-questions" || tab === "overview" ? tab : undefined);
     }
   }, [setActive]);
-
-  const onAsk = (text: string) => {
-    if (!controller) return;
-    if (controller.connection === "connected") void controller.sendText(text);
-    else void controller.start();
-  };
 
   const shortTitle = (question: string) => (question.length > 52 ? `${question.slice(0, 52).trim()}…` : question);
 
@@ -94,7 +89,10 @@ export function ResearchView() {
   if (!activeSession) {
     return (
       <div className="research-view-page page-enter">
-        <ContentTopbar className="research-topbar"><Link className="back-home" href="/"><ArrowLeft size={15} /> Back to Home</Link></ContentTopbar>
+        <ContentTopbar className="research-topbar">
+          <Link className="back-home" href="/"><ArrowLeft size={15} /> Back to Home</Link>
+          <PageVoiceControl />
+        </ContentTopbar>
         {error && <p className="form-error research-error" role="alert">{error}</p>}
 
         <div className="research-start">
@@ -128,7 +126,13 @@ export function ResearchView() {
 
   return (
     <div className="research-view-page page-enter">
-      <ContentTopbar className="research-topbar"><Link className="back-home" href="/"><ArrowLeft size={15} /> Back to Home</Link></ContentTopbar>
+      <ContentTopbar className="research-topbar">
+        <Link className="back-home" href="/"><ArrowLeft size={15} /> Back to Home</Link>
+        <div className="research-topbar-actions">
+          <button className="secondary-button" onClick={startNewProject} type="button">New project</button>
+          <PageVoiceControl />
+        </div>
+      </ContentTopbar>
 
       {error && <p className="form-error research-error" role="alert">{error}</p>}
 
@@ -162,7 +166,6 @@ export function ResearchView() {
             saveCanvas={research.saveCanvas}
             activeTab={research.activeTab}
             setActiveTab={research.setActiveTab}
-            onAsk={onAsk}
           />
         </div>
 

@@ -1,5 +1,5 @@
 import "server-only";
-import { generateGeminiJson, generateGeminiText, isGeminiConfigured } from "./gemini";
+import { generateFastGeminiText, generateGeminiJson, generateGeminiText, isGeminiConfigured } from "./gemini";
 
 /** Gemini is the only reasoning model. AssemblyAI carries live audio and does not answer on its own. */
 export function isAiConfigured() {
@@ -8,6 +8,10 @@ export function isAiConfigured() {
 
 export async function generateText(prompt: string) {
   return generateGeminiText(prompt);
+}
+
+export async function generateFastText(prompt: string) {
+  return generateFastGeminiText(prompt);
 }
 
 export async function generateJson(prompt: string, responseJsonSchema: Record<string, unknown>) {

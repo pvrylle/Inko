@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { apiError, mapDbError } from "@/lib/api/http";
 import { getRequestUser } from "@/lib/auth/request-user";
+import { generateQuestionBrief, materializeBrief } from "@/lib/research/question-brief";
 import { checkRateLimit } from "@/lib/security/rate-limit";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -30,28 +31,48 @@ export async function POST(request: NextRequest) {
   if (!checkRateLimit(`research-session:${user.userId}`, 20, 3_600_000).allowed) return apiError("RATE_LIMITED", 429);
   const body = createSchema.safeParse(await request.json().catch(() => null));
   if (!body.success) return apiError("INVALID_INPUT", 400);
-  const now = new Date().toISOString();
-  if (user.isDemo) {
-    return NextResponse.json({
-      id: crypto.randomUUID(),
-      owner_id: user.userId,
-      question: body.data.question,
-      title: body.data.title ?? null,
-      description: body.data.description ?? "",
-      status: "draft",
-      created_at: now,
-      updated_at: now,
-    });
-  }
+
+  const brief = await generateQuestionBrief(body.data.question);
+  const bundle = materializeBrief(user.userId, body.data.question, brief);
+
+  if (user.isDemo) return NextResponse.json(bundle);
 
   const supabase = await createServerSupabaseClient();
-  if (!supabase) return apiError("SUPABASE_NOT_CONFIGURED", 503);
+  if (!supabase) return NextResponse.json(bundle);
   const { data, error } = await supabase.from("research_sessions").insert({
+    id: bundle.session.id,
     owner_id: user.userId,
     question: body.data.question,
-    title: body.data.title ?? null,
-    description: body.data.description ?? "",
+    title: body.data.title ?? brief.title,
+    description: body.data.description ?? brief.description,
+    status: "ready",
   }).select(columns).single();
   if (error || !data) return apiError(mapDbError(error), 502);
-  return NextResponse.json(data);
+
+  await Promise.all([
+    supabase.from("research_sources").insert(
+      bundle.sources.map(({ id, session_id, owner_id, title, url, type, tag, meta }) => ({
+        id, session_id, owner_id, title, url, type, tag, meta,
+      })),
+    ),
+    supabase.from("research_findings").insert(bundle.findings.map(({ id, session_id, owner_id, statement, source_id }) => ({
+      id, session_id, owner_id, statement, source_id,
+    }))),
+    bundle.contradictions.length
+      ? supabase.from("research_contradictions").insert(bundle.contradictions.map(({ id, session_id, owner_id, explanation, source_ids }) => ({
+        id, session_id, owner_id, explanation, source_ids,
+      })))
+      : Promise.resolve(),
+    supabase.from("research_open_questions").insert(bundle.openQuestions.map(({ id, session_id, owner_id, text }) => ({
+      id, session_id, owner_id, text,
+    }))),
+    supabase.from("research_notes").upsert({
+      id: bundle.note.id,
+      session_id: data.id,
+      owner_id: user.userId,
+      content_markdown: bundle.note.content_markdown,
+    }),
+  ]);
+
+  return NextResponse.json({ ...bundle, session: { ...data, title: brief.title, description: brief.description, status: "ready" } });
 }

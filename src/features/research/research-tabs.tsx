@@ -24,7 +24,6 @@ type Props = {
   saveCanvas: (content: string) => Promise<void>;
   activeTab: ResearchTab;
   setActiveTab: (tab: ResearchTab) => void;
-  onAsk?: (text: string) => void;
 };
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
@@ -41,10 +40,10 @@ const TABS: { id: ResearchTab; label: string }[] = [
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-const overviewAskChips = [
-  "Show me the sources.",
-  "Find contradictory studies.",
-  "Put the main arguments on the canvas.",
+const overviewAskChips: { label: string; tab: ResearchTab }[] = [
+  { label: "Show me the sources.", tab: "sources" },
+  { label: "Find contradictory studies.", tab: "contradictions" },
+  { label: "Put the main arguments on the canvas.", tab: "canvas" },
 ];
 
 const findingIcons = [
@@ -61,7 +60,6 @@ function OverviewPanel({
   contradictions,
   openQuestions,
   setActiveTab,
-  onAsk,
 }: {
   session: ResearchSession;
   sources: ResearchSource[];
@@ -69,7 +67,6 @@ function OverviewPanel({
   contradictions: ResearchContradiction[];
   openQuestions: OpenQuestion[];
   setActiveTab: (tab: ResearchTab) => void;
-  onAsk?: (text: string) => void;
 }) {
   const stats = [
     { key: "sources" as const, label: "Sources", value: sources.length, Icon: FileText, tone: "blue" },
@@ -84,10 +81,10 @@ function OverviewPanel({
 
       <div className="overview-ask">
         <span className="overview-ask-icon" aria-hidden="true"><Mic2 size={16} /></span>
-        <p>You can ask me anything about this research project.</p>
+        <p>Jump into any part of this project. Talk with Inko only if you want to.</p>
         <div className="overview-ask-chips">
           {overviewAskChips.map((chip) => (
-            <button key={chip} onClick={() => onAsk?.(chip)} type="button">&ldquo;{chip}&rdquo;</button>
+            <button key={chip.label} onClick={() => setActiveTab(chip.tab)} type="button">&ldquo;{chip.label}&rdquo;</button>
           ))}
         </div>
       </div>
@@ -427,7 +424,6 @@ export function ResearchTabs({
   saveCanvas,
   activeTab,
   setActiveTab,
-  onAsk,
 }: Props) {
   const panelId = (id: ResearchTab) => `research-panel-${id}`;
   const tabId   = (id: ResearchTab) => `research-tab-${id}`;
@@ -479,7 +475,6 @@ export function ResearchTabs({
             noteMarkdown,
             saveCanvas,
             setActiveTab,
-            onAsk,
           })}
         </div>
       ))}
@@ -501,7 +496,6 @@ function renderPanel(
     noteMarkdown,
     saveCanvas,
     setActiveTab,
-    onAsk,
   }: Omit<Props, "activeTab">,
 ) {
   switch (tab) {
@@ -514,7 +508,6 @@ function renderPanel(
           contradictions={contradictions}
           openQuestions={openQuestions}
           setActiveTab={setActiveTab}
-          onAsk={onAsk}
         />
       );
     case "sources":

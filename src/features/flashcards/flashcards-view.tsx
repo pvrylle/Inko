@@ -1,14 +1,19 @@
 "use client";
 
-import { BookOpen, Brain, CalendarClock, CheckCircle2, Flame, Layers3, RotateCcw, Sparkles } from "lucide-react";
+import { Brain, CalendarClock, CheckCircle2, Flame, Layers3, RotateCcw, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { BackToPractice } from "@/components/layout/content-topbar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeading } from "@/components/ui/page-heading";
 import { useMascot } from "@/features/mascot/mascot-provider";
+import { generateNoteFromContent } from "@/features/notes/notes-repository";
 import { useNotes } from "@/features/notes/use-notes";
 import { useToasts } from "@/features/toast/toast-provider";
-import type { Flashcard, SemanticGrade, StudyRating } from "@/lib/data/models";
+import { PageVoiceControl } from "@/features/voice/page-voice-control";
+import { usesLocalStudyData } from "@/lib/data/local-study";
+import { upsertLocalRecord } from "@/lib/data/local-store";
+import type { Flashcard, Note, SemanticGrade, StudyRating } from "@/lib/data/models";
+import { topicToNote } from "@/lib/study/topic-note";
 import { commitFlashcardReview, generateFlashcards, gradeFlashcardAnswer } from "./flashcards-repository";
 import { useFlashcards } from "./use-flashcards";
 
@@ -36,6 +41,7 @@ export function FlashcardsView() {
   const { celebrate: mascotCelebrate, dispatch } = useMascot();
   const { celebrate } = useToasts();
   const [selectedNoteId, setSelectedNoteId] = useState("");
+  const [topic, setTopic] = useState("");
   const [answer, setAnswer] = useState("");
   const [grade, setGrade] = useState<SemanticGrade | null>(null);
   const [flipped, setFlipped] = useState(false);
@@ -73,19 +79,37 @@ export function FlashcardsView() {
     if (flipped) setFlipped(false);
   }
 
+  const resolveNote = async (): Promise<Note | null> => {
+    const prompt = topic.trim();
+    if (prompt.length >= 8 && userId) {
+      if (await usesLocalStudyData()) {
+        const note = topicToNote(userId, prompt);
+        upsertLocalRecord("notes", userId, note);
+        return note;
+      }
+      return generateNoteFromContent(userId, prompt);
+    }
+    return selectedNote ?? null;
+  };
+
   const createCards = async () => {
-    if (!userId || !selectedNote) return;
+    if (!userId) return;
     setWorking("generate");
     setFormError(null);
     try {
-      const generatedCards = await generateFlashcards(userId, selectedNote);
+      const note = await resolveNote();
+      if (!note) {
+        setFormError("Choose a note or type a topic of at least 8 characters.");
+        return;
+      }
+      const generatedCards = await generateFlashcards(userId, note);
       await reload();
       setReviewClock((current) => Math.max(current, ...generatedCards.map((card) => Date.parse(card.due))));
       mascotCelebrate("Your new cards are ready!");
-      celebrate("Deck ready", `${generatedCards.length} card${generatedCards.length === 1 ? "" : "s"} from ${selectedNote.title}`);
+      celebrate("Deck ready", `${generatedCards.length} card${generatedCards.length === 1 ? "" : "s"} from ${note.title}`);
     } catch (caught) {
       const code = caught instanceof Error ? caught.message : "FLASHCARD_GENERATION_FAILED";
-      setFormError(code === "GEMINI_NOT_CONFIGURED" ? "Add GEMINI_API_KEY to generate flashcards with Inko." : "Inko couldn't make those cards. Please try again.");
+      setFormError(code === "GUEST_LIMIT" ? "You've used today's guest study limit. Sign in to keep going." : code === "GEMINI_NOT_CONFIGURED" ? "Add GEMINI_API_KEY to generate flashcards with Inko." : "Inko couldn't make those cards. Please try again.");
     } finally {
       setWorking(null);
     }
@@ -138,7 +162,7 @@ export function FlashcardsView() {
   return (
     <div className="content-page page-enter">
       <BackToPractice />
-      <PageHeading eyebrow="Remember for longer" title="Flashcards" description="Inko checks meaning, then you choose the rating that advances your private FSRS schedule." />
+      <PageHeading eyebrow="Remember for longer" title="Flashcards" description="Inko checks meaning, then you choose the rating that advances your private FSRS schedule." action={<PageVoiceControl />} />
 
       <div className="stat-strip" aria-label="Flashcard statistics">
         <span><strong>{dueToday}</strong><small>Due today</small></span>
@@ -155,22 +179,24 @@ export function FlashcardsView() {
         </div>
       )}
 
-      {!notesLoading && notes.length > 0 && (
-        <section className="deck-generator" aria-label="Create a flashcard deck">
-          <div><span className="deck-generator-icon"><Sparkles size={19} /></span><div><h2>Make cards from a note</h2><p>Gemini finds the most useful ideas for active recall.</p></div></div>
-          <div className="deck-generator-controls">
+      <section className="deck-generator" aria-label="Create a flashcard deck">
+        <div><span className="deck-generator-icon"><Sparkles size={19} /></span><div><h2>Make cards from a note or topic</h2><p>Pick an existing note, or type a topic and Inko will build a deck.</p></div></div>
+        <div className="deck-generator-controls">
+          {!notesLoading && notes.length > 0 && (
             <label><span className="sr-only">Source note</span><select onChange={(event) => setSelectedNoteId(event.target.value)} value={activeNoteId}>{notes.map((note) => <option key={note.id} value={note.id}>{note.title}</option>)}</select></label>
-            <button className="secondary-button" disabled={working !== null} onClick={() => void createCards()}>{working === "generate" ? "Making cards…" : "Generate cards"}</button>
-          </div>
-        </section>
-      )}
+          )}
+          <label className="topic-field">
+            <span className="sr-only">Study topic</span>
+            <input onChange={(event) => setTopic(event.target.value)} placeholder="Or type a topic, e.g. mitosis checkpoints" value={topic} />
+          </label>
+          <button className="secondary-button" disabled={working !== null} onClick={() => void createCards()}>{working === "generate" ? "Making cards…" : "Generate cards"}</button>
+        </div>
+      </section>
 
       {(error || formError) && <p className="form-error flashcard-error" role="alert">{formError || error}</p>}
 
-      {!loading && notes.length === 0 ? (
-        <EmptyState icon={BookOpen} title="Create a note first" message="Flashcards stay grounded in your notes, so Inko never invents facts for your deck." />
-      ) : !loading && flashcards.length === 0 ? (
-        <EmptyState icon={Layers3} title="No cards yet" message="Choose a note above and Inko will turn its key ideas into an active-recall deck." />
+      {!loading && flashcards.length === 0 ? (
+        <EmptyState icon={Layers3} title="No cards yet" message="Choose a note or type a topic above and Inko will turn the key ideas into an active-recall deck." />
       ) : !loading && !activeCard ? (
         <EmptyState icon={CheckCircle2} title="You are caught up" message="Nothing is due right now. FSRS will bring each idea back when reviewing helps most." />
       ) : activeCard ? (

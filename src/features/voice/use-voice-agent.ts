@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { inkoFetch } from "@/lib/auth/api-client";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useMascot } from "@/features/mascot/mascot-provider";
 import { base64Pcm16ToFloat, floatToBase64Pcm16, resampleFloat32, rmsAmplitude } from "./audio-utils";
 import { persistChatTurn } from "./voice-persistence";
 import { executeVoiceTool } from "./voice-tools";
-import type { ToolCall, VoiceConnectionState, VoiceMessage, VoiceServerEvent } from "./voice-types";
+import type { StudySourceLink, ToolCall, VoiceConnectionState, VoiceMessage, VoiceServerEvent } from "./voice-types";
 
 type TokenResponse = { token: string; agentId: string; voiceSessionId: string; maxSessionDurationSeconds: number; error?: string; message?: string };
 type ToolResult = { callId: string; result: string; isError: boolean };
@@ -142,6 +143,30 @@ function replyErrorMessage() {
   return "Inko is not ready";
 }
 
+function spokenAnswer(text: string) {
+  return text.replace(/\s*\[\d+\]/g, "").replace(/\s+/g, " ").trim();
+}
+
+function studySources(value: unknown): StudySourceLink[] {
+  if (!Array.isArray(value)) return [];
+  const links: StudySourceLink[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const title = "title" in item && typeof item.title === "string" ? item.title.trim() : "";
+    const url = "url" in item && typeof item.url === "string" ? item.url.trim() : "";
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      continue;
+    }
+    if (parsed.protocol !== "https:" || !title) continue;
+    links.push({ title: title.slice(0, 160), url: parsed.toString() });
+    if (links.length >= 4) break;
+  }
+  return links;
+}
+
 const cuteVoiceNames = [/ana/i, /aria/i, /jenny/i, /samantha/i, /google uk english female/i, /zira/i];
 
 function pickCuteVoice(voices: SpeechSynthesisVoice[]) {
@@ -155,12 +180,18 @@ function pickCuteVoice(voices: SpeechSynthesisVoice[]) {
 
 export function useVoiceAgent() {
   const { userId, isGuest } = useAuth();
+  const pathname = usePathname() ?? "";
+  // Research keeps the live agent for tool calls. Everywhere else, including
+  // home, speech is captured in the browser and answered by the fast chat model.
+  const liveVoice = !isGuest && pathname.startsWith("/research");
   const { dispatch, setAmplitude, celebrate } = useMascot();
   const [connection, setConnection] = useState<VoiceConnectionState>("idle");
   const [messages, setMessages] = useState<VoiceMessage[]>([]);
   const [partialTranscript, setPartialTranscript] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [dictating, setDictating] = useState(false);
+  const [replyPending, setReplyPending] = useState(false);
+  const replyPendingRef = useRef(false);
 
   const socketRef = useRef<WebSocket | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -189,10 +220,17 @@ export function useVoiceAgent() {
     silenceTimerRef.current = null;
   }, []);
 
+  const markReplyPending = useCallback((pending: boolean) => {
+    replyPendingRef.current = pending;
+    setReplyPending(pending);
+  }, []);
+
   const addMessage = useCallback((message: VoiceMessage) => {
     setMessages((current) => [...current.slice(-39), message]);
+    if (message.role === "inko") markReplyPending(false);
+    else if (message.role === "student") markReplyPending(true);
     if (userId) void persistChatTurn(userId, voiceSessionIdRef.current, message).catch(() => undefined);
-  }, [userId]);
+  }, [markReplyPending, userId]);
 
   const send = useCallback((payload: object) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify(payload));
@@ -388,6 +426,8 @@ export function useVoiceAgent() {
         flushToolResults();
         break;
       case "session.ended":
+        if (replyPendingRef.current) setError(replyErrorMessage());
+        markReplyPending(false);
         setConnection("idle");
         dispatch({ type: "REPLY_DONE" });
         cleanUpMedia();
@@ -395,6 +435,7 @@ export function useVoiceAgent() {
         break;
       case "session.error":
       case "error":
+        markReplyPending(false);
         setError(event.message || "The voice session ended unexpectedly.");
         setConnection("error");
         dispatch({ type: "ERROR" });
@@ -402,7 +443,7 @@ export function useVoiceAgent() {
         void finalizeProviderSession();
         break;
     }
-  }, [addMessage, cleanUpMedia, dispatch, finalizeProviderSession, flushToolResults, handleToolCall, playAudio, stopPlayback]);
+  }, [addMessage, cleanUpMedia, dispatch, finalizeProviderSession, flushToolResults, handleToolCall, markReplyPending, playAudio, stopPlayback]);
 
   // Browser speech stays open. A short pause ends the sentence and Inko answers,
   // then listening starts again until the student taps to hang up.
@@ -472,7 +513,7 @@ export function useVoiceAgent() {
         clearSilenceTimer();
         if (spoken.replace(/[^\p{L}\p{N}]/gu, "").length < 2) return;
         recoverableErrorsRef.current = 0;
-        silenceTimerRef.current = window.setTimeout(commitUtterance, endsFinal ? 700 : 1200);
+        silenceTimerRef.current = window.setTimeout(commitUtterance, endsFinal ? 250 : 700);
       };
 
       recognition.onerror = (event) => {
@@ -542,9 +583,9 @@ export function useVoiceAgent() {
     setError(null);
     setConnection("connecting");
 
-    // Guests have no account session, so AssemblyAI refuses the live token.
-    // Capture speech in the browser and answer through Gemini instead.
-    if (isGuest) {
+    // The live agent only runs on Research. Home answers through browser speech
+    // and the fast chat model, so a question is not left waiting on AssemblyAI.
+    if (!liveVoice) {
       handsFreeRef.current = true;
       pauseForReplyRef.current = false;
       startDictation();
@@ -576,6 +617,8 @@ export function useVoiceAgent() {
       };
       socket.onerror = () => handleEvent({ type: "session.error", code: "SOCKET_ERROR", message: "The voice connection could not be opened." });
       socket.onclose = () => {
+        if (replyPendingRef.current) setError(replyErrorMessage());
+        markReplyPending(false);
         setConnection("idle");
         cleanUpMedia();
         void finalizeProviderSession();
@@ -611,7 +654,7 @@ export function useVoiceAgent() {
       setConnection("error");
       dispatch({ type: "ERROR", message });
     }
-  }, [cleanUpMedia, connection, dictating, dispatch, finalizeProviderSession, handleEvent, isGuest, send, setAmplitude, startDictation]);
+  }, [cleanUpMedia, connection, dictating, dispatch, finalizeProviderSession, handleEvent, liveVoice, markReplyPending, send, setAmplitude, startDictation]);
 
   const resumeListening = useCallback(() => {
     pauseForReplyRef.current = false;
@@ -635,6 +678,7 @@ export function useVoiceAgent() {
       interimRef.current = "";
       setPartialTranscript("");
       setDictating(false);
+      markReplyPending(false);
       setConnection("idle");
       try { recognitionRef.current?.stop(); } catch {}
       recognitionRef.current = null;
@@ -656,7 +700,7 @@ export function useVoiceAgent() {
       setConnection("idle");
       void finalizeProviderSession();
     }
-  }, [cleanUpMedia, clearSilenceTimer, finalizeProviderSession, send, setPartialTranscript]);
+  }, [cleanUpMedia, clearSilenceTimer, finalizeProviderSession, markReplyPending, send, setPartialTranscript]);
 
   const sendText = useCallback(async (text: string) => {
     const trimmed = text.trim();
@@ -671,11 +715,41 @@ export function useVoiceAgent() {
     }
 
     dispatch({ type: "USER_STOPPED" });
-    const response = await inkoFetch("/api/chat", { method: "POST", body: JSON.stringify({ message: trimmed }) });
-    const payload = (await response.json()) as { text?: string; error?: string };
-    if (!response.ok || !payload.text) {
+    let response: Response;
+    try {
+      response = await inkoFetch("/api/chat", {
+        method: "POST",
+        body: JSON.stringify({ message: trimmed }),
+        signal: AbortSignal.timeout(22_000),
+      });
+    } catch {
+      markReplyPending(false);
+      setError(replyErrorMessage());
+      dispatch({ type: "ERROR", message: replyErrorMessage() });
+      resumeListeningRef.current();
+      return;
+    }
+    const contentType = response.headers.get("content-type") ?? "";
+    if (response.ok && contentType.includes("application/json")) {
+      const payload = (await response.json().catch(() => ({}))) as { text?: string; error?: string; sources?: unknown };
+      const answer = payload.text?.trim();
+      if (!answer || payload.error) {
+        markReplyPending(false);
+        setError(replyErrorMessage());
+        dispatch({ type: "ERROR", message: replyErrorMessage() });
+        resumeListeningRef.current();
+        return;
+      }
+      const sources = studySources(payload.sources);
+      addMessage({ id: crypto.randomUUID(), role: "inko", text: answer, createdAt: new Date().toISOString(), sources });
+      speakReply(spokenAnswer(answer));
+      return;
+    }
+    if (!response.ok || contentType.includes("application/json")) {
+      const payload = (await response.json().catch(() => ({}))) as { text?: string; error?: string };
       const blocked = payload.error === "GUEST_LIMIT";
       const message = blocked ? "Guest limit reached. Create a free account to keep going." : replyErrorMessage();
+      markReplyPending(false);
       setError(message);
       dispatch({ type: "ERROR", message });
       if (blocked) {
@@ -692,9 +766,35 @@ export function useVoiceAgent() {
       resumeListeningRef.current();
       return;
     }
-    addMessage({ id: crypto.randomUUID(), role: "inko", text: payload.text, createdAt: new Date().toISOString() });
-    speakReply(payload.text);
-  }, [addMessage, clearSilenceTimer, dispatch, send, speakReply]);
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      markReplyPending(false);
+      setError(replyErrorMessage());
+      dispatch({ type: "ERROR", message: replyErrorMessage() });
+      resumeListeningRef.current();
+      return;
+    }
+    const decoder = new TextDecoder();
+    let reply = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      reply += decoder.decode(value, { stream: true });
+      const visible = reply.trim();
+      if (visible) setPartialTranscript(visible);
+    }
+    reply = reply.trim();
+    if (!reply) {
+      markReplyPending(false);
+      setError(replyErrorMessage());
+      dispatch({ type: "ERROR", message: replyErrorMessage() });
+      resumeListeningRef.current();
+      return;
+    }
+    addMessage({ id: crypto.randomUUID(), role: "inko", text: reply, createdAt: new Date().toISOString() });
+    speakReply(reply);
+  }, [addMessage, clearSilenceTimer, dispatch, markReplyPending, send, speakReply]);
 
   // Keep a stable reference so the dictation callbacks can send captured text
   // without depending on sendText's identity.
@@ -719,5 +819,5 @@ export function useVoiceAgent() {
     };
   }, [cleanUpMedia, finalizeProviderSession]);
 
-  return { connection, messages, partialTranscript, error, dictating, start, end, sendText };
+  return { connection, messages, partialTranscript, error, dictating, replyPending, start, end, sendText };
 }

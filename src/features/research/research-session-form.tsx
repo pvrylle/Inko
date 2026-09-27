@@ -91,7 +91,7 @@ export function ResearchSessionForm({ createSession, sessionError }: Props) {
           disabled={submitting}
           type="submit"
         >
-          {submitting ? "Creating…" : "Start research"}
+          {submitting ? "Gathering sources…" : "Start research"}
         </button>
       </div>
 

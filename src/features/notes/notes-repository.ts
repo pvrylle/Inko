@@ -1,6 +1,7 @@
 "use client";
 
 import { inkoFetch } from "@/lib/auth/api-client";
+import { usesLocalStudyData } from "@/lib/data/local-study";
 import type { Note } from "@/lib/data/models";
 import { deleteLocalRecord, readLocalCollection, subscribeToLocalCollection, upsertLocalRecord } from "@/lib/data/local-store";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
@@ -9,11 +10,12 @@ export async function generateNoteFromContent(userId: string, content: string) {
   const response = await inkoFetch("/api/study/notes/generate", { method: "POST", body: JSON.stringify({ content, source: "text", callId: crypto.randomUUID() }) });
   const payload = (await response.json()) as { note?: Note; persisted?: boolean; error?: string };
   if (!response.ok || !payload.note) throw new Error(payload.error || "NOTE_GENERATION_FAILED");
-  if (!payload.persisted) upsertLocalRecord("notes", userId, payload.note);
+  if (!payload.persisted || await usesLocalStudyData()) upsertLocalRecord("notes", userId, payload.note);
   return payload.note;
 }
 
 export async function listNotes(userId: string) {
+  if (await usesLocalStudyData()) return readLocalCollection<Note>("notes", userId);
   const supabase = getBrowserSupabaseClient();
   if (!supabase) return readLocalCollection<Note>("notes", userId);
   const { data, error } = await supabase.from("notes").select("*").order("created_at", { ascending: false });
@@ -22,6 +24,7 @@ export async function listNotes(userId: string) {
 }
 
 export async function removeNote(userId: string, note: Note) {
+  if (await usesLocalStudyData()) return deleteLocalRecord<Note>("notes", userId, note.id);
   const supabase = getBrowserSupabaseClient();
   if (!supabase) return deleteLocalRecord<Note>("notes", userId, note.id);
   if (note.storage_path) await supabase.storage.from("note-assets").remove([note.storage_path]);
@@ -30,13 +33,17 @@ export async function removeNote(userId: string, note: Note) {
 }
 
 export function subscribeToNotes(userId: string, onChange: () => void) {
+  const unsubscribeLocal = subscribeToLocalCollection("notes", userId, onChange);
   const supabase = getBrowserSupabaseClient();
-  if (!supabase) return subscribeToLocalCollection("notes", userId, onChange);
+  if (!supabase) return unsubscribeLocal;
   const channel = supabase
     .channel(`notes:${userId}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "notes", filter: `owner_id=eq.${userId}` }, onChange)
     .subscribe();
-  return () => { void supabase.removeChannel(channel); };
+  return () => {
+    unsubscribeLocal();
+    void supabase.removeChannel(channel);
+  };
 }
 
 export function downloadNote(note: Note) {

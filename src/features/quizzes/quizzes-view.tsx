@@ -6,8 +6,13 @@ import { BackToPractice } from "@/components/layout/content-topbar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeading } from "@/components/ui/page-heading";
 import { useMascot } from "@/features/mascot/mascot-provider";
+import { generateNoteFromContent } from "@/features/notes/notes-repository";
 import { useNotes } from "@/features/notes/use-notes";
-import type { QuizAnswerResult } from "@/lib/data/models";
+import { PageVoiceControl } from "@/features/voice/page-voice-control";
+import { usesLocalStudyData } from "@/lib/data/local-study";
+import { upsertLocalRecord } from "@/lib/data/local-store";
+import type { Note, QuizAnswerResult } from "@/lib/data/models";
+import { topicToNote } from "@/lib/study/topic-note";
 import { generateQuiz, submitQuizAnswer } from "./quizzes-repository";
 import { useQuizzes } from "./use-quizzes";
 
@@ -18,6 +23,7 @@ export function QuizzesView() {
   const { quizzes, questions, attempts, loading, error, reload, userId } = useQuizzes();
   const { celebrate, dispatch } = useMascot();
   const [selectedNoteId, setSelectedNoteId] = useState("");
+  const [topic, setTopic] = useState("");
   const [selectedQuizId, setSelectedQuizId] = useState("");
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [result, setResult] = useState<QuizAnswerResult | null>(null);
@@ -36,19 +42,37 @@ export function QuizzesView() {
   const score = activeAttempts.filter((attempt) => attempt.correct).length;
   const complete = Boolean(activeQuiz && activeQuestions.length > 0 && activeAttempts.length === activeQuestions.length && !result);
 
+  const resolveNote = async (): Promise<Note | null> => {
+    const prompt = topic.trim();
+    if (prompt.length >= 8 && userId) {
+      if (await usesLocalStudyData()) {
+        const note = topicToNote(userId, prompt);
+        upsertLocalRecord("notes", userId, note);
+        return note;
+      }
+      return generateNoteFromContent(userId, prompt);
+    }
+    return selectedNote ?? null;
+  };
+
   const createQuiz = async () => {
-    if (!userId || !selectedNote) return;
+    if (!userId) return;
     setWorking("generate");
     setFormError(null);
     try {
-      const generated = await generateQuiz(userId, selectedNote);
+      const note = await resolveNote();
+      if (!note) {
+        setFormError("Choose a note or type a topic of at least 8 characters.");
+        return;
+      }
+      const generated = await generateQuiz(userId, note);
       setSelectedQuizId(generated.quiz.id);
       setSelectedOption(null);
       setResult(null);
       await reload();
     } catch (caught) {
       const code = caught instanceof Error ? caught.message : "QUIZ_GENERATION_FAILED";
-      setFormError(code === "GEMINI_NOT_CONFIGURED" ? "Add GEMINI_API_KEY to generate quizzes with Inko." : code === "SUPABASE_SECRET_KEY_REQUIRED" ? "Add SUPABASE_SECRET_KEY so Inko can protect quiz answer keys." : "Inko couldn't make that quiz. Please try again.");
+      setFormError(code === "GUEST_LIMIT" ? "You've used today's guest study limit. Sign in to keep going." : code === "GEMINI_NOT_CONFIGURED" ? "Add GEMINI_API_KEY to generate quizzes with Inko." : code === "SUPABASE_SECRET_KEY_REQUIRED" ? "Add SUPABASE_SECRET_KEY so Inko can protect quiz answer keys." : "Inko couldn't make that quiz. Please try again.");
     } finally {
       setWorking(null);
     }
@@ -87,27 +111,29 @@ export function QuizzesView() {
   return (
     <div className="content-page page-enter">
       <BackToPractice />
-      <PageHeading eyebrow="Test your understanding" title="Quiz with Inko" description="Four choices, one grounded answer, and no peeking before you commit." />
+      <PageHeading eyebrow="Test your understanding" title="Quiz with Inko" description="Four choices, one grounded answer, and no peeking before you commit." action={<PageVoiceControl />} />
 
-      {!notesLoading && notes.length > 0 && (
-        <section className="quiz-generator" aria-label="Generate a quiz">
-          <div><span><Sparkles size={19} /></span><div><h2>Build from your notes</h2><p>Answer keys stay private until each attempt is submitted.</p></div></div>
-          <div className="quiz-generator-controls">
+      <section className="quiz-generator" aria-label="Generate a quiz">
+        <div><span><Sparkles size={19} /></span><div><h2>Build from a note or topic</h2><p>Answer keys stay private until each attempt is submitted.</p></div></div>
+        <div className="quiz-generator-controls">
+          {!notesLoading && notes.length > 0 && (
             <label><span className="sr-only">Source note</span><select onChange={(event) => setSelectedNoteId(event.target.value)} value={activeNoteId}>{notes.map((note) => <option key={note.id} value={note.id}>{note.title}</option>)}</select></label>
-            <button className="secondary-button" disabled={working !== null} onClick={() => void createQuiz()}>{working === "generate" ? "Building quiz…" : "Generate quiz"}</button>
-          </div>
-        </section>
-      )}
+          )}
+          <label className="topic-field">
+            <span className="sr-only">Study topic</span>
+            <input onChange={(event) => setTopic(event.target.value)} placeholder="Or type a topic, e.g. cellular respiration" value={topic} />
+          </label>
+          <button className="secondary-button" disabled={working !== null} onClick={() => void createQuiz()}>{working === "generate" ? "Building quiz…" : "Generate quiz"}</button>
+        </div>
+      </section>
 
       {quizzes.length > 1 && (
         <label className="quiz-picker">Quiz deck<select onChange={(event) => chooseQuiz(event.target.value)} value={activeQuizId}>{quizzes.map((quiz) => <option key={quiz.id} value={quiz.id}>{quiz.title}</option>)}</select></label>
       )}
       {(error || formError) && <p className="form-error quiz-error" role="alert">{formError || error}</p>}
 
-      {!loading && notes.length === 0 ? (
-        <EmptyState icon={Brain} title="Create a note first" message="Inko builds every question from your own study material." />
-      ) : !loading && quizzes.length === 0 ? (
-        <EmptyState icon={Brain} title="What should I quiz you on?" message="Choose a note above and Inko will create a focused multiple-choice challenge." />
+      {!loading && quizzes.length === 0 ? (
+        <EmptyState icon={Brain} title="What should I quiz you on?" message="Choose a note or type a topic above and Inko will create a focused multiple-choice challenge." />
       ) : complete && activeQuiz ? (
         <section className="quiz-complete" aria-live="polite">
           <span><Trophy size={28} /></span><p className="eyebrow">Quiz complete</p><h2>{score} of {activeQuestions.length} correct</h2>

@@ -21,8 +21,16 @@ export function PersistentVoiceDock() {
   const controller = useOptionalVoiceAgent();
   const { state } = useMascot();
 
-  // Home uses the central capsule; Research uses the in-panel ask box + mascot.
-  if (!controller || pathname === "/" || pathname.startsWith("/research")) return null;
+  const hideDock = !pathname || pathname === "/" || pathname === "/welcome" || [
+    "/research",
+    "/sources",
+    "/canvas",
+    "/practice",
+    "/flashcards",
+    "/quiz",
+    "/focus",
+  ].some((route) => pathname === route || pathname.startsWith(`${route}/`));
+  if (!controller || hideDock) return null;
 
   const active = controller.connection === "connected" || controller.connection === "connecting" || controller.connection === "ending";
   const label = controller.connection === "connecting"

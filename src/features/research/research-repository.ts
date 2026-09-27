@@ -1,7 +1,15 @@
 "use client";
 
 import { inkoFetch } from "@/lib/auth/api-client";
-import { readDemo, saveDemo } from "@/lib/data/demo-memory";
+import { usesLocalStudyData } from "@/lib/data/local-study";
+import {
+  getLocalResearchProject,
+  listLocalResearchProjects,
+  patchLocalResearchProject,
+  saveLocalResearchProject,
+  subscribeToLocalResearch,
+  type ResearchProject,
+} from "@/lib/data/research-local";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 import type {
   CanvasNote,
@@ -14,17 +22,28 @@ import type {
   SourceTag,
 } from "./research-schema";
 
-// ─── Sessions ─────────────────────────────────────────────────────────────────
+type SessionCreatePayload = ResearchSession & Partial<ResearchProject> & { session?: ResearchSession };
 
-/**
- * Returns all research sessions for the user, ordered by most recently updated
- * first (Requirement 8.2).
- */
-export async function listResearchSessions(
-  userId: string,
-): Promise<ResearchSession[]> {
+function projectFromPayload(payload: SessionCreatePayload, fallbackSession: ResearchSession): ResearchProject {
+  const session = payload.session?.id ? payload.session : fallbackSession;
+  return {
+    session,
+    sources: payload.sources ?? [],
+    findings: payload.findings ?? [],
+    contradictions: payload.contradictions ?? [],
+    openQuestions: payload.openQuestions ?? [],
+    note: payload.note ?? null,
+    canvas: payload.canvas ?? null,
+  };
+}
+
+export async function listResearchSessions(userId: string): Promise<ResearchSession[]> {
+  if (await usesLocalStudyData()) {
+    return listLocalResearchProjects(userId).map((project) => project.session);
+  }
+
   const supabase = getBrowserSupabaseClient();
-  if (!supabase) return readDemo<ResearchSession>("research-sessions", userId);
+  if (!supabase) return listLocalResearchProjects(userId).map((project) => project.session);
 
   const { data, error } = await supabase
     .from("research_sessions")
@@ -36,11 +55,6 @@ export async function listResearchSessions(
   return data ?? [];
 }
 
-/**
- * Creates a new research session with the given question. The question must
- * already be validated against `researchQuestionSchema` before calling this
- * function (Requirement 8.11).
- */
 export async function createResearchSession(
   userId: string,
   question: string,
@@ -49,22 +63,26 @@ export async function createResearchSession(
     method: "POST",
     body: JSON.stringify({ question }),
   });
-  if (!response.ok) throw new Error("CREATE_FAILED");
-  const session = (await response.json()) as ResearchSession;
-  if (!getBrowserSupabaseClient()) saveDemo("research-sessions", userId, session);
-  return session;
+  const payload = (await response.json()) as SessionCreatePayload & { error?: string };
+  if (!response.ok) throw new Error(payload.error || "CREATE_FAILED");
+
+  const session = payload.session?.id ? payload.session : payload;
+  if (!session.id) throw new Error("CREATE_FAILED");
+  const project = projectFromPayload(payload, session);
+  if (await usesLocalStudyData()) saveLocalResearchProject(userId, project);
+  return project.session;
 }
 
-/**
- * Returns a single research session by id scoped to the user, or `null` if not
- * found (Requirement 8.3).
- */
 export async function getResearchSession(
   userId: string,
   sessionId: string,
 ): Promise<ResearchSession | null> {
+  if (await usesLocalStudyData()) {
+    return getLocalResearchProject(userId, sessionId)?.session ?? null;
+  }
+
   const supabase = getBrowserSupabaseClient();
-  if (!supabase) return readDemo<ResearchSession>("research-sessions", userId).find((session) => session.id === sessionId) ?? null;
+  if (!supabase) return getLocalResearchProject(userId, sessionId)?.session ?? null;
 
   const { data, error } = await supabase
     .from("research_sessions")
@@ -77,16 +95,13 @@ export async function getResearchSession(
   return data;
 }
 
-/**
- * Subscribes to realtime changes on the user's research sessions. Returns an
- * unsubscribe function.
- */
 export function subscribeToResearchSessions(
   userId: string,
   onChange: () => void,
 ): () => void {
+  const unsubscribeLocal = subscribeToLocalResearch(userId, onChange);
   const supabase = getBrowserSupabaseClient();
-  if (!supabase) return () => undefined;
+  if (!supabase) return unsubscribeLocal;
 
   const channel = supabase
     .channel(`research_sessions:${userId}`)
@@ -103,21 +118,21 @@ export function subscribeToResearchSessions(
     .subscribe();
 
   return () => {
+    unsubscribeLocal();
     void supabase.removeChannel(channel);
   };
 }
 
-// ─── Sources ──────────────────────────────────────────────────────────────────
-
-/**
- * Returns all sources for a given session (Requirement 8.5).
- */
 export async function listSources(
   userId: string,
   sessionId: string,
 ): Promise<ResearchSource[]> {
+  if (await usesLocalStudyData()) {
+    return getLocalResearchProject(userId, sessionId)?.sources ?? [];
+  }
+
   const supabase = getBrowserSupabaseClient();
-  if (!supabase) return readDemo<ResearchSource>(`research-sources:${sessionId}`, userId);
+  if (!supabase) return getLocalResearchProject(userId, sessionId)?.sources ?? [];
 
   const { data, error } = await supabase
     .from("research_sources_public")
@@ -130,9 +145,6 @@ export async function listSources(
   return (data ?? []) as ResearchSource[];
 }
 
-/**
- * Creates a new source record attached to the given session.
- */
 export async function createSource(
   userId: string,
   sessionId: string,
@@ -147,15 +159,17 @@ export async function createSource(
     method: "POST",
     body: JSON.stringify(source),
   });
-  if (!response.ok) throw new Error("SOURCE_CREATE_FAILED");
-  const created = (await response.json()) as ResearchSource;
-  if (!getBrowserSupabaseClient()) saveDemo(`research-sources:${sessionId}`, userId, created);
+  const created = (await response.json()) as ResearchSource & { error?: string };
+  if (!response.ok) throw new Error(created.error || "SOURCE_CREATE_FAILED");
+  if (await usesLocalStudyData()) {
+    const project = getLocalResearchProject(userId, sessionId);
+    patchLocalResearchProject(userId, sessionId, {
+      sources: [created, ...(project?.sources ?? []).filter((item) => item.id !== created.id)],
+    });
+  }
   return created;
 }
 
-/**
- * Deletes a source by id (scoped to the user via RLS).
- */
 export async function deleteSource(
   userId: string,
   sourceId: string,
@@ -164,17 +178,16 @@ export async function deleteSource(
   if (!response.ok) throw new Error("SOURCE_DELETE_FAILED");
 }
 
-// ─── Findings ─────────────────────────────────────────────────────────────────
-
-/**
- * Returns all findings for a given session (Requirement 8.6).
- */
 export async function listFindings(
   userId: string,
   sessionId: string,
 ): Promise<ResearchFinding[]> {
+  if (await usesLocalStudyData()) {
+    return getLocalResearchProject(userId, sessionId)?.findings ?? [];
+  }
+
   const supabase = getBrowserSupabaseClient();
-  if (!supabase) return [];
+  if (!supabase) return getLocalResearchProject(userId, sessionId)?.findings ?? [];
 
   const { data, error } = await supabase
     .from("research_findings")
@@ -187,17 +200,16 @@ export async function listFindings(
   return data ?? [];
 }
 
-// ─── Contradictions ───────────────────────────────────────────────────────────
-
-/**
- * Returns all contradictions for a given session (Requirement 8.7).
- */
 export async function listContradictions(
   userId: string,
   sessionId: string,
 ): Promise<ResearchContradiction[]> {
+  if (await usesLocalStudyData()) {
+    return getLocalResearchProject(userId, sessionId)?.contradictions ?? [];
+  }
+
   const supabase = getBrowserSupabaseClient();
-  if (!supabase) return [];
+  if (!supabase) return getLocalResearchProject(userId, sessionId)?.contradictions ?? [];
 
   const { data, error } = await supabase
     .from("research_contradictions")
@@ -210,17 +222,16 @@ export async function listContradictions(
   return data ?? [];
 }
 
-// ─── Open Questions ───────────────────────────────────────────────────────────
-
-/**
- * Returns all open questions for a given session (Requirement 8.8).
- */
 export async function listOpenQuestions(
   userId: string,
   sessionId: string,
 ): Promise<OpenQuestion[]> {
+  if (await usesLocalStudyData()) {
+    return getLocalResearchProject(userId, sessionId)?.openQuestions ?? [];
+  }
+
   const supabase = getBrowserSupabaseClient();
-  if (!supabase) return [];
+  if (!supabase) return getLocalResearchProject(userId, sessionId)?.openQuestions ?? [];
 
   const { data, error } = await supabase
     .from("research_open_questions")
@@ -233,20 +244,16 @@ export async function listOpenQuestions(
   return data ?? [];
 }
 
-// ─── Canvas ───────────────────────────────────────────────────────────────────
-
-/**
- * Returns the canvas note for a given session, or `null` if none exists
- * (Requirement 8.13).
- */
 export async function getCanvasNote(
   userId: string,
   sessionId: string,
 ): Promise<CanvasNote | null> {
-  const supabase = getBrowserSupabaseClient();
-  if (!supabase) {
-    return readDemo<CanvasNote>("research-canvas", userId).find((note) => note.session_id === sessionId) ?? null;
+  if (await usesLocalStudyData()) {
+    return getLocalResearchProject(userId, sessionId)?.canvas ?? null;
   }
+
+  const supabase = getBrowserSupabaseClient();
+  if (!supabase) return getLocalResearchProject(userId, sessionId)?.canvas ?? null;
 
   const { data, error } = await supabase
     .from("research_canvas")
@@ -259,36 +266,37 @@ export async function getCanvasNote(
   return data;
 }
 
-/**
- * Creates or updates the canvas note for a given session (Requirement 8.13).
- * Uses upsert on the composite (owner_id, session_id) natural key.
- */
 export async function upsertCanvasNote(
   userId: string,
   sessionId: string,
   content: string,
 ): Promise<void> {
-  const response = await inkoFetch(`/api/research/sessions/${sessionId}/canvas`, {
-    method: "PUT",
-    body: JSON.stringify({ content }),
-  });
-  if (!response.ok) throw new Error("CANVAS_SAVE_FAILED");
-  if (!getBrowserSupabaseClient()) {
-    saveDemo("research-canvas", userId, {
+  const local = await usesLocalStudyData();
+  if (!local) {
+    const response = await inkoFetch(`/api/research/sessions/${sessionId}/canvas`, {
+      method: "PUT",
+      body: JSON.stringify({ content }),
+    });
+    if (!response.ok) throw new Error("CANVAS_SAVE_FAILED");
+  }
+  patchLocalResearchProject(userId, sessionId, {
+    canvas: {
       id: sessionId,
       session_id: sessionId,
       owner_id: userId,
       content,
       updated_at: new Date().toISOString(),
-    });
-  }
+    },
+  });
 }
 
 export async function getResearchNote(userId: string, sessionId: string): Promise<ResearchNote | null> {
-  const supabase = getBrowserSupabaseClient();
-  if (!supabase) {
-    return readDemo<ResearchNote>("research-notes", userId).find((note) => note.session_id === sessionId) ?? null;
+  if (await usesLocalStudyData()) {
+    return getLocalResearchProject(userId, sessionId)?.note ?? null;
   }
+
+  const supabase = getBrowserSupabaseClient();
+  if (!supabase) return getLocalResearchProject(userId, sessionId)?.note ?? null;
   const { data, error } = await supabase
     .from("research_notes")
     .select("id, session_id, owner_id, content_markdown, updated_at")

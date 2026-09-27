@@ -161,6 +161,13 @@ function VoicePanelView({ controller }: { controller: VoiceAgentController }) {
               <span className="bubble">
                 <strong>{message.role === "inko" ? "Inko" : "You"}</strong>
                 <span>{message.text}</span>
+                {message.sources?.length ? (
+                  <ol className="study-source-list">
+                    {message.sources.map((source) => (
+                      <li key={source.url}><a href={source.url} rel="noopener noreferrer" target="_blank">{source.title}</a></li>
+                    ))}
+                  </ol>
+                ) : null}
               </span>
             </p>
           ))}

@@ -4,6 +4,7 @@ import { ArrowRight, LayoutGrid } from "lucide-react";
 import Link from "next/link";
 import { PageHeading } from "@/components/ui/page-heading";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageVoiceControl } from "@/features/voice/page-voice-control";
 import { useResearch } from "./use-research";
 
 export function CanvasView() {
@@ -11,7 +12,7 @@ export function CanvasView() {
 
   return (
     <div className="content-page page-enter">
-      <PageHeading eyebrow="Research" title="Canvas" description="Open the working canvas for any research project to arrange arguments and notes." />
+      <PageHeading eyebrow="Research" title="Canvas" description="Open the working canvas for any research project to arrange arguments and notes." action={<PageVoiceControl />} />
 
       {loading ? (
         <div className="library-loading" aria-busy="true"><span /><span /><span /><p>Loading your canvases…</p></div>
@@ -20,7 +21,7 @@ export function CanvasView() {
       ) : (
         <div className="source-collection-grid">
           {sessions.map((session) => (
-            <Link className="source-collection" href={`/research?session=${session.id}`} key={session.id}>
+            <Link className="source-collection" href={`/research?session=${session.id}&tab=canvas`} key={session.id}>
               <span className="source-collection-icon" data-tone="purple"><LayoutGrid size={18} /></span>
               <div><strong>{session.question}</strong><small>Open canvas</small></div>
               <ArrowRight size={15} />

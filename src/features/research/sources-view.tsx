@@ -4,6 +4,7 @@ import { ArrowRight, FolderOpen, Upload } from "lucide-react";
 import Link from "next/link";
 import { PageHeading } from "@/components/ui/page-heading";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageVoiceControl } from "@/features/voice/page-voice-control";
 import { useResearch } from "./use-research";
 
 function relativeTime(iso: string) {
@@ -24,7 +25,12 @@ export function SourcesView() {
         eyebrow="Research"
         title="Sources"
         description="Every source Inko has gathered, grouped by research project."
-        action={<Link className="secondary-button" href="/library"><Upload size={15} /> Upload files</Link>}
+        action={
+          <div className="page-heading-actions">
+            <PageVoiceControl />
+            <Link className="secondary-button" href="/library"><Upload size={15} /> Upload files</Link>
+          </div>
+        }
       />
 
       {loading ? (
@@ -34,7 +40,7 @@ export function SourcesView() {
       ) : (
         <div className="source-collection-grid">
           {sessions.map((session) => (
-            <Link className="source-collection" href={`/research?session=${session.id}`} key={session.id}>
+            <Link className="source-collection" href={`/research?session=${session.id}&tab=sources`} key={session.id}>
               <span className="source-collection-icon"><FolderOpen size={18} /></span>
               <div><strong>{session.question}</strong><small>Updated {relativeTime(session.updated_at)}</small></div>
               <ArrowRight size={15} />

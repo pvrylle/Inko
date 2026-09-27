@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
+import { getLocalResearchProject } from "@/lib/data/research-local";
 import {
   listResearchSessions,
   createResearchSession,
@@ -43,7 +44,7 @@ export type ActivityItem = { key: string; tone: string; text: string; time: stri
 export type UseResearchReturn = {
   sessions: ResearchSession[];
   activeSession: ResearchSession | null;
-  setActive: (id: string) => void;
+  setActive: (id: string, tab?: ResearchTab) => void;
   sources: ResearchSource[];
   findings: ResearchFinding[];
   contradictions: ResearchContradiction[];
@@ -54,11 +55,22 @@ export type UseResearchReturn = {
   activeTab: ResearchTab;
   setActiveTab: (tab: ResearchTab) => void;
   createSession: (question: string) => Promise<void>;
+  startNewProject: () => void;
   sessionError: string | null;
   loading: boolean;
   error: string | null;
   activity: ActivityItem[];
 };
+
+function syncResearchUrl(sessionId: string | null, tab: ResearchTab) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (sessionId) url.searchParams.set("session", sessionId);
+  else url.searchParams.delete("session");
+  if (sessionId && tab !== "overview") url.searchParams.set("tab", tab);
+  else url.searchParams.delete("tab");
+  window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+}
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -84,6 +96,7 @@ export function useResearch(): UseResearchReturn {
   const [activeTab, setActiveTab] = useState<ResearchTab>("overview");
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const autoOpened = useRef(false);
 
   // ── Load the full session list (Requirement 8.2) ────────────────────────────
   const reloadSessions = useCallback(async () => {
@@ -91,9 +104,11 @@ export function useResearch(): UseResearchReturn {
     try {
       const data = await listResearchSessions(userId);
       setSessions(data);
-      // Auto-open the most recent project so the workspace is visible (the
-      // reference always shows an open research project).
-      setActiveSessionId((current) => current ?? data[0]?.id ?? null);
+      setActiveSessionId((current) => {
+        if (current || autoOpened.current) return current;
+        autoOpened.current = true;
+        return data[0]?.id ?? null;
+      });
       setError(null);
     } catch {
       setError("Your research sessions couldn't be loaded.");
@@ -168,10 +183,31 @@ export function useResearch(): UseResearchReturn {
     return () => window.clearInterval(timer);
   }, [activeSession?.status, activeSessionId, loadSessionData]);
 
+  const chooseTab = useCallback((tab: ResearchTab) => {
+    setActiveTab(tab);
+    syncResearchUrl(activeSessionId, tab);
+  }, [activeSessionId]);
+
   // ── setActive: pick a session from the sidebar (Requirement 8.3) ────────────
-  const setActive = useCallback((id: string) => {
+  const setActive = useCallback((id: string, tab?: ResearchTab) => {
+    const nextTab = tab ?? "overview";
     setActiveSessionId(id);
+    setActiveTab(nextTab);
+    syncResearchUrl(id, nextTab);
+  }, []);
+
+  const startNewProject = useCallback(() => {
+    autoOpened.current = true;
+    setActiveSessionId(null);
+    setActiveSession(null);
+    setSources([]);
+    setFindings([]);
+    setContradictions([]);
+    setOpenQuestions([]);
+    setCanvasContent("");
+    setNoteMarkdown("");
     setActiveTab("overview");
+    syncResearchUrl(null, "overview");
   }, []);
 
   // ── createSession (Requirements 8.11, 8.12) ──────────────────────────────────
@@ -200,12 +236,25 @@ export function useResearch(): UseResearchReturn {
       setSessionError(null);
       try {
         const newSession = await createResearchSession(userId, question);
-        // Optimistically prepend to the list then let realtime sync
-        setSessions((prev) => [newSession, ...prev]);
+        const project = getLocalResearchProject(userId, newSession.id);
+        setSessions((prev) => [newSession, ...prev.filter((session) => session.id !== newSession.id)]);
+        setActiveSession(newSession);
+        setSources(project?.sources ?? []);
+        setFindings(project?.findings ?? []);
+        setContradictions(project?.contradictions ?? []);
+        setOpenQuestions(project?.openQuestions ?? []);
+        setNoteMarkdown(project?.note?.content_markdown ?? "");
+        setCanvasContent(project?.canvas?.content ?? "");
         setActiveSessionId(newSession.id);
         setActiveTab("overview");
-      } catch {
-        setSessionError("Failed to create research session. Please try again.");
+        syncResearchUrl(newSession.id, "overview");
+      } catch (caught) {
+        const code = caught instanceof Error ? caught.message : "CREATE_FAILED";
+        if (code === "GUEST_LIMIT") {
+          setSessionError("You've used today's guest research limit. Sign in to keep going.");
+        } else {
+          setSessionError("Failed to create research session. Please try again.");
+        }
       }
     },
     [userId],
@@ -233,8 +282,9 @@ export function useResearch(): UseResearchReturn {
     noteMarkdown,
     saveCanvas,
     activeTab,
-    setActiveTab,
+    setActiveTab: chooseTab,
     createSession,
+    startNewProject,
     sessionError,
     loading,
     error,

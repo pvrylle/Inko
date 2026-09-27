@@ -1,6 +1,7 @@
 "use client";
 
 import { Mic, Square } from "lucide-react";
+import type { VoiceMessage } from "./voice-types";
 import { useMascot } from "@/features/mascot/mascot-provider";
 import { useVoiceAgent } from "./use-voice-agent";
 import { useOptionalVoiceAgent, type VoiceAgentController } from "./voice-agent-provider";
@@ -14,13 +15,39 @@ function captionFor(
   partial: string,
   messages: VoiceAgentController["messages"],
   error: string | null,
+  replyPending: boolean,
 ) {
   const last = messages.at(-1);
-  if (connection === "connected" && partial && partial !== (last?.role === "inko" ? last.text : undefined)) return partial;
-  if (last?.role === "inko") return last.text;
-  if (last?.role === "student" && !error) return "Thinking…";
+  const spoken = last?.role === "inko" ? last.text : "";
+  const heard = spoken.replace(/\s*\[\d+\]/g, "").replace(/\s+/g, " ").trim();
+  if (replyPending && !error) return "Looking up sources…";
+  if (partial && partial !== spoken && partial !== heard) return partial;
+  if (last?.role === "inko") return last.sources?.length ? "Sources are listed with the answer." : "Answer ready.";
   if (connection === "idle" && error) return error;
   return hintFor(connection, partial);
+}
+
+function StudyAnswer({ message }: { message: VoiceMessage }) {
+  const sources = message.sources ?? [];
+  return (
+    <article className="study-answer" aria-live="polite">
+      <p>{message.text}</p>
+      {sources.length > 0 ? (
+        <>
+          <h2>Sources</h2>
+          <ol>
+            {sources.map((source) => (
+              <li key={source.url}>
+                <a href={source.url} rel="noopener noreferrer" target="_blank">{source.title}</a>
+              </li>
+            ))}
+          </ol>
+        </>
+      ) : (
+        <p className="study-answer-note">No source links came back for this question.</p>
+      )}
+    </article>
+  );
 }
 
 function hintFor(connection: VoiceAgentController["connection"], partial: string) {
@@ -53,11 +80,12 @@ function Wave({ side, amp, active }: { side: "left" | "right"; amp: number; acti
 }
 
 function VoiceCapsuleView({ controller }: { controller: VoiceAgentController }) {
-  const { connection, messages, partialTranscript, error, start, end } = controller;
+  const { connection, messages, partialTranscript, error, replyPending, start, end } = controller;
   const { amplitude } = useMascot();
   const active = connection === "connected" || connection === "connecting" || connection === "ending";
   const capturing = connection === "connected";
   const amp = Math.min(1, amplitude);
+  const answer = messages.at(-1);
 
   return (
     <div className="voice-capsule-wrap">
@@ -81,10 +109,12 @@ function VoiceCapsuleView({ controller }: { controller: VoiceAgentController }) 
       </div>
 
       <p className="voice-capsule-hint" data-partial={partialTranscript ? "true" : "false"} aria-live="polite">
-        {captionFor(connection, partialTranscript, messages, error)}
+        {captionFor(connection, partialTranscript, messages, error, replyPending)}
       </p>
 
       {error && <p className="voice-capsule-error" role="status">{error}</p>}
+
+      {!replyPending && answer?.role === "inko" ? <StudyAnswer message={answer} /> : null}
     </div>
   );
 }

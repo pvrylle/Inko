@@ -1,11 +1,17 @@
 export type VoiceConnectionState = "idle" | "connecting" | "connected" | "ending" | "error";
 
+export type StudySourceLink = {
+  title: string;
+  url: string;
+};
+
 export type VoiceMessage = {
   id: string;
   role: "student" | "inko";
   text: string;
   createdAt: string;
   interrupted?: boolean;
+  sources?: StudySourceLink[];
 };
 
 export type ToolCall = {

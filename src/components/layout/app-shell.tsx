@@ -99,7 +99,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className="main-content" id="main-content" tabIndex={-1}>{children}</main>
 
       <MascotOverlay />
-      <PersistentVoiceDock />
+      {!["/research", "/sources", "/canvas", "/practice", "/flashcards", "/quiz", "/focus"].some((route) => pathname === route || pathname.startsWith(`${route}/`)) && (
+        <PersistentVoiceDock />
+      )}
 
       <nav className="mobile-nav" aria-label="Primary navigation">
         {mobileNavigation.map(({ href, icon: Icon, label }) => (
