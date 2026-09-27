@@ -12,9 +12,9 @@ const sections = [
   {
     icon: Radio,
     tone: "blue",
-    title: "Voice & AssemblyAI",
+    title: "Voice",
     items: [
-      "Live conversation streams directly to AssemblyAI.",
+      "AssemblyAI carries the live audio. Gemini decides what Inko says and which tools to use.",
       "Say “Hey Inko” or tap the microphone to start a session.",
       "You can interrupt Inko at any time while it speaks.",
     ],

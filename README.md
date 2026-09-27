@@ -6,7 +6,7 @@ Inko is a mobile-first, voice-first AI study companion built with Next.js, Supab
 
 - Anonymous Supabase Auth with owner-scoped RLS and a no-credentials local demo fallback.
 - Direct browser audio streaming to AssemblyAI; Inko/Supabase never persist raw audio.
-- Gemini-only note, flashcard, semantic grading, and quiz generation.
+- Gemini is the only reasoning model. AssemblyAI carries live audio and does not answer on its own.
 - `ts-fsrs` scheduling with explicit student confirmation before a review advances.
 - Multiple-choice quizzes whose hosted answer keys live in the private database schema.
 - Timestamp-derived focus timers that survive reloads, pauses, and sleeping browser tabs.
@@ -36,17 +36,19 @@ Without Supabase variables the browser uses isolated localStorage demo data.
 
 **Plan B (Gemini only):** set `GEMINI_API_KEY` (and optionally `GEMINI_API_KEY2` as backup). Browser dictation → chat, plus notes/flashcards/quizzes. If the primary key hits quota/rate limits, Inko retries with key 2 automatically. No AssemblyAI and no cron required.
 
-**Plan A (later):** add `ASSEMBLYAI_API_KEY` + `ASSEMBLYAI_AGENT_ID` (and usually Supabase) for live voice; ending a call deletes the provider session immediately.
+**Plan A (later):** add `ASSEMBLYAI_API_KEY` + `ASSEMBLYAI_AGENT_ID` (and usually Supabase) for live voice. AssemblyAI carries the audio. Gemini answers. Ending a call deletes the provider session immediately.
 
 ## Environment variables
 
 | Variable | Visibility | Purpose |
 | --- | --- | --- |
-| `GEMINI_API_KEY` | Server only | **Plan B** primary Gemini key — chat, dictation, notes/flashcards/quizzes. |
-| `GEMINI_API_KEY2` | Server only | **Plan B** optional backup Gemini key if primary is rate-limited or exhausted. |
+| `GEMINI_API_KEY` | Server only | Primary Gemini key — chat, dictation, notes, flashcards, quizzes, research, and live-voice reasoning. |
+| `GEMINI_API_KEY2` | Server only | Optional backup Gemini key if the primary is rate-limited or exhausted. |
 | `GEMINI_MODEL` | Server only | Defaults to `gemini-flash-latest`. |
 | `ASSEMBLYAI_API_KEY` | Server only | **Plan A (optional)** live voice token + session deletion. |
 | `ASSEMBLYAI_AGENT_ID` | Server only | **Plan A (optional)** provisioned Voice Agent ID. |
+| `INKO_PUBLIC_URL` | Server only | Public https origin AssemblyAI calls for Gemini reasoning, for example `https://inko.example.com`. |
+| `VOICE_BRAIN_SECRET` | Server only | Shared secret for `/api/voice/brain`. This is not the Gemini key. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Browser-visible | Optional Supabase project URL. |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser-visible | Optional publishable/anon client key. |
 | `SUPABASE_SECRET_KEY` | Server only | Optional atomic private quiz creation on hosted Supabase. Never prefix with `NEXT_PUBLIC_`. |
@@ -76,23 +78,23 @@ The migrations create owner RLS, private quiz keys, atomic flashcard/focus RPCs,
 
 ## Provision the voice agent
 
-Put `ASSEMBLYAI_API_KEY` and `GEMINI_API_KEY` in `.env.local`, then run:
+Put `ASSEMBLYAI_API_KEY` and `GEMINI_API_KEY` in `.env.local`. To keep the Gemini key on your server, also set `INKO_PUBLIC_URL` (an https origin AssemblyAI can reach) and `VOICE_BRAIN_SECRET`, then run:
 
 ```powershell
 npm run voice:provision
 ```
 
-The script creates an agent when `ASSEMBLYAI_AGENT_ID` is absent and updates that agent when it is present. Copy the emitted ID into local and Vercel environments, then rerun the command whenever tool definitions or the system prompt change.
+The script creates an agent when `ASSEMBLYAI_AGENT_ID` is absent and updates that agent when it is present. With both public URL and brain secret set, the agent calls `/api/voice/brain` and never receives the Gemini key. Without them, the agent calls Gemini directly. Copy the emitted ID into local and Vercel environments, then rerun the command whenever tool definitions or the system prompt change.
 
 ## Deploy to Vercel
 
 1. Import this repository into Vercel; the detected framework is Next.js and the build command is `npm run build`.
-2. Add environment variables (at minimum `GEMINI_API_KEY` for AI fallback; add AssemblyAI + Supabase when enabling live voice).
+2. Add environment variables (at minimum `GEMINI_API_KEY`; add AssemblyAI, `INKO_PUBLIC_URL`, `VOICE_BRAIN_SECRET`, and Supabase when enabling live voice).
 3. Apply Supabase migrations **before** deploying code that invokes new RPCs (only if using Supabase).
 4. Optionally provision/update the AssemblyAI agent and set `ASSEMBLYAI_AGENT_ID`.
 5. Deploy and verify Home, Library, Flashcards, Quiz, Focus, Progress, and mic fallback (or one live voice call when configured).
 
-Deployment is straightforward as one Vercel project: without AssemblyAI the mic falls back to browser dictation → Gemini; with AssemblyAI, browser audio goes directly to the agent. Short authenticated API mutations run as Next.js functions. No cron job and no long-running custom server are required.
+Deployment is one Vercel project. Without AssemblyAI, the mic uses browser dictation and Gemini chat. With AssemblyAI, browser audio goes to the agent, and Gemini writes the reply. Short authenticated API mutations run as Next.js functions. No long-running custom server is required.
 
 ## Validation
 

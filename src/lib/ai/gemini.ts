@@ -52,6 +52,39 @@ export async function generateGeminiText(prompt: string) {
   });
 }
 
+type GeminiChatPart =
+  | { text: string }
+  | { functionCall: { name: string; args: Record<string, unknown> } }
+  | { functionResponse: { name: string; response: Record<string, unknown> } };
+
+export async function generateGeminiChat(input: {
+  system: string;
+  contents: Array<{ role: "user" | "model"; parts: GeminiChatPart[] }>;
+  tools: Array<{ name: string; description: string; parameters: Record<string, unknown> }>;
+}) {
+  return withGeminiFallback(async (client) => {
+    const response = await client.models.generateContent({
+      model: getGeminiModel(),
+      contents: input.contents,
+      config: {
+        systemInstruction: input.system || undefined,
+        temperature: 0.4,
+        ...(input.tools.length > 0 ? { tools: [{ functionDeclarations: input.tools }] } : {}),
+      },
+    });
+    const parts = response.candidates?.[0]?.content?.parts ?? [];
+    const text = parts.map((part) => part.text ?? "").join("").trim();
+    const calls = parts.flatMap((part) => {
+      const call = part.functionCall;
+      if (!call?.name) return [];
+      const args = call.args && typeof call.args === "object" ? call.args as Record<string, unknown> : {};
+      return [{ name: call.name, args }];
+    });
+    if (!text && calls.length === 0) throw new Error("GEMINI_EMPTY_RESPONSE");
+    return { text, calls, model: getGeminiModel() };
+  });
+}
+
 export async function generateGeminiJson(prompt: string, responseJsonSchema: Record<string, unknown>) {
   return withGeminiFallback(async (client) => {
     const response = await client.models.generateContent({

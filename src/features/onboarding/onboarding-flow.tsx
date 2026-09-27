@@ -63,13 +63,13 @@ export function OnboardingFlow() {
       state: slideState({ presence: "listening", mood: "neutral", emotion: "focused", message: "I’m listening…" }),
       content: (
         <div className="onboarding-slide-content">
-          <span className="onboarding-eyebrow">Powered by AssemblyAI</span>
+          <span className="onboarding-eyebrow">Gemini thinks, AssemblyAI speaks</span>
           <h1>Real-time voice conversations</h1>
-          <p>Inko hears you, thinks, and talks back — powered by AssemblyAI Voice Agent.</p>
+          <p>AssemblyAI carries your voice. Gemini decides what Inko says, then speaks the answer back.</p>
           <div className="onboarding-voice-badge">
             <span className="onboarding-voice-dot" />
             <Mic size={15} />
-            <span>AssemblyAI live voice</span>
+            <span>Live voice</span>
           </div>
           <button type="button" className="onboarding-cta" onClick={() => setSlide(2)}>
             See how it works <ArrowRight size={18} />

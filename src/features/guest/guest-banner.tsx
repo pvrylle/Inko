@@ -16,7 +16,7 @@ export function GuestBanner() {
     <div className="guest-banner" data-urgent={status.anyExceeded} role="status">
       <span className="guest-banner-text">
         {status.anyExceeded
-          ? "Guest limit reached. Create a free account to unlock live AssemblyAI voice and keep your work."
+          ? "Guest limit reached. Create a free account to unlock live voice and keep your work."
           : "You’re near the guest limit. Create a free account to keep going."}
       </span>
       <Link href="/settings" className="guest-banner-action">

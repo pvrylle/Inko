@@ -12,7 +12,7 @@ const WAVE = [7, 11, 16, 22, 18, 12, 8, 14, 20, 25, 19, 13, 9, 6];
 function hintFor(connection: VoiceAgentController["connection"], partial: string) {
   switch (connection) {
     case "connecting":
-      return "Connecting to AssemblyAI…";
+      return "Connecting voice…";
     case "connected":
       return partial || "Listening — speak naturally";
     case "ending":

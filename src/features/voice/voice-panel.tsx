@@ -8,7 +8,7 @@ import { useOptionalVoiceAgent, type VoiceAgentController } from "./voice-agent-
 
 const connectionCopy = {
   idle: { title: "What would you like to study?", hint: "Tap the microphone and speak naturally" },
-  connecting: { title: "Opening a private voice session…", hint: "Connecting securely to AssemblyAI" },
+  connecting: { title: "Opening a private voice session…", hint: "Connecting the voice link. Gemini will do the thinking." },
   connected: { title: "Inko is ready", hint: "Speak naturally — you can interrupt at any time" },
   ending: { title: "Wrapping up your session…", hint: "Saving the final study turn" },
   error: { title: "Voice needs a quick reset", hint: "Try again or type your question below" },
@@ -84,7 +84,7 @@ function VoicePanelView({ controller }: { controller: VoiceAgentController }) {
     <section className="voice-experience" data-capturing={capturing} data-connection={connection} aria-label="Talk to Inko">
       <div className="voice-provider-row">
         <button
-          aria-label={active ? "End AssemblyAI live session" : "Start AssemblyAI live session"}
+          aria-label={active ? "End live voice" : "Start live voice"}
           aria-pressed={active}
           className="voice-provider-badge"
           disabled={connection === "ending"}
@@ -92,7 +92,7 @@ function VoicePanelView({ controller }: { controller: VoiceAgentController }) {
           type="button"
         >
           <Radio aria-hidden="true" size={12} />
-          {dictating ? "Capturing your voice" : active ? "AssemblyAI session live" : "Start with AssemblyAI"}
+          {dictating ? "Capturing your voice" : active ? "Live voice connected" : "Start live voice"}
         </button>
         <span className="voice-private-badge" data-live={capturing}><LockKeyhole aria-hidden="true" size={11} /> {capturing ? "microphone capturing" : "private live session"}</span>
       </div>
@@ -167,7 +167,7 @@ function VoicePanelView({ controller }: { controller: VoiceAgentController }) {
         </div>
       )}
 
-      <p className="privacy-caption">Your microphone streams directly to AssemblyAI for the live conversation. Inko does not store audio, and requests deletion when the session ends.</p>
+      <p className="privacy-caption">Your microphone streams to AssemblyAI. Gemini writes the reply. Inko does not store audio, and requests deletion when the session ends.</p>
     </section>
   );
 }

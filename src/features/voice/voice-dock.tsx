@@ -34,7 +34,7 @@ export function PersistentVoiceDock() {
         : stateCopy[state.presence];
 
   return (
-    <aside className="voice-dock" data-active={active} aria-label="AssemblyAI study companion">
+    <aside className="voice-dock" data-active={active} aria-label="Inko study companion">
       <button
         aria-label={active ? "End voice session" : "Start talking to Inko"}
         aria-pressed={active}
@@ -43,7 +43,7 @@ export function PersistentVoiceDock() {
         onClick={active ? controller.end : () => void controller.start()}
         type="button"
       >
-        <span className="voice-dock-provider"><Radio aria-hidden="true" size={11} /> AssemblyAI live</span>
+        <span className="voice-dock-provider"><Radio aria-hidden="true" size={11} /> Live voice</span>
         <span className="voice-dock-content">
           <span className="voice-dock-icon" aria-hidden="true">
             {active ? <Square fill="currentColor" size={14} /> : <Mic size={18} />}
