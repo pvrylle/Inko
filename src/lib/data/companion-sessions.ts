@@ -59,6 +59,7 @@ function isVoiceMessage(value: unknown): value is VoiceMessage {
   if (value.sources !== undefined && (!Array.isArray(value.sources) || !value.sources.every(
     (source) => isRecord(source) && typeof source.title === "string" && typeof source.url === "string",
   ))) return false;
+  if (value.attachment !== undefined && (!isRecord(value.attachment) || typeof value.attachment.name !== "string" || typeof value.attachment.type !== "string")) return false;
   return true;
 }
 

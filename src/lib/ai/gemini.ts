@@ -133,6 +133,19 @@ export async function generateStudyAnswer(prompt: string) {
   throw lastError instanceof Error ? lastError : new Error("GEMINI_FAILED");
 }
 
+export async function generateAttachmentAnswer(prompt: string, mimeType: string, data: string) {
+  return withGeminiFallback(async (client) => {
+    const response = await client.models.generateContent({
+      model: getGeminiModel(),
+      contents: [{ role: "user", parts: [{ text: prompt }, { inlineData: { mimeType, data } }] }],
+      config: { maxOutputTokens: 800, temperature: 0.2 },
+    });
+    const text = response.text?.trim();
+    if (!text) throw new Error("GEMINI_EMPTY_RESPONSE");
+    return text;
+  });
+}
+
 /** Yields reply text as Gemini writes it, so the home page can leave "Thinking…" early. */
 export async function* generateFastGeminiTextStream(prompt: string) {
   const keys = geminiKeys();

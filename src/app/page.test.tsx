@@ -19,8 +19,9 @@ vi.mock("@/features/voice/voice-agent-provider", () => ({
 describe("HomePage", () => {
   it("presents a simple conversation with text and voice input", () => {
     render(<MascotProvider><HomePage /></MascotProvider>);
-    expect(screen.getByRole("heading", { name: /new conversation/i, level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /what should we work on/i, level: 1 })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: /message Inko/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /attach pdf or image/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /start talking to Inko/i })).toBeInTheDocument();
   });
 });

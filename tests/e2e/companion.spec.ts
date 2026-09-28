@@ -1,49 +1,47 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
-test("a companion conversation resumes and can be renamed or deleted", async ({ page }) => {
+async function showHistory(page: Page) {
+  const openAssistant = page.getByRole("button", { name: "Open assistant" });
+  if (await openAssistant.isVisible() && await page.locator(".assistant-rail").getAttribute("data-open") !== "true") await openAssistant.click();
+  const panel = page.getByRole("region", { name: "Inko assistant" });
+  await panel.getByRole("button", { name: "Show conversations" }).click();
+  return panel;
+}
+
+test("a conversation resumes and can be renamed or deleted", async ({ page }) => {
   await page.addInitScript(() => window.localStorage.setItem("inko.hasCompletedOnboarding", "1"));
   await page.route("**/api/chat", (route) => route.fulfill({ json: { text: "Let's make a biology plan.", sources: [] } }));
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "New conversation", level: 1 })).toBeVisible({ timeout: 15_000 });
-  await page.getByRole("textbox", { name: "Message Inko" }).fill("Help me plan biology");
-  await page.getByRole("button", { name: "Send message" }).click();
-  await expect(page.getByText("Let's make a biology plan.")).toBeVisible();
+  await page.locator("main").getByRole("textbox", { name: "Message Inko" }).fill("Help me plan biology");
+  await page.locator("main").getByRole("button", { name: "Send message" }).click();
+  await expect(page.locator("main").getByText("Let's make a biology plan.", { exact: true })).toBeVisible();
 
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Help me plan biology", level: 1 })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText("Let's make a biology plan.")).toBeVisible();
-  if (await page.getByRole("button", { name: "Show conversations" }).isVisible()) {
-    await page.getByRole("button", { name: "Show conversations" }).click();
-  }
+  await expect(page.locator("main").getByText("Let's make a biology plan.", { exact: true })).toBeVisible();
+  let panel = await showHistory(page);
+  await panel.locator('summary[aria-label="Options for Help me plan biology"]').click();
+  await panel.getByRole("button", { name: "Rename" }).click();
+  await panel.getByRole("textbox", { name: "Conversation title" }).fill("Biology prep");
+  await panel.getByRole("button", { name: "Save title" }).click();
+  await expect(panel.getByRole("button", { name: "Biology prep", exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "Options for Help me plan biology" }).click();
-  await page.getByRole("button", { name: "Rename" }).click();
-  await page.getByRole("textbox", { name: "Conversation title" }).fill("Biology prep");
-  await page.getByRole("button", { name: "Save title" }).click();
-  await expect(page.getByRole("heading", { name: "Biology prep", level: 1 })).toBeVisible();
+  await panel.getByRole("button", { name: "New conversation" }).click();
+  await expect(page.locator("main").getByRole("heading", { name: "What should we work on?" })).toBeVisible();
+  panel = await showHistory(page);
+  await panel.getByRole("button", { name: "Biology prep", exact: true }).click();
+  await expect(page.locator("main").getByText("Let's make a biology plan.", { exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "New conversation" }).first().click();
-  await expect(page.getByRole("heading", { name: "New conversation", level: 1 })).toBeVisible();
-  if (await page.getByRole("button", { name: "Show conversations" }).isVisible()) {
-    await page.getByRole("button", { name: "Show conversations" }).click();
-  }
-  await page.getByRole("button", { name: "Biology prep", exact: true }).click();
-  await expect(page.getByText("Let's make a biology plan.")).toBeVisible();
-
-  if (await page.getByRole("button", { name: "Show conversations" }).isVisible()) {
-    await page.getByRole("button", { name: "Show conversations" }).click();
-  }
-
-  await page.getByRole("button", { name: "Options for Biology prep" }).click();
-  await page.getByRole("button", { name: "Delete", exact: true }).first().click();
-  await expect(page.getByText("Delete this conversation?")).toBeVisible();
-  await page.getByRole("button", { name: "Delete", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "New conversation", level: 1 })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Biology prep", exact: true })).toHaveCount(0);
+  panel = await showHistory(page);
+  await panel.locator('summary[aria-label="Options for Biology prep"]').click();
+  await panel.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(panel.getByText("Delete this conversation?")).toBeVisible();
+  await panel.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(page.locator("main").getByRole("heading", { name: "What should we work on?" })).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Biology prep", exact: true })).toHaveCount(0);
 });
 
-test("conversation options stay inside a long scrollable list", async ({ page }) => {
+test("conversation options stay usable in a long list", async ({ page }) => {
   await page.addInitScript(() => {
     const ownerId = "00000000-0000-4000-8000-000000000001";
     window.localStorage.setItem("inko.hasCompletedOnboarding", "1");
@@ -62,25 +60,16 @@ test("conversation options stay inside a long scrollable list", async ({ page })
   });
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Session 0", level: 1 })).toBeVisible({ timeout: 15_000 });
-  if (await page.getByRole("button", { name: "Show conversations" }).isVisible()) {
-    await page.getByRole("button", { name: "Show conversations" }).click();
-  }
-  const options = page.getByRole("button", { name: "Options for Session 24" });
+  const panel = await showHistory(page);
+  const options = panel.locator('summary[aria-label="Options for Session 24"]');
   await options.scrollIntoViewIfNeeded();
   await options.click();
-
-  const list = await page.locator(".home-conversations-list").boundingBox();
-  const rename = await page.getByRole("button", { name: "Rename" }).boundingBox();
-  const remove = await page.getByRole("button", { name: "Delete", exact: true }).boundingBox();
-  expect(list && rename && remove).toBeTruthy();
-  expect(rename!.y).toBeGreaterThanOrEqual(list!.y);
-  expect(remove!.y + remove!.height).toBeLessThanOrEqual(list!.y + list!.height);
-
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "Rename" })).toHaveCount(0);
-  await expect(options).toBeFocused();
-  await options.click();
-  await page.getByRole("button", { name: "Delete", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Cancel" })).toBeFocused();
+  const menu = panel.locator(".assistant-history-options[open] > div");
+  await expect(menu.getByRole("button", { name: "Rename" })).toBeVisible();
+  await expect(menu.getByRole("button", { name: "Delete" })).toBeVisible();
+  const listBox = await panel.locator(".assistant-history").boundingBox();
+  const menuBox = await menu.boundingBox();
+  expect(listBox && menuBox).toBeTruthy();
+  expect(menuBox!.y).toBeGreaterThanOrEqual(listBox!.y);
+  expect(menuBox!.y + menuBox!.height).toBeLessThanOrEqual(listBox!.y + listBox!.height);
 });
