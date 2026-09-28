@@ -32,7 +32,6 @@ export function AuthModal({
   onClose: () => void;
 }) {
   const { user } = useAuth();
-  const [activeMode, setActiveMode] = useState<AuthMode>(mode);
 
   useEffect(() => {
     if (!open) return;

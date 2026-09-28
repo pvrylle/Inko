@@ -234,6 +234,9 @@ export function useVoiceAgent() {
   const pendingToolsRef = useRef(new Map<string, ToolResult>());
   const latestEventRef = useRef("");
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const recordingRef = useRef<MediaRecorder | null>(null);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
+  const recordingTimeoutRef = useRef<number | null>(null);
   const inputMeterRef = useRef<{ stream: MediaStream; context: AudioContext; frame: number } | null>(null);
   const inputMeterGenerationRef = useRef(0);
   const dictationFinalRef = useRef("");
@@ -887,7 +890,7 @@ export function useVoiceAgent() {
       setConnection("error");
       dispatch({ type: "ERROR", message });
     }
-  }, [cleanUpMedia, connection, dictating, dispatch, finalizeProviderSession, handleEvent, liveVoice, markReplyPending, setAmplitude, startDictation]);
+  }, [cleanUpMedia, connection, dictating, dispatch, finalizeProviderSession, handleEvent, liveVoice, markReplyPending, setAmplitude, startDictation, startRecording]);
 
   const resumeListening = useCallback(() => {
     pauseForReplyRef.current = false;
