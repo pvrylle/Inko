@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { inkoFetch } from "@/lib/auth/api-client";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useMascot } from "@/features/mascot/mascot-provider";
+import { useOptionalProjects } from "@/features/projects/project-provider";
 import { createResearchSession } from "@/features/research/research-repository";
 import { base64Pcm16ToFloat, floatToBase64Pcm16, resampleFloat32, rmsAmplitude } from "./audio-utils";
 import { persistChatTurn } from "./voice-persistence";
@@ -151,12 +152,12 @@ function spokenAnswer(text: string) {
 }
 
 const companionDestinations: Record<string, string> = {
-  home: "/", research: "/research", sources: "/sources", canvas: "/canvas",
+  home: "/", projects: "/projects", debate: "/debate", timer: "/timer", research: "/research", sources: "/sources", canvas: "/canvas",
   practice: "/practice", history: "/history", settings: "/settings",
 };
 
 function navigationCommand(text: string) {
-  const match = text.trim().toLowerCase().match(/^(?:please\s+)?(?:open|go to|show me)\s+(?:the\s+)?(home|research|sources|canvas|practice|history|settings)(?:\s+page)?[.!?]?$/);
+  const match = text.trim().toLowerCase().match(/^(?:please\s+)?(?:open|go to|show me)\s+(?:the\s+)?(home|projects|debate|timer|research|sources|canvas|practice|history|settings)(?:\s+page)?[.!?]?$/);
   return match ? companionDestinations[match[1]] : null;
 }
 
@@ -167,6 +168,20 @@ function focusCommand(text: string) {
 
 function researchCommand(text: string) {
   return text.trim().match(/^(?:please\s+)?(?:start|create)\s+(?:a\s+)?research\s+(?:project\s+)?(?:on|about)\s+(.+)$/i)?.[1]?.trim() ?? null;
+}
+
+function debateCommand(text: string) {
+  return text.trim().match(/^(?:please\s+)?(?:debate me on|start a debate (?:on|about))\s+(.+?)[.!?]?$/i)?.[1]?.trim() ?? null;
+}
+
+function timerCommand(text: string) {
+  const match = text.trim().match(/^(?:please\s+)?start\s+(?:a\s+)?(\d{1,3})\s*(second|minute|hour)s?\s+timer[.!?]?$/i);
+  if (!match) return null;
+  return Number(match[1]) * (match[2].toLowerCase() === "hour" ? 3600 : match[2].toLowerCase() === "minute" ? 60 : 1);
+}
+
+function projectCommand(text: string) {
+  return text.trim().match(/^(?:please\s+)?create\s+(?:a\s+)?project\s+called\s+(.+?)[.!?]?$/i)?.[1]?.trim() ?? null;
 }
 
 function studySources(value: unknown): StudySourceLink[] {
@@ -203,6 +218,7 @@ function pickCuteVoice(voices: SpeechSynthesisVoice[]) {
 export function useVoiceAgent() {
   const { userId, isGuest, isReady } = useAuth();
   const router = useRouter();
+  const projects = useOptionalProjects();
   const pathname = usePathname() ?? "";
   // The signed-in companion can use its supported tools from Home or Research.
   const liveVoice = !isGuest && (pathname === "/" || pathname.startsWith("/research"));
@@ -350,6 +366,7 @@ export function useVoiceAgent() {
     else if (message.role === "student") markReplyPending(true);
     if (userId) {
       const current = activeSessionRef.current ?? makeCompanionSession(userId, message.role === "student" ? message.text : "New chat");
+      if (!activeSessionRef.current) projects?.assignConversation(current.id);
       const next: CompanionSession = {
         ...current,
         title: current.messages.length === 0 && message.role === "student" ? message.text.slice(0, 80) : current.title,
@@ -362,7 +379,7 @@ export function useVoiceAgent() {
       void saveCompanionSession(userId, isGuest, next).catch(() => setSessionError("This conversation could not be saved."));
       if (voiceSessionIdRef.current) void persistChatTurn(userId, voiceSessionIdRef.current, message).catch(() => undefined);
     }
-  }, [isGuest, markReplyPending, userId]);
+  }, [isGuest, markReplyPending, projects, userId]);
 
   const send = useCallback((payload: object) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify(payload));
@@ -373,6 +390,7 @@ export function useVoiceAgent() {
     dispatch({ type: "AGENT_AUDIO" });
     const synth = window.speechSynthesis;
     if (!synth) {
+      setPartialTranscript("");
       dispatch({ type: "REPLY_DONE" });
       resumeListeningRef.current();
       return;
@@ -387,6 +405,7 @@ export function useVoiceAgent() {
       if (finished) return;
       finished = true;
       window.clearTimeout(watchdog);
+      setPartialTranscript("");
       dispatch({ type: "REPLY_DONE" });
       resumeListeningRef.current();
     };
@@ -966,12 +985,42 @@ export function useVoiceAgent() {
     const studentMessage: VoiceMessage = { id: crypto.randomUUID(), role: "student", text: trimmed, createdAt: new Date().toISOString() };
     addMessage(studentMessage);
     const version = conversationVersionRef.current;
+    const newProject = projectCommand(trimmed);
+    if (newProject && projects) {
+      const id = projects.createProject(newProject);
+      addMessage({ id: crypto.randomUUID(), role: "inko", text: id ? `Created ${newProject}. What should we work on first?` : "I couldn't create that project.", createdAt: new Date().toISOString() });
+      dispatch({ type: "REPLY_DONE" });
+      if (id) router.push("/projects");
+      return;
+    }
     const destination = navigationCommand(trimmed);
     if (destination) {
       const responseText = `Opening ${destination === "/" ? "Home" : destination.slice(1)}.`;
       addMessage({ id: crypto.randomUUID(), role: "inko", text: responseText, createdAt: new Date().toISOString() });
       dispatch({ type: "REPLY_DONE" });
       router.push(destination);
+      return;
+    }
+    const debateTopic = debateCommand(trimmed);
+    if (debateTopic) {
+      const href = `/debate?topic=${encodeURIComponent(debateTopic.slice(0, 200))}`;
+      projects?.addActivity("debate", debateTopic, href);
+      addMessage({ id: crypto.randomUUID(), role: "inko", text: `Let's debate ${debateTopic}. I'll take the other side.`, createdAt: new Date().toISOString() });
+      dispatch({ type: "REPLY_DONE" });
+      router.push(href);
+      return;
+    }
+    const timerSeconds = timerCommand(trimmed);
+    if (timerSeconds !== null) {
+      if (timerSeconds < 1 || timerSeconds > 10800) {
+        addMessage({ id: crypto.randomUUID(), role: "inko", text: "Choose a timer between 1 second and 3 hours.", createdAt: new Date().toISOString() });
+        return;
+      }
+      const href = `/timer?seconds=${timerSeconds}`;
+      projects?.addActivity("timer", `${timerSeconds} second timer`, href);
+      addMessage({ id: crypto.randomUUID(), role: "inko", text: `Starting your timer.`, createdAt: new Date().toISOString() });
+      dispatch({ type: "REPLY_DONE" });
+      router.push(href);
       return;
     }
     const focusMinutes = focusCommand(trimmed);
@@ -985,7 +1034,10 @@ export function useVoiceAgent() {
       if (version !== conversationVersionRef.current) return;
       addMessage({ id: crypto.randomUUID(), role: "inko", text: outcome.isError ? "I couldn't start focus right now. Please try again." : `Your ${focusMinutes} minute focus session is ready.`, createdAt: new Date().toISOString() });
       dispatch({ type: "REPLY_DONE" });
-      if (!outcome.isError) router.push("/focus");
+      if (!outcome.isError) {
+        projects?.addActivity("timer", `${focusMinutes} minute focus`, "/focus");
+        router.push("/focus");
+      }
       return;
     }
     const topic = researchCommand(trimmed);
@@ -999,6 +1051,8 @@ export function useVoiceAgent() {
         const project = await createResearchSession(userId, topic.slice(0, 500));
         if (version !== conversationVersionRef.current) return;
         linkResearchSession(project.id);
+        if (projects?.activeId) projects.linkResearch(projects.activeId, project.id);
+        projects?.addActivity("research", topic, `/research?session=${encodeURIComponent(project.id)}`);
         addMessage({ id: crypto.randomUUID(), role: "inko", text: `I opened a research project for ${topic}. We can review its sources and findings there.`, createdAt: new Date().toISOString() });
         dispatch({ type: "REPLY_DONE" });
         router.push(`/research?session=${encodeURIComponent(project.id)}`);
@@ -1019,9 +1073,13 @@ export function useVoiceAgent() {
     dispatch({ type: "USER_STOPPED" });
     let response: Response;
     try {
+      const currentDebate = pathname === "/debate" ? new URLSearchParams(window.location.search).get("topic")?.slice(0, 200) : null;
+      const prompt = currentDebate
+        ? `In a concise study debate about "${currentDebate}", challenge my reasoning with one clear counterargument and one question. My argument: ${trimmed}`
+        : trimmed;
       response = await inkoFetch("/api/chat", {
         method: "POST",
-        body: JSON.stringify({ message: trimmed, history: messagesRef.current.slice(-12, -1).map(({ role, text }) => ({ role, text })) }),
+        body: JSON.stringify({ message: prompt, history: messagesRef.current.slice(-12, -1).map(({ role, text }) => ({ role, text })) }),
         signal: AbortSignal.timeout(22_000),
       });
     } catch {
@@ -1101,7 +1159,35 @@ export function useVoiceAgent() {
     }
     addMessage({ id: crypto.randomUUID(), role: "inko", text: reply, createdAt: new Date().toISOString() });
     speakReply(reply);
-  }, [addMessage, clearSilenceTimer, dispatch, linkResearchSession, markReplyPending, router, send, speakReply, userId]);
+  }, [addMessage, clearSilenceTimer, dispatch, linkResearchSession, markReplyPending, pathname, projects, router, send, speakReply, userId]);
+
+  const sendAttachment = useCallback(async (file: File, question: string) => {
+    if (!file.size || file.size > 8 * 1024 * 1024 || !["application/pdf", "image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setError("Choose a PDF, PNG, JPG, or WebP file under 8 MB.");
+      return;
+    }
+    const text = question.trim() || `Explain ${file.name}`;
+    const version = conversationVersionRef.current;
+    addMessage({ id: crypto.randomUUID(), role: "student", text, attachment: { name: file.name, type: file.type }, createdAt: new Date().toISOString() });
+    dispatch({ type: "USER_STOPPED" });
+    const form = new FormData();
+    form.set("file", file);
+    form.set("message", question.trim());
+    try {
+      const response = await inkoFetch("/api/chat/attachment", { method: "POST", body: form, signal: AbortSignal.timeout(60_000) });
+      const payload = (await response.json()) as { text?: string; error?: string };
+      if (version !== conversationVersionRef.current) return;
+      if (!response.ok || !payload.text?.trim()) throw new Error(payload.error || "ANALYSIS_FAILED");
+      const answer = payload.text.trim();
+      addMessage({ id: crypto.randomUUID(), role: "inko", text: answer, createdAt: new Date().toISOString() });
+      speakReply(spokenAnswer(answer));
+    } catch {
+      if (version !== conversationVersionRef.current) return;
+      markReplyPending(false);
+      setError("I couldn't read that file. Please try again.");
+      dispatch({ type: "ERROR", message: "The file could not be read." });
+    }
+  }, [addMessage, dispatch, markReplyPending, speakReply]);
 
   // Keep a stable reference so the dictation callbacks can send captured text
   // without depending on sendText's identity.
@@ -1127,5 +1213,5 @@ export function useVoiceAgent() {
     };
   }, [cleanUpMedia, finalizeProviderSession, stopInputMeter]);
 
-  return { connection, messages, sessions, activeSessionId, sessionError, openConversation, linkResearchSession, renameConversation, removeConversation, partialTranscript, error, dictating, replyPending, start, end, sendText, clearConversation };
+  return { connection, messages, sessions, activeSessionId, sessionError, openConversation, linkResearchSession, renameConversation, removeConversation, partialTranscript, error, dictating, replyPending, start, end, sendText, sendAttachment, clearConversation };
 }

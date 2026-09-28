@@ -12,6 +12,7 @@ export type VoiceMessage = {
   createdAt: string;
   interrupted?: boolean;
   sources?: StudySourceLink[];
+  attachment?: { name: string; type: string };
 };
 
 export type ToolCall = {

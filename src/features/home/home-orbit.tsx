@@ -1,219 +1,154 @@
 "use client";
 
-import { Check, MessageSquareText, MoreHorizontal, Plus, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ArrowUp, FileImage, FileText, Mic, Paperclip, Square, X } from "lucide-react";
+import { type DragEvent, type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { ContentTopbar } from "@/components/layout/content-topbar";
+import { useOptionalProjects } from "@/features/projects/project-provider";
 import { useOptionalVoiceAgent } from "@/features/voice/voice-agent-provider";
-import { HomeChat } from "./home-chat";
+import { StudyAnswerText } from "./study-answer-card";
+import { ProjectWorkspacePanel, type ProjectTab } from "./project-workspace-panel";
+
+const projectTabs: { id: ProjectTab; label: string }[] = [
+  { id: "chat", label: "Chat" },
+  { id: "sources", label: "Sources" },
+  { id: "debate", label: "Debate" },
+  { id: "paper", label: "White paper" },
+  { id: "research", label: "Research" },
+];
 
 export function HomeOrbit() {
   const controller = useOptionalVoiceAgent();
-  const [desktopSessionsOpen, setDesktopSessionsOpen] = useState(true);
-  const [mobileSessionsOpen, setMobileSessionsOpen] = useState(false);
-  const [isNarrow, setIsNarrow] = useState(false);
-  const [menuSessionId, setMenuSessionId] = useState<string | null>(null);
-  const [menuOpensUp, setMenuOpensUp] = useState(false);
-  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
-  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
-  const [draftTitle, setDraftTitle] = useState("");
-  const menuRef = useRef<HTMLDivElement>(null);
-  const menuTriggerRef = useRef<HTMLButtonElement>(null);
-  const deleteCancelRef = useRef<HTMLButtonElement>(null);
-  const newConversationRef = useRef<HTMLButtonElement>(null);
-  const sessions = controller?.sessions;
-  const openConversation = controller?.openConversation;
+  const projects = useOptionalProjects();
+  const activeProject = projects?.projects.find((project) => project.id === projects.activeId);
+  const [tabState, setTabState] = useState<{ projectId: string | null; tab: ProjectTab }>({ projectId: null, tab: "chat" });
+  const activeTab = tabState.projectId === (activeProject?.id ?? null) ? tabState.tab : "chat";
+  const setActiveTab = (tab: ProjectTab) => setTabState({ projectId: activeProject?.id ?? null, tab });
+  const [draft, setDraft] = useState("");
+  const [attachment, setAttachment] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const threadRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (typeof window.matchMedia !== "function") return;
-    const media = window.matchMedia("(max-width: 1150px)");
-    const update = () => setIsNarrow(media.matches);
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-
-  useEffect(() => {
-    if (!sessions?.length || !openConversation) return;
     const requested = new URLSearchParams(window.location.search).get("chat");
-    if (requested) openConversation(requested);
-  }, [sessions, openConversation]);
+    if (requested && controller?.sessions.some((session) => session.id === requested)) controller.openConversation(requested);
+  }, [controller]);
 
   useEffect(() => {
-    if (!menuSessionId) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      setMenuSessionId(null);
-      setDeletingSessionId(null);
-      menuTriggerRef.current?.focus();
-    };
-    const closeOnOutsideClick = (event: PointerEvent) => {
-      if (!(event.target instanceof Node)) return;
-      if (menuRef.current?.contains(event.target) || menuTriggerRef.current?.contains(event.target)) return;
-      setMenuSessionId(null);
-      setDeletingSessionId(null);
-    };
-    document.addEventListener("keydown", closeOnEscape);
-    document.addEventListener("pointerdown", closeOnOutsideClick);
-    return () => {
-      document.removeEventListener("keydown", closeOnEscape);
-      document.removeEventListener("pointerdown", closeOnOutsideClick);
-    };
-  }, [menuSessionId]);
+    const thread = threadRef.current;
+    if (!thread) return;
+    const distance = thread.scrollHeight - thread.scrollTop - thread.clientHeight;
+    if (distance < 220) thread.scrollTop = thread.scrollHeight;
+  }, [controller?.messages, controller?.replyPending]);
 
-  useEffect(() => {
-    if (deletingSessionId) deleteCancelRef.current?.focus();
-  }, [deletingSessionId]);
-
-  if (!controller) return null;
-
-  const sessionsOpen = isNarrow ? mobileSessionsOpen : desktopSessionsOpen;
-  const newConversation = () => {
-    window.history.replaceState(null, "", "/");
-    controller.clearConversation();
-    setMobileSessionsOpen(false);
-    setMenuSessionId(null);
+  const chooseFile = (file: File | undefined) => {
+    if (!file) return;
+    if (!["application/pdf", "image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 8 * 1024 * 1024) {
+      setUploadError("Choose a PDF, PNG, JPG, or WebP file under 8 MB.");
+      return;
+    }
+    setUploadError(null);
+    setAttachment(file);
   };
 
+  const onDrop = (event: DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.files.length) return;
+    event.preventDefault();
+    chooseFile(event.dataTransfer.files[0]);
+    setActiveTab("chat");
+  };
+
+  const send = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!controller || controller.replyPending || sending || (!draft.trim() && !attachment)) return;
+    const text = draft.trim();
+    const file = attachment;
+    setSending(true);
+    try {
+      if (file) {
+        if (activeProject && projects) await projects.addSource(activeProject.id, file);
+        await controller.sendAttachment(file, text);
+      } else {
+        await controller.sendText(text);
+      }
+      setDraft("");
+      setAttachment(null);
+      setUploadError(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch (caught) {
+      setUploadError(caught instanceof Error ? caught.message : "The file could not be saved.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const onDraftKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+      event.preventDefault();
+      event.currentTarget.form?.requestSubmit();
+    }
+  };
+
+  const voiceActive = controller?.connection === "connected" || controller?.connection === "connecting" || controller?.connection === "ending";
+  const messages = controller?.messages ?? [];
+
   return (
-    <div className="home-screen home-screen-chat home-companion-page page-enter">
+    <div className="assistant-home page-enter" onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); }} onDrop={onDrop}>
       <ContentTopbar />
-      <div className="home-companion-workspace" data-desktop-sessions-open={desktopSessionsOpen} data-mobile-sessions-open={mobileSessionsOpen}>
-        {mobileSessionsOpen ? (
-          <button
-            aria-label="Close conversations"
-            className="home-conversations-scrim"
-            onClick={() => setMobileSessionsOpen(false)}
-            type="button"
-          />
-        ) : null}
-        <aside className="home-conversations" id="home-conversations" aria-label="Conversations">
-          <div className="home-conversations-heading">
-            <h2>Conversations</h2>
-            <button aria-label="New conversation" className="home-conversations-add" onClick={newConversation} ref={newConversationRef} type="button">
-              <Plus aria-hidden="true" size={17} />
-            </button>
-          </div>
-          <div className="home-conversations-list">
-            {controller.sessionError ? <p className="home-conversations-error" role="status">{controller.sessionError}</p> : null}
-            {controller.sessions.length === 0 ? (
-              <p className="home-conversations-empty">Your conversations will appear here.</p>
+      {activeProject && projects ? (
+        <div className="project-workspace-header">
+          <div><span className="workspace-eyebrow">Project</span><strong>{activeProject.name}</strong></div>
+          <nav aria-label="Project workspace" className="project-workspace-tabs">
+            {projectTabs.map((tab) => <button aria-current={activeTab === tab.id ? "page" : undefined} key={tab.id} onClick={() => setActiveTab(tab.id)} type="button">{tab.label}</button>)}
+          </nav>
+        </div>
+      ) : null}
+
+      {activeTab !== "chat" && activeProject && projects ? (
+        <ProjectWorkspacePanel key={`${activeProject.id}:${activeTab}`} project={activeProject} projects={projects} tab={activeTab} onChat={() => setActiveTab("chat")} />
+      ) : (
+        <div className="home-conversation">
+          <div className="home-conversation-thread" ref={threadRef}>
+            {messages.length === 0 ? (
+              <div className="home-conversation-empty">
+                <span className="workspace-eyebrow">{activeProject?.name || "New chat"}</span>
+                <h1>What should we work on?</h1>
+                <p>Ask a question, share a file, or talk to Inko.</p>
+              </div>
             ) : (
-              controller.sessions.map((session) => (
-                <div className="home-conversation-row" key={session.id}>
-                  {editingSessionId === session.id ? (
-                    <form
-                      className="home-conversation-rename"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        if (draftTitle.trim()) controller.renameConversation(session.id, draftTitle);
-                        setEditingSessionId(null);
-                      }}
-                    >
-                      <input
-                        aria-label="Conversation title"
-                        autoFocus
-                        maxLength={160}
-                        onChange={(event) => setDraftTitle(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Escape") setEditingSessionId(null);
-                        }}
-                        value={draftTitle}
-                      />
-                      <button aria-label="Save title" type="submit"><Check aria-hidden="true" size={15} /></button>
-                      <button aria-label="Cancel rename" onClick={() => setEditingSessionId(null)} type="button"><X aria-hidden="true" size={15} /></button>
-                    </form>
-                  ) : (
-                    <>
-                      <button
-                        aria-current={session.id === controller.activeSessionId ? "true" : undefined}
-                        className="home-conversation-item"
-                        data-active={session.id === controller.activeSessionId}
-                        onClick={() => {
-                          window.history.replaceState(null, "", `/?chat=${encodeURIComponent(session.id)}`);
-                          void controller.openConversation(session.id);
-                          setMobileSessionsOpen(false);
-                          setMenuSessionId(null);
-                        }}
-                        type="button"
-                      >
-                        <MessageSquareText aria-hidden="true" size={16} />
-                        <span>{session.title || "New conversation"}</span>
-                      </button>
-                      <button
-                        aria-expanded={menuSessionId === session.id}
-                        aria-label={`Options for ${session.title || "New conversation"}`}
-                        className="home-conversation-options"
-                        onClick={(event) => {
-                          menuTriggerRef.current = event.currentTarget;
-                          const listBottom = event.currentTarget.closest(".home-conversations-list")?.getBoundingClientRect().bottom ?? window.innerHeight;
-                          setMenuOpensUp(listBottom - event.currentTarget.getBoundingClientRect().bottom < 120);
-                          setMenuSessionId((current) => current === session.id ? null : session.id);
-                          setDeletingSessionId(null);
-                        }}
-                        type="button"
-                      >
-                        <MoreHorizontal aria-hidden="true" size={16} />
-                      </button>
-                    </>
-                  )}
-                  {menuSessionId === session.id && editingSessionId !== session.id ? (
-                    <div aria-label={`Options for ${session.title || "New conversation"}`} className="home-conversation-menu" data-opens-up={menuOpensUp} ref={menuRef} role="group">
-                      {deletingSessionId === session.id ? (
-                        <>
-                          <p role="alert">Delete this conversation?</p>
-                          <div className="home-conversation-menu-actions">
-                            <button
-                              onClick={() => {
-                                setDeletingSessionId(null);
-                                window.requestAnimationFrame(() => menuRef.current?.querySelector<HTMLButtonElement>("button")?.focus());
-                              }}
-                              ref={deleteCancelRef}
-                              type="button"
-                            >Cancel</button>
-                            <button
-                              className="home-conversation-delete"
-                              onClick={() => {
-                                if (controller.activeSessionId === session.id) window.history.replaceState(null, "", "/");
-                                controller.removeConversation(session.id);
-                                setMenuSessionId(null);
-                                setDeletingSessionId(null);
-                                newConversationRef.current?.focus();
-                              }}
-                              type="button"
-                            >Delete</button>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => {
-                              setDraftTitle(session.title || "New conversation");
-                              setEditingSessionId(session.id);
-                              setMenuSessionId(null);
-                            }}
-                            type="button"
-                          >Rename</button>
-                          <button className="home-conversation-delete" onClick={() => setDeletingSessionId(session.id)} type="button">Delete</button>
-                        </>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-              ))
+              <div className="home-conversation-messages">
+                {messages.map((message) => (
+                  <article className="home-conversation-message" data-role={message.role} key={message.id}>
+                    <span>{message.role === "inko" ? "Inko" : "You"}</span>
+                    {message.attachment ? <div className="home-message-file">{message.attachment.type === "application/pdf" ? <FileText size={16} /> : <FileImage size={16} />}{message.attachment.name}</div> : null}
+                    {message.role === "inko" ? <StudyAnswerText sources={message.sources ?? []} text={message.text} /> : <p>{message.text}</p>}
+                    {message.sources?.length ? <details><summary>Sources ({message.sources.length})</summary><ul>{message.sources.map((source) => <li key={source.url}><a href={source.url} rel="noopener noreferrer" target="_blank">{source.title}</a></li>)}</ul></details> : null}
+                  </article>
+                ))}
+                {controller?.replyPending ? <p aria-live="polite" className="home-conversation-pending">Inko is thinking...</p> : null}
+              </div>
             )}
           </div>
-        </aside>
-        <HomeChat
-          controller={controller}
-          key={controller.activeSessionId ?? "new"}
-          onNewSession={newConversation}
-          onToggleSessions={() => {
-            if (isNarrow) setMobileSessionsOpen((open) => !open);
-            else setDesktopSessionsOpen((open) => !open);
-          }}
-          sessionsOpen={sessionsOpen}
-        />
-      </div>
+          <div className="home-conversation-bottom">
+            {controller?.partialTranscript ? <p aria-live="polite" className="home-live-transcript"><span>{controller.replyPending ? "Inko" : "Listening"}</span> {controller.partialTranscript}</p> : null}
+            {controller?.error ? <p className="home-conversation-error" role="status">{controller.error}</p> : null}
+            {uploadError ? <p className="home-conversation-error" role="alert">{uploadError}</p> : null}
+            <form className="home-conversation-composer" onSubmit={(event) => void send(event)}>
+              {attachment ? <div className="home-attachment"><Paperclip size={16} /><span>{attachment.name}</span><button aria-label="Remove attachment" onClick={() => setAttachment(null)} type="button"><X size={16} /></button></div> : null}
+              <label className="sr-only" htmlFor="home-chat-input">Message Inko</label>
+              <textarea id="home-chat-input" maxLength={4000} onChange={(event) => setDraft(event.target.value)} onKeyDown={onDraftKeyDown} placeholder="Message Inko" rows={2} value={draft} />
+              <div className="home-composer-tools">
+                <input accept=".pdf,image/png,image/jpeg,image/webp" aria-label="Attach PDF or image" onChange={(event) => chooseFile(event.target.files?.[0])} ref={fileInputRef} type="file" />
+                <button aria-label="Attach PDF or image" onClick={() => fileInputRef.current?.click()} title="Attach PDF or image" type="button"><Paperclip size={19} /></button>
+                <span className="home-composer-spacer" />
+                <button aria-label={voiceActive ? "End voice session" : "Start talking to Inko"} aria-pressed={voiceActive} onClick={() => { if (voiceActive) controller?.end(); else void controller?.start(); }} title={voiceActive ? "End voice session" : "Start talking to Inko"} type="button">{voiceActive ? <Square size={18} /> : <Mic size={19} />}</button>
+                <button aria-label="Send message" className="home-composer-send" disabled={(!draft.trim() && !attachment) || controller?.replyPending || sending} title="Send message" type="submit"><ArrowUp size={20} /></button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
