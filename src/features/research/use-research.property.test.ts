@@ -8,7 +8,7 @@
  * Validates: Requirements 8.2
  *
  * Property 20: Research new session appears in sidebar and activates
- * - For any valid research question `q` (10–500 chars), calling
+ * - For any valid research question `q` (2–500 chars), calling
  *   `createSession(q)` SHALL add the new session to the `sessions` list AND
  *   set `activeSession` to that new session.
  * Validates: Requirements 8.11
@@ -186,16 +186,16 @@ describe("Property 20: Research new session appears in sidebar and activates", (
   }
 
   /**
-   * For any valid research question q (10–500 chars), calling createSession(q)
+   * For any valid research question q (2–500 chars), calling createSession(q)
    * SHALL add the new session to `sessions` AND set `activeSession` to it.
    * Validates: Requirements 8.11
    */
   it("20a — createSession with any valid question adds session to list and sets it as active", async () => {
     await fc.assert(
       fc.asyncProperty(
-        // Only generate questions that pass Zod validation (10–500 non-empty chars)
+        // Only generate questions that pass Zod validation (2–500 non-empty chars)
         fc
-          .string({ minLength: 10, maxLength: 500 })
+          .string({ minLength: 2, maxLength: 500 })
           .filter((q) => researchQuestionSchema.safeParse(q).success),
         async (question) => {
           vi.clearAllMocks();
@@ -289,14 +289,14 @@ describe("Property 20: Research new session appears in sidebar and activates", (
   });
 
   /**
-   * For any string shorter than 10 chars, the schema SHALL reject it —
+   * For any string shorter than 2 chars, the schema SHALL reject it —
    * ensuring the hook never creates a session for invalid questions.
    * Validates: Requirements 8.12
    */
-  it("20d — researchQuestionSchema rejects any question shorter than 10 chars", () => {
+  it("20d — researchQuestionSchema rejects any topic shorter than 2 chars", () => {
     fc.assert(
       fc.property(
-        fc.string({ minLength: 0, maxLength: 9 }),
+        fc.string({ minLength: 0, maxLength: 1 }),
         (shortQuestion) => {
           const result = researchQuestionSchema.safeParse(shortQuestion);
           expect(result.success).toBe(false);
@@ -326,7 +326,7 @@ describe("Property 20: Research new session appears in sidebar and activates", (
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {
-      await result.current.createSession("short");
+      await result.current.createSession("A");
     });
 
     expect(result.current.sessionError).not.toBeNull();

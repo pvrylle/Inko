@@ -2,8 +2,8 @@
  * Property tests for research question validation — `researchQuestionSchema`
  *
  * Property 12: Research question length validation
- * - For any string `q` with 10 ≤ q.length ≤ 500, the schema SHALL validate successfully.
- * - For any string `q` with q.length < 10, the schema SHALL reject.
+ * - For any string `q` with 2 ≤ q.length ≤ 500, the schema SHALL validate successfully.
+ * - For any string `q` with q.length < 2, the schema SHALL reject.
  * - For any string `q` with q.length > 500, the schema SHALL reject.
  *
  * Validates: Requirements 8.10, 8.12
@@ -20,17 +20,17 @@ function isValid(q: string): boolean {
   return result.success;
 }
 
-// ─── Property 12a: Valid range (10–500) always accepted ───────────────────────
+// ─── Property 12a: Valid range (2–500) always accepted ───────────────────────
 
 describe("Property 12: Research question length validation", () => {
-  it("12a — any string with length in [10, 500] is accepted", () => {
+  it("12a — any string with length in [2, 500] is accepted", () => {
     /**
-     * For any string whose length is between 10 and 500 characters (inclusive),
+     * For any string whose length is between 2 and 500 characters (inclusive),
      * researchQuestionSchema SHALL parse successfully.
      */
     fc.assert(
       fc.property(
-        fc.string({ minLength: 10, maxLength: 500 }),
+        fc.string({ minLength: 2, maxLength: 500 }),
         (q) => {
           expect(isValid(q)).toBe(true);
         },
@@ -38,16 +38,16 @@ describe("Property 12: Research question length validation", () => {
     );
   });
 
-  // ─── Property 12b: Below minimum (< 10) always rejected ─────────────────────
+  // ─── Property 12b: Below minimum (< 2) always rejected ─────────────────────
 
-  it("12b — any string with length < 10 is rejected", () => {
+  it("12b — any string with length < 2 is rejected", () => {
     /**
-     * For any string shorter than 10 characters (including the empty string),
+     * For any string shorter than 2 characters (including the empty string),
      * researchQuestionSchema SHALL reject.
      */
     fc.assert(
       fc.property(
-        fc.string({ minLength: 0, maxLength: 9 }),
+        fc.string({ minLength: 0, maxLength: 1 }),
         (q) => {
           expect(isValid(q)).toBe(false);
         },
@@ -77,12 +77,12 @@ describe("Property 12: Research question length validation", () => {
     expect(isValid("")).toBe(false);
   });
 
-  it('concrete — "1234567890" (exactly 10 chars) is accepted', () => {
-    expect(isValid("1234567890")).toBe(true);
+  it('concrete — "AI" (exactly 2 chars) is accepted', () => {
+    expect(isValid("AI")).toBe(true);
   });
 
-  it('concrete — "123456789" (9 chars) is rejected', () => {
-    expect(isValid("123456789")).toBe(false);
+  it('concrete — "A" (1 char) is rejected', () => {
+    expect(isValid("A")).toBe(false);
   });
 
   it("concrete — 500-character string is accepted", () => {

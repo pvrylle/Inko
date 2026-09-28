@@ -78,5 +78,5 @@ export type CanvasNote = {
 
 // ─── Validation schemas ───────────────────────────────────────────────────────
 
-/** Research question must be between 10 and 500 characters (Requirements 8.10, 8.12). */
-export const researchQuestionSchema = z.string().min(10).max(500);
+/** A research topic or question must be between 2 and 500 characters. */
+export const researchQuestionSchema = z.string().min(2).max(500);

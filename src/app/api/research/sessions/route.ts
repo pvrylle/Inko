@@ -7,7 +7,7 @@ import { checkRateLimit } from "@/lib/security/rate-limit";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const createSchema = z.object({
-  question: z.string().trim().min(10).max(500),
+  question: z.string().trim().min(2).max(500),
   title: z.string().trim().min(1).max(160).optional(),
   description: z.string().trim().max(1000).optional(),
 });

@@ -215,13 +215,13 @@ export function useResearch(): UseResearchReturn {
     async (question: string) => {
       if (!userId) return undefined;
 
-      // Validate question length (10–500 chars)
+      // Validate topic or question length (2–500 chars)
       const result = researchQuestionSchema.safeParse(question);
       if (!result.success) {
         const issue = result.error.issues[0];
         if (issue?.code === "too_small") {
           setSessionError(
-            "Research question must be at least 10 characters.",
+            "Enter at least two characters for a topic.",
           );
         } else if (issue?.code === "too_big") {
           setSessionError(

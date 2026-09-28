@@ -18,7 +18,7 @@ type Props = {
  * Form for creating a new Research Session.
  *
  * Validates the research question client-side using `researchQuestionSchema`
- * (10–500 chars) before calling `createSession`. Inline error is shown on
+ * (2–500 chars) before calling `createSession`. Inline error is shown on
  * submit when validation fails, satisfying Requirements 8.10, 8.11, and 8.12.
  */
 export function ResearchSessionForm({ createSession, sessionError }: Props) {
@@ -37,7 +37,7 @@ export function ResearchSessionForm({ createSession, sessionError }: Props) {
     if (!result.success) {
       const issue = result.error.issues[0];
       if (issue?.code === "too_small") {
-        setLocalError("Research question must be at least 10 characters.");
+        setLocalError("Enter at least two characters for a topic.");
       } else if (issue?.code === "too_big") {
         setLocalError("Research question must be 500 characters or fewer.");
       } else {
@@ -66,7 +66,7 @@ export function ResearchSessionForm({ createSession, sessionError }: Props) {
         className="research-session-input"
         id="research-question"
         maxLength={500}
-        minLength={10}
+        minLength={2}
         onChange={(e) => {
           setQuestion(e.target.value);
           // Clear local error as user types so feedback is not stale

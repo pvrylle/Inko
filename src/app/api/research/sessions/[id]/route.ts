@@ -6,7 +6,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const paramsSchema = z.object({ id: z.string().uuid() });
 const patchSchema = z.object({
-  question: z.string().trim().min(10).max(500).optional(),
+  question: z.string().trim().min(2).max(500).optional(),
   title: z.string().trim().min(1).max(160).nullable().optional(),
   description: z.string().trim().max(1000).optional(),
 }).refine((value) => value.question !== undefined || value.title !== undefined || value.description !== undefined, { message: "EMPTY" });
