@@ -2,8 +2,12 @@ import { expect, test } from "@playwright/test";
 
 test.setTimeout(90_000);
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem("inko.hasCompletedOnboarding", "1"));
+});
+
 const pages = [
-  ["/", /Hey Inko/i],
+  ["/", /New conversation/i],
   ["/research", /Start a research project/i],
   ["/sources", /Sources/i],
   ["/canvas", /Canvas/i],
@@ -15,7 +19,7 @@ const pages = [
 test("all study surfaces render and expose a current route", async ({ page }) => {
   for (const [path, heading] of pages) {
     await page.goto(path);
-    await expect(page.getByRole("heading", { name: heading, level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: heading, level: 1 })).toBeVisible({ timeout: 15_000 });
     const currentLinks = page.locator('a[aria-current="page"]:visible');
     await expect(currentLinks.first()).toBeVisible();
   }

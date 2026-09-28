@@ -1,10 +1,11 @@
 "use client";
 
-import { ArrowRight, Clock, Flame, Layers3, Target } from "lucide-react";
+import { ArrowRight, Clock, Flame, Layers3, MessageSquareText, Target } from "lucide-react";
 import Link from "next/link";
 import { PageHeading } from "@/components/ui/page-heading";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useProgress } from "@/features/progress/use-progress";
+import { useOptionalVoiceAgent } from "@/features/voice/voice-agent-provider";
 import { useResearch } from "./use-research";
 
 function relativeTime(iso: string) {
@@ -17,12 +18,34 @@ function relativeTime(iso: string) {
 }
 
 export function HistoryView() {
+  const companion = useOptionalVoiceAgent();
   const { sessions, loading } = useResearch();
   const { summary } = useProgress();
+  const conversations = companion?.sessions ?? [];
 
   return (
     <div className="content-page page-enter">
-      <PageHeading eyebrow="History" title="History" description="Look back at your research projects and study momentum." />
+      <PageHeading eyebrow="History" title="History" description="Pick up a conversation or return to your research." />
+
+      <section className="history-section" aria-labelledby="history-conversations-heading">
+        <h2 id="history-conversations-heading">Conversations</h2>
+        {companion?.sessionError ? <p role="status">{companion.sessionError}</p> : null}
+        {conversations.length === 0 ? (
+          <EmptyState icon={MessageSquareText} title="No conversations yet" message="Conversations with Inko will appear here." action={<Link className="primary-button" href="/">Talk to Inko</Link>} />
+        ) : (
+          <ul className="history-list">
+            {conversations.map((session) => (
+              <li key={session.id}>
+                <Link className="history-item" href={`/?chat=${encodeURIComponent(session.id)}`}>
+                  <span className="history-item-dot" aria-hidden="true" />
+                  <span className="history-item-body"><strong>{session.title || "New conversation"}</strong><small>Updated {relativeTime(session.updated_at)}</small></span>
+                  <ArrowRight size={15} aria-hidden="true" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <div className="history-stats">
         <div className="history-stat"><span className="history-stat-icon" data-tone="coral"><Flame size={16} /></span><strong>{summary.streak}</strong><small>Day streak</small></div>

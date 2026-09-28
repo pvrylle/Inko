@@ -6,6 +6,19 @@ import { useRouter } from "next/navigation";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 
 const DEMO_USER_KEY = "inko.demo-user-id";
+const AUTH_STARTUP_TIMEOUT_MS = 2500;
+
+async function getInitialUser(supabase: NonNullable<ReturnType<typeof getBrowserSupabaseClient>>) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      supabase.auth.getSession().then(({ data }) => data.session?.user ?? null).catch(() => null),
+      new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), AUTH_STARTUP_TIMEOUT_MS); }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 export type AuthState = {
   user: User | null;
@@ -55,6 +68,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await supabase.auth.signOut();
     }
     window.localStorage.removeItem(DEMO_USER_KEY);
+    const guestId = getDemoUserId();
+    setState({ user: null, userId: guestId, isReady: true, isDemo: false, isGuest: true, error: null });
     router.push("/");
     router.refresh();
   }, [router]);
@@ -71,12 +86,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     let active = true;
     const establishSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
+      const initialUser = await getInitialUser(supabase);
+      if (initialUser) {
         if (active)
           setState({
-            user: session.user,
-            userId: session.user.id,
+            user: initialUser,
+            userId: initialUser.id,
             isReady: true,
             isDemo: false,
             isGuest: false,
@@ -104,7 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setState((current) => ({
         ...current,
         user: session?.user ?? null,
-        userId: session?.user.id ?? current.userId,
+        userId: session?.user.id ?? getDemoUserId(),
         isGuest: !session?.user,
         isReady: true,
       }));

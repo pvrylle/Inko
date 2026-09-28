@@ -2,9 +2,9 @@ import "server-only";
 import { GoogleGenAI } from "@google/genai";
 
 function geminiKeys() {
-  return [process.env.GEMINI_API_KEY, process.env.GEMINI_API_KEY2]
+  return [...new Set([process.env.GEMINI_API_KEY, process.env.GEMINI_API_KEY2, process.env.GEMINI_API_KEY3]
     .map((key) => key?.trim())
-    .filter((key): key is string => Boolean(key));
+    .filter((key): key is string => Boolean(key)))];
 }
 
 export function isGeminiConfigured() {
@@ -137,23 +137,27 @@ export async function generateStudyAnswer(prompt: string) {
 export async function* generateFastGeminiTextStream(prompt: string) {
   const keys = geminiKeys();
   if (keys.length === 0) throw new Error("GEMINI_NOT_CONFIGURED");
-  const fastModel = getGeminiChatModel();
-  const client = new GoogleGenAI({ apiKey: keys[0] });
-  try {
-    yield* streamModel(client, fastModel, prompt);
-  } catch (error) {
-    if (isMissingModelError(error) && fastModel !== getGeminiModel()) {
-      yield* streamModel(client, getGeminiModel(), prompt);
-      return;
+  const models = [getGeminiChatModel(), getGeminiModel()].filter((model, index, all) => all.indexOf(model) === index);
+  let sawRetryable = false;
+  for (const model of models) {
+    for (const apiKey of keys) {
+      let emitted = false;
+      try {
+        for await (const piece of streamModel(new GoogleGenAI({ apiKey }), model, prompt)) {
+          emitted = true;
+          yield piece;
+        }
+        return;
+      } catch (error) {
+        // Retrying after text is visible would duplicate the beginning of the reply.
+        if (emitted) throw new Error("GEMINI_UNAVAILABLE");
+        if (isMissingModelError(error)) break;
+        if (!isRetryableGeminiError(error)) throw new Error("GEMINI_FAILED");
+        sawRetryable = true;
+      }
     }
-    const backup = keys[1];
-    if (backup && isRetryableGeminiError(error)) {
-      yield* streamModel(new GoogleGenAI({ apiKey: backup }), fastModel, prompt);
-      return;
-    }
-    if (isMissingModelError(error)) throw new Error("GEMINI_MODEL_UNAVAILABLE");
-    throw new Error(isRetryableGeminiError(error) ? "GEMINI_UNAVAILABLE" : "GEMINI_FAILED");
   }
+  throw new Error(sawRetryable ? "GEMINI_UNAVAILABLE" : "GEMINI_MODEL_UNAVAILABLE");
 }
 
 type GeminiChatPart =

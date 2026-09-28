@@ -1,7 +1,7 @@
 "use client";
 
 import { addGuestUsage, getGuestUsage, GUEST_LIMITS } from "@/lib/guest-limits";
-import { getBrowserSupabaseClient } from "@/lib/supabase/client";
+import { usesLocalStudyData } from "@/lib/data/local-study";
 
 const DEMO_USER_KEY = "inko.demo-user-id";
 
@@ -37,13 +37,6 @@ function meterAmount(meter: GuestMeter, body: BodyInit | null | undefined) {
   }
 }
 
-async function actingAsGuest() {
-  const supabase = getBrowserSupabaseClient();
-  if (!supabase) return true;
-  const { data } = await supabase.auth.getSession();
-  return !data.session?.user;
-}
-
 export async function inkoFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   const demoUserId = window.localStorage.getItem(DEMO_USER_KEY);
@@ -51,7 +44,7 @@ export async function inkoFetch(input: RequestInfo | URL, init: RequestInit = {}
   if (!headers.has("content-type") && init.body && !(init.body instanceof FormData)) headers.set("content-type", "application/json");
 
   const meter = guestMeter(requestPath(input), init.method ?? "GET");
-  if (meter && await actingAsGuest()) {
+  if (meter && await usesLocalStudyData()) {
     const amount = meterAmount(meter, init.body);
     if (getGuestUsage()[meter] + amount > meterLimit(meter)) {
       return new Response(JSON.stringify({ error: "GUEST_LIMIT" }), {

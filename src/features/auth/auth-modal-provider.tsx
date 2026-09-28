@@ -34,7 +34,7 @@ export function AuthModalProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthModalContext.Provider value={value}>
       {children}
-      <AuthModal open={open} mode={mode} ticket={ticket} onClose={close} />
+      <AuthModal key={ticket} open={open} mode={mode} ticket={ticket} onClose={close} />
     </AuthModalContext.Provider>
   );
 }
