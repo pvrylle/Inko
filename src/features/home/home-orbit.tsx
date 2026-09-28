@@ -21,6 +21,7 @@ import { useMascot } from "@/features/mascot/mascot-provider";
 import { useResearch } from "@/features/research/use-research";
 import { VoiceCapsule } from "@/features/voice/voice-capsule";
 import { useOptionalVoiceAgent } from "@/features/voice/voice-agent-provider";
+import { HomeChat } from "./home-chat";
 
 const prompts = [
   { text: "Research the effects of AI on education", icon: Search, tone: "blue" },
@@ -54,8 +55,9 @@ export function HomeOrbit() {
   const reduced = useReducedMotion();
   const { state, amplitude } = useMascot();
   const controller = useOptionalVoiceAgent();
-  const { sessions } = useResearch();
+  const { sessions, createSession, startNewProject } = useResearch();
   const recent = sessions.slice(0, 3);
+  const chatting = (controller?.messages ?? []).some((message) => message.role === "student");
 
   const onPrompt = (text: string) => {
     if (!controller) return;
@@ -63,10 +65,21 @@ export function HomeOrbit() {
   };
 
   return (
-    <div className="home-screen page-enter">
+    <div className={`home-screen page-enter${chatting ? " home-screen-chat" : ""}`}>
       <ContentTopbar />
 
-      <div className="home-screen-grid">
+      {chatting && controller ? (
+        <HomeChat
+          controller={controller}
+          createSession={createSession}
+          onNewSession={() => {
+            controller.clearConversation();
+            startNewProject();
+          }}
+        />
+      ) : null}
+
+      {chatting ? null : <div className="home-screen-grid">
         <section className="home-console" aria-label="Talk to Inko">
           <motion.div
             className="home-console-mascot"
@@ -147,7 +160,7 @@ export function HomeOrbit() {
             </ul>
           </article>
         </aside>
-      </div>
+      </div>}
     </div>
   );
 }

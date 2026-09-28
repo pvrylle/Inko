@@ -702,6 +702,25 @@ export function useVoiceAgent() {
     }
   }, [cleanUpMedia, clearSilenceTimer, finalizeProviderSession, markReplyPending, send, setPartialTranscript]);
 
+  const clearConversation = useCallback(() => {
+    handsFreeRef.current = false;
+    pauseForReplyRef.current = false;
+    clearSilenceTimer();
+    window.speechSynthesis?.cancel();
+    dictationFinalRef.current = "";
+    interimRef.current = "";
+    try { recognitionRef.current?.abort(); } catch {}
+    recognitionRef.current = null;
+    try { socketRef.current?.close(); } catch {}
+    socketRef.current = null;
+    setPartialTranscript("");
+    setDictating(false);
+    setError(null);
+    markReplyPending(false);
+    setConnection("idle");
+    setMessages([]);
+  }, [clearSilenceTimer, markReplyPending, setPartialTranscript]);
+
   const sendText = useCallback(async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -819,5 +838,5 @@ export function useVoiceAgent() {
     };
   }, [cleanUpMedia, finalizeProviderSession]);
 
-  return { connection, messages, partialTranscript, error, dictating, replyPending, start, end, sendText };
+  return { connection, messages, partialTranscript, error, dictating, replyPending, start, end, sendText, clearConversation };
 }

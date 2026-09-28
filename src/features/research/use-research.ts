@@ -54,7 +54,7 @@ export type UseResearchReturn = {
   saveCanvas: (content: string) => Promise<void>;
   activeTab: ResearchTab;
   setActiveTab: (tab: ResearchTab) => void;
-  createSession: (question: string) => Promise<void>;
+  createSession: (question: string) => Promise<ResearchSession | undefined>;
   startNewProject: () => void;
   sessionError: string | null;
   loading: boolean;
@@ -213,7 +213,7 @@ export function useResearch(): UseResearchReturn {
   // ── createSession (Requirements 8.11, 8.12) ──────────────────────────────────
   const createSession = useCallback(
     async (question: string) => {
-      if (!userId) return;
+      if (!userId) return undefined;
 
       // Validate question length (10–500 chars)
       const result = researchQuestionSchema.safeParse(question);
@@ -230,7 +230,7 @@ export function useResearch(): UseResearchReturn {
         } else {
           setSessionError("Please enter a valid research question.");
         }
-        return;
+        return undefined;
       }
 
       setSessionError(null);
@@ -248,6 +248,7 @@ export function useResearch(): UseResearchReturn {
         setActiveSessionId(newSession.id);
         setActiveTab("overview");
         syncResearchUrl(newSession.id, "overview");
+        return newSession;
       } catch (caught) {
         const code = caught instanceof Error ? caught.message : "CREATE_FAILED";
         if (code === "GUEST_LIMIT") {
@@ -255,6 +256,7 @@ export function useResearch(): UseResearchReturn {
         } else {
           setSessionError("Failed to create research session. Please try again.");
         }
+        return undefined;
       }
     },
     [userId],

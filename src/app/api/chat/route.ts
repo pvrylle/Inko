@@ -21,7 +21,7 @@ function studyPrompt(question: string, sources: StudySource[]) {
     return `You are Inko, a study companion. No sources were found. Answer in 3 or 4 sentences a student can study. Say that you could not attach sources this time. Do not invent citations, paper titles, or links.\n\nStudent: ${question}`;
   }
   const block = sources.map((source, index) => `[${index + 1}] ${source.title}\n${source.snippet}`).join("\n\n");
-  return `You are Inko, a study companion. Answer like a research notebook: use only the source snippets below. Write 4 to 6 sentences a student can study. Cite snippets inline as [1] or [2]. If the snippets disagree, say so. If they do not cover the question, say what is missing instead of guessing. Do not add a link list.\n\nSources:\n${block}\n\nStudent: ${question}`;
+  return `You are Inko, a study companion. Answer like a research notebook: use only the sources below. Write 4 to 6 sentences a student can study. Cite a source inline as [1] or [2], and never use the word snippet. If the sources disagree, say so. If they do not cover the question, say what is missing instead of guessing. Do not add a link list.\n\nSources:\n${block}\n\nStudent: ${question}`;
 }
 
 function guestAddress(request: NextRequest) {

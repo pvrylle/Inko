@@ -176,18 +176,29 @@ export async function generateGeminiChat(input: {
 }
 
 export async function generateGeminiJson(prompt: string, responseJsonSchema: Record<string, unknown>) {
-  return withGeminiFallback(async (client) => {
-    const response = await client.models.generateContent({
-      model: getGeminiModel(),
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseJsonSchema,
-        temperature: 0.25,
-      },
-    });
-    const text = response.text?.trim();
-    if (!text) throw new Error("GEMINI_EMPTY_RESPONSE");
-    return JSON.parse(text) as unknown;
-  });
+  const models = [getGeminiModel(), getGeminiChatModel()].filter((model, index, all) => all.indexOf(model) === index);
+  let lastError: unknown;
+  for (const model of models) {
+    try {
+      return await withGeminiFallback(async (client) => {
+        const response = await client.models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseJsonSchema,
+            temperature: 0.25,
+          },
+        });
+        const text = response.text?.trim();
+        if (!text) throw new Error("GEMINI_EMPTY_RESPONSE");
+        return JSON.parse(text) as unknown;
+      });
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : "";
+      if (message !== "GEMINI_UNAVAILABLE" && message !== "GEMINI_MODEL_UNAVAILABLE") throw error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("GEMINI_FAILED");
 }

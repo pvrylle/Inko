@@ -1,7 +1,6 @@
 "use client";
 
 import { Mic, Square } from "lucide-react";
-import type { VoiceMessage } from "./voice-types";
 import { useMascot } from "@/features/mascot/mascot-provider";
 import { useVoiceAgent } from "./use-voice-agent";
 import { useOptionalVoiceAgent, type VoiceAgentController } from "./voice-agent-provider";
@@ -16,38 +15,17 @@ function captionFor(
   messages: VoiceAgentController["messages"],
   error: string | null,
   replyPending: boolean,
+  compact: boolean,
 ) {
   const last = messages.at(-1);
   const spoken = last?.role === "inko" ? last.text : "";
   const heard = spoken.replace(/\s*\[\d+\]/g, "").replace(/\s+/g, " ").trim();
   if (replyPending && !error) return "Looking up sources…";
   if (partial && partial !== spoken && partial !== heard) return partial;
-  if (last?.role === "inko") return last.sources?.length ? "Sources are listed with the answer." : "Answer ready.";
+  if (compact && last?.role === "inko") return "Ask a follow-up";
+  if (last?.role === "inko") return spoken;
   if (connection === "idle" && error) return error;
   return hintFor(connection, partial);
-}
-
-function StudyAnswer({ message }: { message: VoiceMessage }) {
-  const sources = message.sources ?? [];
-  return (
-    <article className="study-answer" aria-live="polite">
-      <p>{message.text}</p>
-      {sources.length > 0 ? (
-        <>
-          <h2>Sources</h2>
-          <ol>
-            {sources.map((source) => (
-              <li key={source.url}>
-                <a href={source.url} rel="noopener noreferrer" target="_blank">{source.title}</a>
-              </li>
-            ))}
-          </ol>
-        </>
-      ) : (
-        <p className="study-answer-note">No source links came back for this question.</p>
-      )}
-    </article>
-  );
 }
 
 function hintFor(connection: VoiceAgentController["connection"], partial: string) {
@@ -79,16 +57,14 @@ function Wave({ side, amp, active }: { side: "left" | "right"; amp: number; acti
   );
 }
 
-function VoiceCapsuleView({ controller }: { controller: VoiceAgentController }) {
+function VoiceCapsuleView({ controller, compact = false }: { controller: VoiceAgentController; compact?: boolean }) {
   const { connection, messages, partialTranscript, error, replyPending, start, end } = controller;
   const { amplitude } = useMascot();
   const active = connection === "connected" || connection === "connecting" || connection === "ending";
   const capturing = connection === "connected";
   const amp = Math.min(1, amplitude);
-  const answer = messages.at(-1);
-
   return (
-    <div className="voice-capsule-wrap">
+    <div className="voice-capsule-wrap" data-compact={compact}>
       <div className="voice-capsule" data-active={active} data-capturing={capturing}>
         <Wave side="left" amp={amp} active={active} />
 
@@ -109,22 +85,20 @@ function VoiceCapsuleView({ controller }: { controller: VoiceAgentController }) 
       </div>
 
       <p className="voice-capsule-hint" data-partial={partialTranscript ? "true" : "false"} aria-live="polite">
-        {captionFor(connection, partialTranscript, messages, error, replyPending)}
+        {captionFor(connection, partialTranscript, messages, error, replyPending, compact)}
       </p>
 
-      {error && <p className="voice-capsule-error" role="status">{error}</p>}
-
-      {!replyPending && answer?.role === "inko" ? <StudyAnswer message={answer} /> : null}
+      {error && !compact ? <p className="voice-capsule-error" role="status">{error}</p> : null}
     </div>
   );
 }
 
-function StandaloneVoiceCapsule() {
+function StandaloneVoiceCapsule({ compact }: { compact: boolean }) {
   const controller = useVoiceAgent();
-  return <VoiceCapsuleView controller={controller} />;
+  return <VoiceCapsuleView compact={compact} controller={controller} />;
 }
 
-export function VoiceCapsule() {
+export function VoiceCapsule({ compact = false }: { compact?: boolean }) {
   const shared = useOptionalVoiceAgent();
-  return shared ? <VoiceCapsuleView controller={shared} /> : <StandaloneVoiceCapsule />;
+  return shared ? <VoiceCapsuleView compact={compact} controller={shared} /> : <StandaloneVoiceCapsule compact={compact} />;
 }
