@@ -1,16 +1,9 @@
 "use client";
 
-import {
-  ArrowLeft,
-  ArrowRight,
-  FolderOpen,
-} from "lucide-react";
-import Link from "next/link";
+import { ArrowRight, FolderOpen } from "lucide-react";
 import { useEffect, useRef } from "react";
-import { ContentTopbar } from "@/components/layout/content-topbar";
 import { InkoMascot } from "@/features/mascot/inko-mascot";
 import { useMascot } from "@/features/mascot/mascot-provider";
-import { PageVoiceControl } from "@/features/voice/page-voice-control";
 import { ResearchSessionForm } from "./research-session-form";
 import { ResearchTabs } from "./research-tabs";
 import { useResearch } from "./use-research";
@@ -62,7 +55,6 @@ export function ResearchView() {
   if (loading && !activeSession) {
     return (
       <div className="research-view-page page-enter">
-        <ContentTopbar className="research-topbar"><Link className="back-home" href="/"><ArrowLeft size={15} /> Back to Home</Link></ContentTopbar>
         <div className="research-loading" aria-live="polite" aria-busy="true">
           <span className="research-loading-orb" />
           <p>Organising your research desk…</p>
@@ -74,17 +66,11 @@ export function ResearchView() {
   if (!activeSession) {
     return (
       <div className="research-view-page page-enter">
-        <ContentTopbar className="research-topbar">
-          <Link className="back-home" href="/"><ArrowLeft size={15} /> Back to Home</Link>
-          <PageVoiceControl />
-        </ContentTopbar>
         {error && <p className="form-error research-error" role="alert">{error}</p>}
 
         <div className="research-start">
           <div className="research-start-card">
-            <span className="research-start-mascot" aria-hidden="true"><InkoMascot state={state} className="research-start-inko" fit="contain" /></span>
-            <h1>Start a research project</h1>
-            <p>Ask a question worth investigating. Inko gathers sources, weighs findings, and surfaces contradictions with you.</p>
+            <h1>What topic are you researching?</h1>
             <ResearchSessionForm createSession={research.createSession} sessionError={research.sessionError} />
           </div>
 
@@ -111,20 +97,12 @@ export function ResearchView() {
 
   return (
     <div className="research-view-page page-enter">
-      <ContentTopbar className="research-topbar">
-        <Link className="back-home" href="/"><ArrowLeft size={15} /> Back to Home</Link>
-        <div className="research-topbar-actions">
-          <button className="secondary-button" onClick={startNewProject} type="button">New project</button>
-          <PageVoiceControl />
-        </div>
-      </ContentTopbar>
-
       {error && <p className="form-error research-error" role="alert">{error}</p>}
 
       <div className="research-conversation">
         <header className="research-conversation-header">
-          <span>Research conversation</span>
-          <h1>{activeSession.title ?? shortTitle(activeSession.question)}</h1>
+          <div><span>Research</span><h1>{activeSession.title ?? shortTitle(activeSession.question)}</h1></div>
+          <button className="secondary-button" onClick={startNewProject} type="button">New research</button>
         </header>
 
         <div className="research-conversation-thread">

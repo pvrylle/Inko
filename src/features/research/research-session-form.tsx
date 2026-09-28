@@ -59,7 +59,7 @@ export function ResearchSessionForm({ createSession, sessionError }: Props) {
   return (
     <form className="research-session-form" onSubmit={(e) => void handleSubmit(e)}>
       <label className="research-session-label" htmlFor="research-question">
-        New research question
+        Research topic or question
       </label>
 
       <textarea
@@ -72,7 +72,7 @@ export function ResearchSessionForm({ createSession, sessionError }: Props) {
           // Clear local error as user types so feedback is not stale
           if (localError) setLocalError(null);
         }}
-        placeholder="e.g. How does sleep deprivation affect memory consolidation?"
+        placeholder="What would you like to research?"
         rows={3}
         value={question}
       />

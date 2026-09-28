@@ -32,6 +32,14 @@ vi.mock("@/features/home/home-chat", () => ({
 
 describe("responsive app rails", () => {
   beforeEach(() => Object.values(chatActions).forEach((action) => action.mockClear()));
+
+  it("marks the current section without leaving New chat selected", () => {
+    render(<AppShell><p>Research content</p></AppShell>);
+    const navigation = screen.getByRole("complementary", { name: "Primary navigation" });
+    expect(within(navigation).getByRole("link", { name: "Research" })).toHaveAttribute("aria-current", "page");
+    expect(within(navigation).getByRole("button", { name: "New chat" })).not.toHaveAttribute("aria-current");
+    expect(within(navigation).getByRole("button", { name: "All chats" })).not.toHaveAttribute("aria-current");
+  });
   it("lets users hide and restore navigation and Inko", async () => {
     const user = userEvent.setup();
     const { container } = render(<AppShell><p>Research content</p></AppShell>);

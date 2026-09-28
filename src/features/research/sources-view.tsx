@@ -4,7 +4,6 @@ import { ArrowRight, FolderOpen, Upload } from "lucide-react";
 import Link from "next/link";
 import { PageHeading } from "@/components/ui/page-heading";
 import { EmptyState } from "@/components/ui/empty-state";
-import { PageVoiceControl } from "@/features/voice/page-voice-control";
 import { useResearch } from "./use-research";
 
 function relativeTime(iso: string) {
@@ -27,7 +26,6 @@ export function SourcesView() {
         description="Every source Inko has gathered, grouped by research project."
         action={
           <div className="page-heading-actions">
-            <PageVoiceControl />
             <Link className="secondary-button" href="/library"><Upload size={15} /> Upload files</Link>
           </div>
         }

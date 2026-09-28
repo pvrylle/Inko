@@ -67,16 +67,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <a className="skip-link" href="#main-content">Skip to main content</a>
       {sidebarOpen && <button aria-label="Close navigation" className="sidebar-scrim" onClick={closeSidebar} type="button" />}
       <aside className="desktop-sidebar" data-open={sidebarOpen} id="workspace-navigation" aria-label="Primary navigation">
-        <div className="sidebar-brand"><InkoLogo /><button aria-label="Hide navigation" className="sidebar-collapse" onClick={() => { setSidebarCollapsed(true); closeSidebar(); }} title="Hide navigation" type="button"><PanelLeftClose size={18} /></button><button aria-label="Close navigation" className="sidebar-drawer-close" onClick={closeSidebar} type="button"><X size={18} /></button></div>
-        <button className="sidebar-new-chat" onClick={newChat} type="button"><MessageSquarePlus size={18} /> New chat</button>
+        <div className="sidebar-brand"><InkoLogo /><button aria-controls="workspace-navigation" aria-expanded={sidebarOpen} aria-label="Expand navigation" className="sidebar-compact-expand" onClick={() => { setAssistantOpen(false); setSidebarOpen(true); }} title="Expand navigation" type="button"><PanelLeftOpen size={18} /></button><button aria-label="Hide navigation" className="sidebar-collapse" onClick={() => { setSidebarCollapsed(true); closeSidebar(); }} title="Hide navigation" type="button"><PanelLeftClose size={18} /></button><button aria-label="Close navigation" className="sidebar-drawer-close" onClick={closeSidebar} type="button"><X size={18} /></button></div>
+        <button aria-current={pathname === "/" && !controller?.activeSessionId ? "page" : undefined} aria-label="New chat" className="sidebar-new-chat" onClick={newChat} title="New chat" type="button"><MessageSquarePlus size={18} /><span>New chat</span></button>
         <nav className="sidebar-primary-nav" aria-label="Workspace">
-          {links.map(({ href, icon: Icon, label }) => <Link aria-current={pathname === href ? "page" : undefined} href={href} key={href} onClick={closeSidebar}><Icon size={17} /><span>{label}</span></Link>)}
+          {links.map(({ href, icon: Icon, label }) => <Link aria-current={pathname === href ? "page" : undefined} aria-label={label} href={href} key={href} onClick={closeSidebar} title={label}><Icon size={17} /><span>{label}</span></Link>)}
         </nav>
         <div className="sidebar-scroll">
           <section className="sidebar-list-section" aria-label="Projects">
             <div className="sidebar-list-heading"><span>Projects</span><Link aria-label="Create project" href="/projects?new=1" onClick={closeSidebar} title="Create project"><Plus size={16} /></Link></div>
-            <button aria-current={!projects?.activeId ? "true" : undefined} className="sidebar-list-item" onClick={() => { openAllChats(); closeSidebar(); }} type="button"><MessageCircle size={15} /><span>All chats</span></button>
-            {projects?.projects.map((project) => <button aria-current={project.id === projects.activeId ? "true" : undefined} className="sidebar-list-item" key={project.id} onClick={() => { openProject(project.id); closeSidebar(); }} type="button"><FolderOpen size={15} /><span>{project.name}</span></button>)}
+            <button aria-current={pathname === "/" && !projects?.activeId && !!controller?.activeSessionId ? "true" : undefined} className="sidebar-list-item" onClick={() => { openAllChats(); closeSidebar(); }} type="button"><MessageCircle size={15} /><span>All chats</span></button>
+            {projects?.projects.map((project) => <button aria-current={pathname === "/" && project.id === projects.activeId ? "true" : undefined} className="sidebar-list-item" key={project.id} onClick={() => { openProject(project.id); closeSidebar(); }} type="button"><FolderOpen size={15} /><span>{project.name}</span></button>)}
             {!projects?.projects.length ? <p className="sidebar-list-empty">No projects yet</p> : null}
           </section>
           <section className="sidebar-list-section" aria-label="Recent chats">
@@ -101,7 +101,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {archived.map((session) => <div className="sidebar-chat-row" key={session.id}><span className="sidebar-chat-archived" title={session.title}>{session.title || "New chat"}</span><button aria-label={`Restore ${session.title || "New chat"}`} className="sidebar-chat-options" onClick={() => controller?.restoreConversation(session.id)} title="Restore chat" type="button"><RotateCcw size={15} /></button></div>)}
           </section> : null}
         </div>
-        <Link aria-current={pathname === "/settings" ? "page" : undefined} className="sidebar-settings" href="/settings" onClick={closeSidebar}><Settings size={17} /> Settings</Link>
+        <Link aria-current={pathname === "/settings" ? "page" : undefined} aria-label="Settings" className="sidebar-settings" href="/settings" onClick={closeSidebar} title="Settings"><Settings size={17} /><span>Settings</span></Link>
       </aside>
 
       <button aria-controls="workspace-navigation" aria-expanded={!sidebarCollapsed} aria-label="Show navigation" className="sidebar-reopen" onClick={() => setSidebarCollapsed(false)} title="Show navigation" type="button"><PanelLeftOpen size={20} /></button>
