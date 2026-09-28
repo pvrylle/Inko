@@ -51,14 +51,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const openAllChats = () => {
     projects?.activateProject(null);
-    const latest = controller?.sessions.find((session) => !session.archived_at && !projects?.conversationProjects[session.id]);
+    const latest = controller?.sessions.find((session) => !session.archived_at);
     if (latest) controller?.openConversation(latest.id);
     else controller?.clearConversation();
     router.push("/");
     setAssistantOpen(false);
   };
 
-  const recent = controller?.sessions.filter((session) => !session.archived_at && (projects?.conversationProjects[session.id] ?? null) === (projects?.activeId ?? null)).slice(0, 8) ?? [];
+  const recent = controller?.sessions.filter((session) => !session.archived_at && (!projects?.activeId || projects.conversationProjects[session.id] === projects.activeId)) ?? [];
   const archived = controller?.sessions.filter((session) => session.archived_at) ?? [];
   const closeSidebar = () => setSidebarOpen(false);
 
@@ -86,10 +86,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <input aria-label={`Rename ${session.title || "New chat"}`} autoFocus maxLength={160} onChange={(event) => setDraftTitle(event.target.value)} value={draftTitle} />
                 <button aria-label="Save chat name" type="submit"><Check size={15} /></button><button aria-label="Cancel rename" onClick={() => setEditingChatId(null)} type="button"><X size={15} /></button>
               </form> : deletingChatId === session.id ? <div className="sidebar-chat-confirm"><span>Delete this chat?</span><button onClick={() => setDeletingChatId(null)} type="button">Cancel</button><button onClick={() => { controller?.removeConversation(session.id); setDeletingChatId(null); }} type="button">Delete</button></div> : <>
-                <button aria-current={session.id === controller?.activeSessionId ? "true" : undefined} className="sidebar-list-item sidebar-chat-open" onClick={() => { controller?.openConversation(session.id); router.push("/"); closeSidebar(); setChatMenuId(null); }} title={session.title || "New chat"} type="button"><span>{session.title || "New chat"}</span></button>
+                <button aria-current={session.id === controller?.activeSessionId ? "true" : undefined} className="sidebar-list-item sidebar-chat-open" onClick={() => { projects?.activateProject(projects.conversationProjects[session.id] ?? null); controller?.openConversation(session.id); router.push("/"); closeSidebar(); setChatMenuId(null); }} title={session.title || "New chat"} type="button"><span>{session.title || "New chat"}</span></button>
                 <button aria-expanded={chatMenuId === session.id} aria-label={`Options for ${session.title || "New chat"}`} className="sidebar-chat-options" onClick={() => setChatMenuId((current) => current === session.id ? null : session.id)} type="button"><MoreHorizontal size={17} /></button>
                 {chatMenuId === session.id ? <div className="sidebar-chat-menu">
                   <button onClick={() => { setDraftTitle(session.title || "New chat"); setEditingChatId(session.id); setChatMenuId(null); }} type="button">Rename</button>
+                  {projects?.projects.length ? <label>Move to project<select aria-label={`Project for ${session.title || "New chat"}`} onChange={(event) => { projects.assignConversation(session.id, event.target.value || null); setChatMenuId(null); }} value={projects.conversationProjects[session.id] ?? ""}><option value="">No project</option>{projects.projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label> : null}
                   <button onClick={() => { controller?.archiveConversation(session.id); setChatMenuId(null); }} type="button"><Archive size={14} /> Archive</button>
                   <button onClick={() => { setDeletingChatId(session.id); setChatMenuId(null); }} type="button"><Trash2 size={14} /> Delete</button>
                 </div> : null}

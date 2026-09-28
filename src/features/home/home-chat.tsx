@@ -52,7 +52,7 @@ export function HomeChat({ controller, home = false, onClose }: { controller: Vo
   const [draftTitle, setDraftTitle] = useState("");
   const threadRef = useRef<HTMLDivElement>(null);
   const active = controller.sessions.find((session) => session.id === activeSessionId);
-  const visibleSessions = controller.sessions.filter((session) => !session.archived_at && (projects?.conversationProjects[session.id] ?? null) === (projects?.activeId ?? null));
+  const visibleSessions = controller.sessions.filter((session) => !session.archived_at && (!projects?.activeId || projects.conversationProjects[session.id] === projects.activeId));
   const status = error ? "Needs attention" : replyPending ? "Thinking" : controller.connection === "connected" ? "Listening" : "Ready";
 
   useEffect(() => {

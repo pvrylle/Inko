@@ -49,8 +49,8 @@ export function ResearchSessionForm({ createSession, sessionError }: Props) {
     setLocalError(null);
     setSubmitting(true);
     try {
-      await createSession(question.trim());
-      setQuestion(""); // reset on success
+      const created = await createSession(question.trim());
+      if (created) setQuestion("");
     } finally {
       setSubmitting(false);
     }

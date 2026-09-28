@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { getLocalResearchProject } from "@/lib/data/research-local";
 import {
@@ -96,7 +96,6 @@ export function useResearch(): UseResearchReturn {
   const [activeTab, setActiveTab] = useState<ResearchTab>("overview");
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
-  const autoOpened = useRef(false);
 
   // ── Load the full session list (Requirement 8.2) ────────────────────────────
   const reloadSessions = useCallback(async () => {
@@ -104,11 +103,6 @@ export function useResearch(): UseResearchReturn {
     try {
       const data = await listResearchSessions(userId);
       setSessions(data);
-      setActiveSessionId((current) => {
-        if (current || autoOpened.current) return current;
-        autoOpened.current = true;
-        return data[0]?.id ?? null;
-      });
       setError(null);
     } catch {
       setError("Your research sessions couldn't be loaded.");
@@ -191,13 +185,19 @@ export function useResearch(): UseResearchReturn {
   // ── setActive: pick a session from the sidebar (Requirement 8.3) ────────────
   const setActive = useCallback((id: string, tab?: ResearchTab) => {
     const nextTab = tab ?? "overview";
+    setActiveSession(sessions.find((session) => session.id === id) ?? null);
     setActiveSessionId(id);
+    setSources([]);
+    setFindings([]);
+    setContradictions([]);
+    setOpenQuestions([]);
+    setCanvasContent("");
+    setNoteMarkdown("");
     setActiveTab(nextTab);
     syncResearchUrl(id, nextTab);
-  }, []);
+  }, [sessions]);
 
   const startNewProject = useCallback(() => {
-    autoOpened.current = true;
     setActiveSessionId(null);
     setActiveSession(null);
     setSources([]);
