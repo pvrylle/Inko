@@ -98,8 +98,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <main className="main-content" id="main-content" tabIndex={-1}>{children}</main>
 
-      <MascotOverlay />
-      {!["/research", "/sources", "/canvas", "/practice", "/flashcards", "/quiz", "/focus"].some((route) => pathname === route || pathname.startsWith(`${route}/`)) && (
+      {pathname !== "/" ? <MascotOverlay /> : null}
+      {!["/", "/research", "/sources", "/canvas", "/practice", "/flashcards", "/quiz", "/focus"].some((route) => pathname === route || pathname.startsWith(`${route}/`)) && (
         <PersistentVoiceDock />
       )}
 

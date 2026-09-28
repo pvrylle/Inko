@@ -23,10 +23,6 @@ export function AuthModal({
   const [activeMode, setActiveMode] = useState<AuthMode>(mode);
 
   useEffect(() => {
-    if (open) setActiveMode(mode);
-  }, [open, mode, ticket]);
-
-  useEffect(() => {
     if (!open) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";

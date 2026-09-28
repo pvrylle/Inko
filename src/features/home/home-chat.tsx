@@ -1,157 +1,166 @@
 "use client";
 
-import { Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { useAuth } from "@/components/providers/auth-provider";
+import { ArrowUp, PanelLeft, Plus } from "lucide-react";
+import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { InkoMascot } from "@/features/mascot/inko-mascot";
 import { useMascot } from "@/features/mascot/mascot-provider";
-import { createSource } from "@/features/research/research-repository";
-import type { ResearchSession } from "@/features/research/research-schema";
 import { VoiceCapsule } from "@/features/voice/voice-capsule";
 import type { VoiceAgentController } from "@/features/voice/voice-agent-provider";
 import type { VoiceMessage } from "@/features/voice/voice-types";
-import { AnswerToolIcons, StudyAnswerCard, StudyAnswerText } from "./study-answer-card";
-
-function studyQuestion(question: string) {
-  const asked = question.trim();
-  if (asked.length >= 10) return asked.slice(0, 500);
-  return asked.length > 0 ? `${asked} — explain this for study`.slice(0, 500) : "Study this topic from the sources Inko found.";
-}
-
-function ThinkingTurn() {
-  const { state } = useMascot();
-  return (
-    <article className="home-turn" data-pending="true" data-role="inko">
-      <span className="home-turn-who">
-        <InkoMascot className="home-turn-mascot" fit="cover" state={state} />
-        Inko
-      </span>
-      <p>Looking up sources…</p>
-    </article>
-  );
-}
+import { AnswerToolIcons, StudyAnswerText } from "./study-answer-card";
 
 function questionBefore(messages: VoiceMessage[], index: number) {
   for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
-    const earlier = messages[cursor];
-    if (earlier?.role === "student") return earlier.text;
+    if (messages[cursor]?.role === "student") return messages[cursor].text;
   }
   return "";
 }
 
-function ChatTurn({
-  message,
-  question,
-  sessionId,
-}: {
-  message: VoiceMessage;
-  question: string;
-  sessionId: string | null;
-}) {
+function ChatTurn({ message, question, sessionId, onResearchSessionCreated }: { message: VoiceMessage; question: string; sessionId: string | null; onResearchSessionCreated: (id: string) => void }) {
   const sources = message.sources ?? [];
+  const isInko = message.role === "inko";
+
   return (
     <article className="home-turn" data-role={message.role}>
-      <span>{message.role === "inko" ? "Inko" : "You"}</span>
-      {message.role === "inko" ? <StudyAnswerText sources={sources} text={message.text} /> : <p>{message.text}</p>}
-      {message.role === "inko" ? <AnswerToolIcons answer={message} question={question} sessionId={sessionId} /> : null}
+      <span className="home-turn-speaker">{isInko ? "Inko" : "You"}</span>
+      {isInko ? <StudyAnswerText sources={sources} text={message.text} /> : <p>{message.text}</p>}
+      {isInko && (sources.length > 0 || message.text) ? (
+        <details className="home-turn-more">
+          <summary>Sources and actions{sources.length > 0 ? ` · ${sources.length} sources` : ""}</summary>
+          {sources.length > 0 ? (
+            <ul className="home-turn-sources">
+              {sources.map((source, index) => (
+                <li key={`${source.url}-${index}`}>
+                  <a href={source.url} rel="noopener noreferrer" target="_blank">{index + 1}. {source.title}</a>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <AnswerToolIcons answer={message} question={question} sessionId={sessionId} onResearchSessionCreated={onResearchSessionCreated} />
+        </details>
+      ) : null}
     </article>
   );
 }
 
 export function HomeChat({
   controller,
-  createSession,
   onNewSession,
+  onToggleSessions,
+  sessionsOpen,
 }: {
   controller: VoiceAgentController;
-  createSession: (question: string) => Promise<ResearchSession | undefined>;
   onNewSession: () => void;
+  onToggleSessions: () => void;
+  sessionsOpen: boolean;
 }) {
-  const { userId } = useAuth();
-  const { messages, replyPending, error } = controller;
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [sessionStatus, setSessionStatus] = useState<"opening" | "ready" | "saved-chat">("opening");
-  const started = useRef(false);
+  const { state } = useMascot();
+  const { messages, replyPending, error, activeSessionId } = controller;
+  const [draft, setDraft] = useState("");
   const threadRef = useRef<HTMLDivElement>(null);
-  const question = messages.find((message) => message.role === "student")?.text ?? "New session";
-  const latestAnswer = [...messages].reverse().find((message) => message.role === "inko");
+  const active = controller.sessions.find((session) => session.id === activeSessionId);
+  const title = active?.title || "New conversation";
+  const status = error ? "Needs attention" : replyPending ? "Working" : controller.connection === "connected" ? "Listening" : "Ready";
+
+  useEffect(() => {
+    const thread = threadRef.current;
+    if (thread) thread.scrollTop = thread.scrollHeight;
+  }, [activeSessionId]);
 
   useEffect(() => {
     const thread = threadRef.current;
     if (!thread) return;
     const distance = thread.scrollHeight - thread.scrollTop - thread.clientHeight;
-    if (distance < 160) thread.scrollTo({ top: thread.scrollHeight, behavior: "smooth" });
+    if (distance < 180) {
+      if (typeof thread.scrollTo === "function") thread.scrollTo({ top: thread.scrollHeight, behavior: "smooth" });
+      else thread.scrollTop = thread.scrollHeight;
+    }
   }, [messages, replyPending]);
 
-  useEffect(() => {
-    if (!latestAnswer || started.current) return;
-    started.current = true;
-    const sources = latestAnswer.sources ?? [];
-    void (async () => {
-      const session = await createSession(studyQuestion(question));
-      if (!session) {
-        setSessionStatus("saved-chat");
-        return;
-      }
-      if (userId) {
-        await Promise.all(sources.map(async (source) => {
-          try {
-            await createSource(userId, session.id, {
-              title: source.title.slice(0, 200),
-              url: source.url,
-              type: "url",
-              tag: "supports",
-            });
-          } catch {
-            // The session still exists when one link is rejected.
-          }
-        }));
-      }
-      window.history.replaceState(null, "", "/");
-      setSessionId(session.id);
-      setSessionStatus("ready");
-    })();
-  }, [createSession, latestAnswer, question, userId]);
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const text = draft.trim();
+    if (!text || replyPending) return;
+    setDraft("");
+    void controller.sendText(text);
+  };
 
-  const title = question.length > 72 ? `${question.slice(0, 72).trim()}…` : question;
+  const onDraftKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+      event.preventDefault();
+      event.currentTarget.form?.requestSubmit();
+    }
+  };
 
   return (
-    <div className="home-chat">
+    <section className="home-chat" aria-label="Inko conversation">
       <header className="home-chat-bar">
-        <div>
-          <span>{sessionStatus === "opening" ? "Opening session…" : sessionStatus === "ready" ? "Session" : "Chat"}</span>
+        <button
+          aria-controls="home-conversations"
+          aria-expanded={sessionsOpen}
+          aria-label={sessionsOpen ? "Hide conversations" : "Show conversations"}
+          className="home-chat-sessions-toggle"
+          onClick={onToggleSessions}
+          type="button"
+        >
+          <PanelLeft aria-hidden="true" size={19} />
+        </button>
+        <div className="home-chat-title">
+          <span>Inko companion</span>
           <h1>{title}</h1>
         </div>
-        <button className="home-chat-new" onClick={onNewSession} type="button">
-          <Plus aria-hidden="true" size={14} /> New session
+        {messages.length > 0 ? (
+          <div className="home-chat-presence">
+            <span className="home-chat-presence-copy"><strong>Inko</strong><small>{status}</small></span>
+            <InkoMascot className="home-chat-presence-mascot" fit="cover" state={state} />
+          </div>
+        ) : null}
+        <button aria-label="New conversation" className="home-chat-new" onClick={onNewSession} type="button">
+          <Plus aria-hidden="true" size={17} /> <span>New chat</span>
         </button>
       </header>
 
-      <div className="home-chat-grid">
-        <div className="home-chat-main">
-          <div className="home-chat-thread" ref={threadRef}>
-            {messages.map((message, index) => (
-              <ChatTurn key={message.id} message={message} question={questionBefore(messages, index)} sessionId={sessionId} />
-            ))}
-            {replyPending ? <ThinkingTurn /> : null}
-            {error ? <p className="voice-capsule-error">{error}</p> : null}
-          </div>
-          <VoiceCapsule compact />
+      <div className="home-chat-main">
+        <div className="home-chat-thread" ref={threadRef}>
+          {messages.length === 0 ? (
+            <div className="home-chat-welcome">
+              <InkoMascot className="home-chat-welcome-mascot" fit="contain" state={state} />
+              <h2>What can I help you with?</h2>
+              <p>Ask a question, talk it through, or give Inko a task.</p>
+            </div>
+          ) : (
+            messages.map((message, index) => (
+              <ChatTurn key={message.id} message={message} question={questionBefore(messages, index)} sessionId={active?.research_session_id ?? null} onResearchSessionCreated={controller.linkResearchSession} />
+            ))
+          )}
+          {replyPending ? (
+            <article aria-live="polite" className="home-turn home-turn-pending" data-role="inko">
+              <span className="home-turn-speaker">Inko</span>
+              <p>Working on it<span className="home-thinking-dots" aria-hidden="true">…</span></p>
+            </article>
+          ) : null}
+          {error ? <p className="home-chat-error" role="status">{error}</p> : null}
         </div>
 
-        <aside className="home-chat-side" aria-label="Session tools">
-          <p className="home-chat-side-status">
-            {sessionStatus === "opening" && "Saving this as a research session."}
-            {sessionStatus === "ready" && "This chat is a research session. Follow-ups stay here."}
-            {sessionStatus === "saved-chat" && "The chat is open. A saved session needs a free account or a free session slot."}
-          </p>
-          {latestAnswer ? (
-            <StudyAnswerCard answer={latestAnswer} panel question={question} sessionId={sessionId} />
-          ) : (
-            <p className="study-answer-note">Sources and tools show up with the answer.</p>
-          )}
-        </aside>
+        <div className="home-chat-composer-area">
+          <form className="home-chat-composer" onSubmit={submit}>
+            <label className="sr-only" htmlFor="home-chat-input">Message Inko</label>
+            <textarea
+              id="home-chat-input"
+              maxLength={4000}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={onDraftKeyDown}
+              placeholder="Message Inko…"
+              rows={2}
+              value={draft}
+            />
+            <button aria-label="Send message" className="home-chat-send" disabled={!draft.trim() || replyPending} type="submit">
+              <ArrowUp aria-hidden="true" size={20} />
+            </button>
+          </form>
+          <VoiceCapsule compact />
+        </div>
       </div>
-    </div>
+    </section>
   );
 }

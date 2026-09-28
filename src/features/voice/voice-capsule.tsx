@@ -20,7 +20,7 @@ function captionFor(
   const last = messages.at(-1);
   const spoken = last?.role === "inko" ? last.text : "";
   const heard = spoken.replace(/\s*\[\d+\]/g, "").replace(/\s+/g, " ").trim();
-  if (replyPending && !error) return "Looking up sources…";
+  if (replyPending && !error) return "Inko is working on your answer…";
   if (partial && partial !== spoken && partial !== heard) return partial;
   if (compact && last?.role === "inko") return "Ask a follow-up";
   if (last?.role === "inko") return spoken;
@@ -39,7 +39,7 @@ function hintFor(connection: VoiceAgentController["connection"], partial: string
     case "error":
       return "Voice needs a quick reset — tap to try again";
     default:
-      return 'Tap to speak · or say "Hey Inko"';
+      return "Tap to speak";
   }
 }
 
@@ -50,7 +50,7 @@ function Wave({ side, amp, active }: { side: "left" | "right"; amp: number; acti
         <span
           key={index}
           data-active={active}
-          style={{ height: `${height}px`, "--bar": index, "--amp": amp } as React.CSSProperties}
+          style={{ height: `${height}px`, "--bar": index, "--amp": amp, "--level": amp * (0.55 + ((index * 7) % 9) / 10) } as React.CSSProperties}
         />
       ))}
     </div>
@@ -59,14 +59,15 @@ function Wave({ side, amp, active }: { side: "left" | "right"; amp: number; acti
 
 function VoiceCapsuleView({ controller, compact = false }: { controller: VoiceAgentController; compact?: boolean }) {
   const { connection, messages, partialTranscript, error, replyPending, start, end } = controller;
-  const { amplitude } = useMascot();
+  const { amplitude, state } = useMascot();
   const active = connection === "connected" || connection === "connecting" || connection === "ending";
-  const capturing = connection === "connected";
+  const capturing = connection === "connected" && state.presence === "listening";
   const amp = Math.min(1, amplitude);
+  const voiceVisible = active && amp > 0.04;
   return (
     <div className="voice-capsule-wrap" data-compact={compact}>
       <div className="voice-capsule" data-active={active} data-capturing={capturing}>
-        <Wave side="left" amp={amp} active={active} />
+        <Wave side="left" amp={amp} active={voiceVisible} />
 
         <button
           aria-label={active ? "End voice session" : "Start talking to Inko"}
@@ -81,7 +82,7 @@ function VoiceCapsuleView({ controller, compact = false }: { controller: VoiceAg
           {active ? <Square aria-hidden="true" fill="currentColor" size={20} /> : <Mic aria-hidden="true" size={24} strokeWidth={2.4} />}
         </button>
 
-        <Wave side="right" amp={amp} active={active} />
+        <Wave side="right" amp={amp} active={voiceVisible} />
       </div>
 
       <p className="voice-capsule-hint" data-partial={partialTranscript ? "true" : "false"} aria-live="polite">
