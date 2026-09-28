@@ -92,10 +92,11 @@ export function HomeOrbit() {
 
   const voiceActive = controller?.connection === "connected" || controller?.connection === "connecting" || controller?.connection === "ending";
   const messages = controller?.messages ?? [];
+  const activeChat = controller?.sessions.find((session) => session.id === controller.activeSessionId);
 
   return (
     <div className="assistant-home page-enter" onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); }} onDrop={onDrop}>
-      <ContentTopbar />
+      <ContentTopbar><div className="conversation-topbar-title"><span>{activeProject?.name || "Chat"}</span><strong title={activeChat?.title || "New chat"}>{activeChat?.title || "New chat"}</strong></div></ContentTopbar>
       {activeProject && projects ? (
         <div className="project-workspace-header">
           <div><span className="workspace-eyebrow">Project</span><strong>{activeProject.name}</strong></div>

@@ -48,7 +48,7 @@ export function ProjectsView({ startCreating = false }: { startCreating?: boolea
         ) : (
           <div className="projects-list">
             {projects.projects.map((project) => {
-              const conversations = companion?.sessions.filter((session) => projects.conversationProjects[session.id] === project.id) ?? [];
+              const conversations = companion?.sessions.filter((session) => !session.archived_at && projects.conversationProjects[session.id] === project.id) ?? [];
               const activities = projects.activities.filter((activity) => activity.projectId === project.id);
               return (
                 <article className="project-item" data-active={project.id === projects.activeId} key={project.id}>

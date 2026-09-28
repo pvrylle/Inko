@@ -27,11 +27,12 @@ export type CompanionSession = {
   title: string;
   messages: VoiceMessage[];
   research_session_id?: string | null;
+  archived_at?: string | null;
   created_at: string;
   updated_at: string;
 };
 
-type SessionRow = Database["public"]["Tables"]["companion_sessions"]["Row"];
+type SessionRow = Omit<Database["public"]["Tables"]["companion_sessions"]["Row"], "archived_at"> & { archived_at?: string | null };
 type DeletionMarker = { id: string; deleted_at: string; synced: boolean };
 type BrowserSupabase = NonNullable<ReturnType<typeof getBrowserSupabaseClient>>;
 
@@ -51,6 +52,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function missingArchiveColumn(error: unknown) {
+  return isRecord(error) && (error.code === "42703" || error.code === "PGRST204")
+    && /archived_at/i.test(String(error.message ?? ""));
+}
+
 function isVoiceMessage(value: unknown): value is VoiceMessage {
   if (!isRecord(value)) return false;
   if (typeof value.id !== "string" || typeof value.text !== "string" || typeof value.createdAt !== "string") return false;
@@ -68,7 +74,7 @@ function messagesFromJson(value: unknown): VoiceMessage[] {
 }
 
 function sessionFromRow(row: SessionRow): CompanionSession {
-  return { ...row, messages: messagesFromJson(row.messages) };
+  return { ...row, archived_at: row.archived_at ?? null, messages: messagesFromJson(row.messages) };
 }
 
 function sessionFromLocal(value: unknown, userId: string): CompanionSession | null {
@@ -81,6 +87,7 @@ function sessionFromLocal(value: unknown, userId: string): CompanionSession | nu
     title: value.title,
     messages: messagesFromJson(value.messages),
     research_session_id: typeof value.research_session_id === "string" ? value.research_session_id : null,
+    archived_at: typeof value.archived_at === "string" ? value.archived_at : null,
     created_at: value.created_at,
     updated_at: value.updated_at,
   };
@@ -121,6 +128,7 @@ function writeUnsynced(userId: string, ids: Set<string>) {
 function sameSnapshot(a: CompanionSession, b: CompanionSession) {
   return a.updated_at === b.updated_at && a.title === b.title
     && (a.research_session_id ?? null) === (b.research_session_id ?? null)
+    && (a.archived_at ?? null) === (b.archived_at ?? null)
     && JSON.stringify(a.messages) === JSON.stringify(b.messages);
 }
 
@@ -157,7 +165,7 @@ function issueFromError(operation: CompanionSessionSyncIssue["operation"], error
   const status = typeof value.status === "number" ? value.status : null;
   let kind: CompanionSessionSyncIssue["kind"] = "unknown";
   if (operation === "configuration") kind = "unconfigured";
-  else if (code === "42P01" || code === "PGRST205") kind = "schema";
+  else if (code === "42P01" || code === "PGRST205" || missingArchiveColumn(error)) kind = "schema";
   else if (code === "42501" || code === "28000" || status === 401 || status === 403) kind = "permission";
   else if (value.name === "AbortError" || /failed to fetch|network|offline|aborted/i.test(detail)) kind = "offline";
   const message = kind === "schema" ? "Cloud history is not ready yet. Conversations are saved on this device."
@@ -243,6 +251,7 @@ export function makeCompanionSession(userId: string, title = "New chat"): Compan
     title: title.trim().slice(0, 160) || "New chat",
     messages: [],
     research_session_id: null,
+    archived_at: null,
     created_at: now,
     updated_at: now,
   };
@@ -261,10 +270,33 @@ function scheduleCloudSave(userId: string, session: CompanionSession) {
           title: session.title,
           messages: session.messages as unknown as Json,
           research_session_id: session.research_session_id ?? null,
+          archived_at: session.archived_at ?? null,
           created_at: session.created_at,
           updated_at: session.updated_at,
         }, { onConflict: "id" })
         .abortSignal(signal));
+      if (missingArchiveColumn(error)) {
+        const fallback = await withCloudTimeout((signal) => supabase
+          .from("companion_sessions")
+          .upsert({
+            id: session.id,
+            owner_id: userId,
+            title: session.title,
+            messages: session.messages as unknown as Json,
+            research_session_id: session.research_session_id ?? null,
+            created_at: session.created_at,
+            updated_at: session.updated_at,
+          }, { onConflict: "id" })
+          .abortSignal(signal));
+        if (fallback.error) throw fallback.error;
+        if (session.archived_at) {
+          recordIssue(userId, `save:${session.id}`, "save", error);
+          return;
+        }
+        clearUnsyncedIfCurrent(userId, session);
+        clearIssue(userId, `save:${session.id}`);
+        return;
+      }
       if (error) throw error;
       clearUnsyncedIfCurrent(userId, session);
       clearIssue(userId, `save:${session.id}`);
@@ -299,26 +331,51 @@ async function readCloudSessions(supabase: BrowserSupabase, userId: string): Pro
   for (let offset = 0; ; offset += CLOUD_PAGE_SIZE) {
     const { data, error } = await withCloudTimeout((signal) => supabase
       .from("companion_sessions")
-      .select("id, owner_id, title, messages, research_session_id, created_at, updated_at")
+      .select("id, owner_id, title, messages, research_session_id, archived_at, created_at, updated_at")
       .eq("owner_id", userId)
       .order("updated_at", { ascending: false })
       .order("id", { ascending: false })
       .range(offset, offset + CLOUD_PAGE_SIZE - 1)
       .abortSignal(signal));
-    if (error) throw error;
-    sessions.push(...(data ?? []).map(sessionFromRow));
-    if ((data ?? []).length < CLOUD_PAGE_SIZE) return sessions;
+    if (missingArchiveColumn(error)) {
+      const legacy = await withCloudTimeout((signal) => supabase
+        .from("companion_sessions")
+        .select("id, owner_id, title, messages, research_session_id, created_at, updated_at")
+        .eq("owner_id", userId)
+        .order("updated_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(offset, offset + CLOUD_PAGE_SIZE - 1)
+        .abortSignal(signal));
+      if (legacy.error) throw legacy.error;
+      sessions.push(...(legacy.data ?? []).map(sessionFromRow));
+      if ((legacy.data ?? []).length < CLOUD_PAGE_SIZE) return sessions;
+    } else {
+      if (error) throw error;
+      sessions.push(...(data ?? []).map(sessionFromRow));
+      if ((data ?? []).length < CLOUD_PAGE_SIZE) return sessions;
+    }
   }
 }
 
 async function readCloudSessionById(supabase: BrowserSupabase, userId: string, sessionId: string) {
   const { data, error } = await withCloudTimeout((signal) => supabase
     .from("companion_sessions")
-    .select("id, owner_id, title, messages, research_session_id, created_at, updated_at")
+    .select("id, owner_id, title, messages, research_session_id, archived_at, created_at, updated_at")
     .eq("owner_id", userId)
     .eq("id", sessionId)
     .abortSignal(signal)
     .maybeSingle());
+  if (missingArchiveColumn(error)) {
+    const legacy = await withCloudTimeout((signal) => supabase
+      .from("companion_sessions")
+      .select("id, owner_id, title, messages, research_session_id, created_at, updated_at")
+      .eq("owner_id", userId)
+      .eq("id", sessionId)
+      .abortSignal(signal)
+      .maybeSingle());
+    if (legacy.error) throw legacy.error;
+    return legacy.data ? sessionFromRow(legacy.data) : null;
+  }
   if (error) throw error;
   return data ? sessionFromRow(data) : null;
 }
@@ -423,6 +480,7 @@ export async function saveCompanionSession(
     title: session.title.trim().slice(0, 160) || "New chat",
     messages: session.messages.filter(isVoiceMessage),
     research_session_id: session.research_session_id ?? null,
+    archived_at: session.archived_at ?? null,
     updated_at: now,
   };
 

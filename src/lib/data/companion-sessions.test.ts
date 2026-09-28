@@ -19,11 +19,15 @@ function useCloud(options: {
   listError?: { code: string; message: string };
   saveError?: { code: string; message: string };
   deleteError?: { code: string; message: string };
+  legacyArchiveColumn?: boolean;
   authenticatedUserId?: string;
 }) {
   let lookupId: string | null = null;
   let rangeStart = 0;
   let rangeEnd = 499;
+  let requestedArchive = false;
+  let savedArchive = false;
+  const missingArchive = { code: "42703", message: "column companion_sessions.archived_at does not exist" };
   const listBuilder = {
     eq: vi.fn((column: string, value: string) => {
       if (column === "id") lookupId = value;
@@ -37,26 +41,27 @@ function useCloud(options: {
     }),
     maybeSingle: vi.fn(async () => ({
       data: options.rows?.find((row) => row.id === lookupId) ?? null,
-      error: options.listError ?? null,
+      error: options.legacyArchiveColumn && requestedArchive ? missingArchive : options.listError ?? null,
     })),
     abortSignal: vi.fn(() => lookupId ? listBuilder : Promise.resolve({
       data: (options.rows ?? []).slice(rangeStart, rangeEnd + 1),
-      error: options.listError ?? null,
+      error: options.legacyArchiveColumn && requestedArchive ? missingArchive : options.listError ?? null,
     })),
   };
-  const saveBuilder = { abortSignal: vi.fn(async () => ({ data: null, error: options.saveError ?? null })) };
+  const saveBuilder = { abortSignal: vi.fn(async () => ({ data: null, error: options.legacyArchiveColumn && savedArchive ? missingArchive : options.saveError ?? null })) };
   const deleteBuilder = {
     eq: vi.fn().mockReturnThis(),
     abortSignal: vi.fn(async () => ({ data: null, error: options.deleteError ?? null })),
   };
   const from = vi.fn(() => ({
-    select: vi.fn(() => {
+    select: vi.fn((columns: string) => {
       lookupId = null;
       rangeStart = 0;
       rangeEnd = 499;
+      requestedArchive = columns.includes("archived_at");
       return listBuilder;
     }),
-    upsert: vi.fn(() => saveBuilder),
+    upsert: vi.fn((value: { archived_at?: string | null }) => { savedArchive = Object.hasOwn(value, "archived_at"); return saveBuilder; }),
     delete: vi.fn(() => deleteBuilder),
   }));
   const auth = { getUser: vi.fn(async () => ({
@@ -117,6 +122,14 @@ describe("companion sessions", () => {
     expect((await getCompanionSession("guest-a", true, "session-1"))?.messages).toHaveLength(3);
   });
 
+  it("persists archived and restored chats", async () => {
+    await saveCompanionSession("guest-a", true, { ...session("guest-a"), archived_at: "2026-09-29T10:00:00.000Z" });
+    expect((await getCompanionSession("guest-a", true, "session-1"))?.archived_at).toBe("2026-09-29T10:00:00.000Z");
+    const archived = (await getCompanionSession("guest-a", true, "session-1"))!;
+    await saveCompanionSession("guest-a", true, { ...archived, archived_at: null });
+    expect((await getCompanionSession("guest-a", true, "session-1"))?.archived_at).toBeNull();
+  });
+
   it("keeps guest conversations separate and reports deletion", async () => {
     const changes = vi.fn();
     const unsubscribe = subscribeToCompanionSessions("guest-a", changes);
@@ -150,6 +163,18 @@ describe("companion sessions", () => {
     expect(await listCompanionSessions("account-a", false)).toHaveLength(1);
     await vi.waitFor(() => expect(recovered.saveBuilder.abortSignal).toHaveBeenCalled());
     await vi.waitFor(() => expect(getCompanionSessionSyncIssue("account-a")).toBeNull());
+  });
+
+  it("reads existing cloud chats before the archive migration and keeps archives locally", async () => {
+    const cloud = useCloud({ rows: [session("account-legacy")], legacyArchiveColumn: true });
+    const loaded = await listCompanionSessions("account-legacy", false);
+    expect(loaded[0]?.title).toBe("Study planning");
+    expect(loaded[0]?.archived_at).toBeNull();
+
+    await saveCompanionSession("account-legacy", false, { ...loaded[0], archived_at: "2026-09-29T10:00:00.000Z" });
+    await vi.waitFor(() => expect(cloud.saveBuilder.abortSignal).toHaveBeenCalledTimes(2));
+    expect((await listCompanionSessions("account-legacy", true))[0]?.archived_at).toBe("2026-09-29T10:00:00.000Z");
+    expect(getCompanionSessionSyncIssue("account-legacy")?.kind).toBe("schema");
   });
 
   it("merges cloud and device histories by the latest update time", async () => {

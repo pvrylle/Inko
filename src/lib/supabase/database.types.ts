@@ -25,8 +25,8 @@ export type Database = {
         Relationships: [];
       };
       companion_sessions: {
-        Row: Owned & Timestamps & { title: string; messages: Json; research_session_id: string | null; updated_at: string };
-        Insert: { id?: string; owner_id: string; title?: string; messages?: Json; research_session_id?: string | null; created_at?: string; updated_at?: string };
+        Row: Owned & Timestamps & { title: string; messages: Json; research_session_id: string | null; archived_at: string | null; updated_at: string };
+        Insert: { id?: string; owner_id: string; title?: string; messages?: Json; research_session_id?: string | null; archived_at?: string | null; created_at?: string; updated_at?: string };
         Update: Partial<Database["public"]["Tables"]["companion_sessions"]["Insert"]>;
         Relationships: [];
       };

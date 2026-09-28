@@ -52,7 +52,7 @@ export function HomeChat({ controller, home = false, onClose }: { controller: Vo
   const [draftTitle, setDraftTitle] = useState("");
   const threadRef = useRef<HTMLDivElement>(null);
   const active = controller.sessions.find((session) => session.id === activeSessionId);
-  const visibleSessions = controller.sessions.filter((session) => (projects?.conversationProjects[session.id] ?? null) === (projects?.activeId ?? null));
+  const visibleSessions = controller.sessions.filter((session) => !session.archived_at && (projects?.conversationProjects[session.id] ?? null) === (projects?.activeId ?? null));
   const status = error ? "Needs attention" : replyPending ? "Thinking" : controller.connection === "connected" ? "Listening" : "Ready";
 
   useEffect(() => {
@@ -85,7 +85,7 @@ export function HomeChat({ controller, home = false, onClose }: { controller: Vo
   return (
     <section className="assistant-panel" aria-label="Inko assistant">
       <header className="assistant-panel-header">
-        <div><strong>Inko</strong><span><i data-status={status} />{status}</span></div>
+        <div><strong title={active?.title || "Inko"}>{active?.title || "Inko"}</strong><span><i data-status={status} />{status}</span></div>
         <div className="assistant-panel-actions">
           <button aria-label={historyOpen ? "Hide conversations" : "Show conversations"} aria-expanded={historyOpen} onClick={() => setHistoryOpen((open) => !open)} title="Conversations" type="button"><History size={18} /></button>
           <button aria-label="New conversation" onClick={newConversation} title="New conversation" type="button"><Plus size={18} /></button>
@@ -115,6 +115,7 @@ export function HomeChat({ controller, home = false, onClose }: { controller: Vo
                     <summary aria-label={`Options for ${session.title || "New conversation"}`} title="Conversation options"><MoreHorizontal size={17} /></summary>
                     <div>
                       <button onClick={() => { setDraftTitle(session.title || "New conversation"); setEditingId(session.id); }} type="button">Rename</button>
+                      <button onClick={() => controller.archiveConversation(session.id)} type="button">Archive</button>
                       <button onClick={() => setDeleteId(session.id)} type="button">Delete</button>
                       {projects && projects.projects.length > 0 ? (
                         <label>Project

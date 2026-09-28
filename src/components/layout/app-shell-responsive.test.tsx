@@ -3,6 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { AppShell } from "./app-shell";
 
+const chatActions = vi.hoisted(() => ({
+  renameConversation: vi.fn(), archiveConversation: vi.fn(), restoreConversation: vi.fn(), removeConversation: vi.fn(),
+}));
+
 vi.mock("next/navigation", () => ({
   usePathname: () => "/research",
   useRouter: () => ({ push: vi.fn() }),
@@ -13,13 +17,21 @@ vi.mock("@/components/providers/auth-provider", () => ({ useAuth: () => ({ user:
 vi.mock("@/features/guest/guest-banner", () => ({ GuestBanner: () => null }));
 vi.mock("@/features/projects/project-provider", () => ({ useOptionalProjects: () => null }));
 vi.mock("@/features/voice/voice-agent-provider", () => ({
-  useOptionalVoiceAgent: () => ({ sessions: [], activeSessionId: null }),
+  useOptionalVoiceAgent: () => ({
+    sessions: [
+      { id: "recent-chat", title: "Plan biology revision", archived_at: null },
+      { id: "archived-chat", title: "Old notes", archived_at: "2026-09-29T00:00:00.000Z" },
+    ],
+    activeSessionId: null,
+    ...chatActions,
+  }),
 }));
 vi.mock("@/features/home/home-chat", () => ({
   HomeChat: ({ onClose }: { onClose: () => void }) => <button onClick={onClose} type="button">Close Inko panel</button>,
 }));
 
 describe("responsive app rails", () => {
+  beforeEach(() => Object.values(chatActions).forEach((action) => action.mockClear()));
   it("lets users hide and restore navigation and Inko", async () => {
     const user = userEvent.setup();
     const { container } = render(<AppShell><p>Research content</p></AppShell>);
@@ -41,5 +53,30 @@ describe("responsive app rails", () => {
     expect(assistant).toHaveAttribute("data-open", "true");
     await user.click(screen.getByRole("button", { name: "Close Inko panel" }));
     expect(assistant).toHaveAttribute("data-open", "false");
+  });
+
+  it("offers rename, archive, delete, and restore in the sidebar", async () => {
+    const user = userEvent.setup();
+    render(<AppShell><p>Research content</p></AppShell>);
+    const navigation = screen.getByRole("complementary", { name: "Primary navigation" });
+
+    await user.click(within(navigation).getByRole("button", { name: "Options for Plan biology revision" }));
+    await user.click(within(navigation).getByRole("button", { name: "Rename" }));
+    await user.clear(within(navigation).getByRole("textbox", { name: "Rename Plan biology revision" }));
+    await user.type(within(navigation).getByRole("textbox", { name: "Rename Plan biology revision" }), "Biology exam");
+    await user.click(within(navigation).getByRole("button", { name: "Save chat name" }));
+    expect(chatActions.renameConversation).toHaveBeenCalledWith("recent-chat", "Biology exam");
+
+    await user.click(within(navigation).getByRole("button", { name: "Options for Plan biology revision" }));
+    await user.click(within(navigation).getByRole("button", { name: "Archive" }));
+    expect(chatActions.archiveConversation).toHaveBeenCalledWith("recent-chat");
+
+    await user.click(within(navigation).getByRole("button", { name: "Options for Plan biology revision" }));
+    await user.click(within(navigation).getByRole("button", { name: "Delete" }));
+    await user.click(within(navigation).getByRole("button", { name: "Delete" }));
+    expect(chatActions.removeConversation).toHaveBeenCalledWith("recent-chat");
+
+    await user.click(within(navigation).getByRole("button", { name: "Restore Old notes" }));
+    expect(chatActions.restoreConversation).toHaveBeenCalledWith("archived-chat");
   });
 });

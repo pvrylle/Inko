@@ -342,7 +342,7 @@ export function useVoiceAgent() {
         return [...merged.values()].sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at));
       });
       if (activeSessionRef.current) return;
-      const first = loaded[0];
+      const first = loaded.find((session) => !session.archived_at);
       if (!first) return;
       activeSessionRef.current = first;
       messagesRef.current = first.messages;
@@ -1078,6 +1078,21 @@ export function useVoiceAgent() {
     void saveCompanionSession(userId, isGuest, renamed).catch(() => setSessionError("This conversation could not be saved."));
   }, [isGuest, sessions, userId]);
 
+  const setConversationArchived = useCallback((id: string, archived: boolean) => {
+    if (!userId) return;
+    const current = activeSessionRef.current?.id === id
+      ? activeSessionRef.current
+      : sessions.find((item) => item.id === id);
+    if (!current) return;
+    const changed = { ...current, archived_at: archived ? new Date().toISOString() : null, updated_at: new Date().toISOString() };
+    if (archived && activeSessionRef.current?.id === id) clearConversation();
+    setSessions((items) => [changed, ...items.filter((item) => item.id !== id)]);
+    void saveCompanionSession(userId, isGuest, changed).catch(() => setSessionError("This conversation could not be saved."));
+  }, [clearConversation, isGuest, sessions, userId]);
+
+  const archiveConversation = useCallback((id: string) => setConversationArchived(id, true), [setConversationArchived]);
+  const restoreConversation = useCallback((id: string) => setConversationArchived(id, false), [setConversationArchived]);
+
   const removeConversation = useCallback((id: string) => {
     if (!userId) return;
     if (activeSessionRef.current?.id === id) clearConversation();
@@ -1328,5 +1343,5 @@ export function useVoiceAgent() {
     };
   }, [cleanUpMedia, finalizeProviderSession, stopInputMeter]);
 
-  return { connection, messages, sessions, activeSessionId, sessionError, openConversation, linkResearchSession, renameConversation, removeConversation, partialTranscript, error, dictating, replyPending, start, end, sendText, sendAttachment, clearConversation };
+  return { connection, messages, sessions, activeSessionId, sessionError, openConversation, linkResearchSession, renameConversation, archiveConversation, restoreConversation, removeConversation, partialTranscript, error, dictating, replyPending, start, end, sendText, sendAttachment, clearConversation };
 }
