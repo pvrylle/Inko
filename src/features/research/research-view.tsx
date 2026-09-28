@@ -3,11 +3,7 @@
 import {
   ArrowLeft,
   ArrowRight,
-  Calendar,
-  Clock,
-  FileText,
   FolderOpen,
-  Mic2,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
@@ -62,17 +58,6 @@ export function ResearchView() {
   }, [setActive]);
 
   const shortTitle = (question: string) => (question.length > 52 ? `${question.slice(0, 52).trim()}…` : question);
-
-  const derivedActivity = activeSession
-    ? [
-        { key: "created", tone: "teal", text: "You started this research project", time: relativeTime(activeSession.created_at) },
-        research.sources.length ? { key: "sources", tone: "blue", text: `Inko found ${research.sources.length} relevant source${research.sources.length === 1 ? "" : "s"}.`, time: relativeTime(activeSession.updated_at) } : null,
-        research.contradictions.length ? { key: "contradictions", tone: "coral", text: `Inko identified ${research.contradictions.length} contradiction${research.contradictions.length === 1 ? "" : "s"}.`, time: relativeTime(activeSession.updated_at) } : null,
-        research.findings.length ? { key: "findings", tone: "blue", text: `Inko saved ${research.findings.length} key finding${research.findings.length === 1 ? "" : "s"}.`, time: relativeTime(activeSession.updated_at) } : null,
-        research.openQuestions.length ? { key: "questions", tone: "amber", text: `${research.openQuestions.length} open question${research.openQuestions.length === 1 ? "" : "s"} to explore.`, time: relativeTime(activeSession.updated_at) } : null,
-      ].filter(Boolean)
-    : [];
-  const activity = research.activity.length ? research.activity : derivedActivity;
 
   if (loading && !activeSession) {
     return (
@@ -136,88 +121,46 @@ export function ResearchView() {
 
       {error && <p className="form-error research-error" role="alert">{error}</p>}
 
-      <div className="research-workspace">
-        <div className="research-main-col">
-          <header className="project-header">
-            <span className="project-folder" aria-hidden="true"><FolderOpen size={24} /></span>
-            <div className="project-heading">
-              <h1>{activeSession.title ?? shortTitle(activeSession.question)}</h1>
-              <p>{activeSession.description?.trim() ? activeSession.description : "Inko is helping you gather evidence, weigh findings, and track open questions for this research."}</p>
-              <div className="project-meta">
-                <span className="meta-chip"><Mic2 size={12} /> Research Project</span>
-                <span className="meta-chip"><Calendar size={12} /> Last updated {relativeTime(activeSession.updated_at)}</span>
-                <span className="meta-chip meta-chip-active"><i /> Active</span>
-              </div>
-            </div>
-            <div className="project-mascot">
-              <span className="project-mascot-bubble">I&apos;ve gathered some sources for your research!</span>
-              <InkoMascot state={state} className="project-mascot-inko" fit="contain" />
-            </div>
-          </header>
+      <div className="research-conversation">
+        <header className="research-conversation-header">
+          <span>Research conversation</span>
+          <h1>{activeSession.title ?? shortTitle(activeSession.question)}</h1>
+        </header>
 
-          <ResearchTabs
-            activeSession={activeSession}
-            sources={research.sources}
-            findings={research.findings}
-            contradictions={research.contradictions}
-            openQuestions={research.openQuestions}
-            canvasContent={research.canvasContent}
-            noteMarkdown={research.noteMarkdown}
-            saveCanvas={research.saveCanvas}
-            activeTab={research.activeTab}
-            setActiveTab={research.setActiveTab}
-          />
+        <div className="research-conversation-thread">
+          <div className="research-message research-message-user">
+            <span>You</span>
+            <p>{activeSession.question}</p>
+          </div>
+
+          <section className="research-message research-message-inko" aria-label="Inko research response">
+            <InkoMascot state={state} className="research-message-avatar" fit="cover" />
+            <div className="research-message-body">
+              <div className="research-message-heading"><strong>Inko</strong><span>Updated {relativeTime(activeSession.updated_at)}</span></div>
+              <p>{activeSession.description?.trim() || "I’m gathering sources and organizing what they tell us. Explore the evidence below."}</p>
+              <ResearchTabs
+                activeSession={activeSession}
+                sources={research.sources}
+                findings={research.findings}
+                contradictions={research.contradictions}
+                openQuestions={research.openQuestions}
+                canvasContent={research.canvasContent}
+                noteMarkdown={research.noteMarkdown}
+                saveCanvas={research.saveCanvas}
+                activeTab={research.activeTab}
+                setActiveTab={research.setActiveTab}
+              />
+              {research.activity.length > 0 && (
+                <details className="research-activity">
+                  <summary>Research activity ({research.activity.length})</summary>
+                  <ul>
+                    {research.activity.map((item) => <li key={item.key}><span>{item.text}</span><small>{item.time}</small></li>)}
+                  </ul>
+                </details>
+              )}
+            </div>
+          </section>
         </div>
-
-        <aside className="research-rail" aria-label="Research overview">
-          <article className="rail-card">
-            <div className="rail-card-head">
-              <span className="rail-card-title"><FileText size={15} /> Recent Sources</span>
-              <button className="rail-view-all" onClick={() => research.setActiveTab("sources")} type="button">View all <ArrowRight size={12} /></button>
-            </div>
-            {research.sources.length === 0 ? (
-              <p className="rail-empty">Inko will list gathered sources here.</p>
-            ) : (
-              <ul className="recent-sources-list">
-                {research.sources.slice(0, 4).map((source) => (
-                  <li className="recent-source" key={source.id}>
-                    <span className="recent-source-icon" aria-hidden="true"><FileText size={15} /></span>
-                    <span className="recent-source-body">
-                      <strong>{source.title}</strong>
-                      <small>{source.meta ?? source.type.toUpperCase()}</small>
-                    </span>
-                    <span className="recent-source-tag" data-tag={source.tag}>{source.tag === "supports" ? "Supports" : "Contradicts"}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </article>
-
-          <article className="rail-card">
-            <span className="rail-card-title"><Clock size={15} /> Recent Activity</span>
-            {activity.length === 0 ? (
-              <p className="rail-empty">Your research activity will appear here.</p>
-            ) : (
-              <ul className="recent-activity-list">
-                {activity.map((item) => item && (
-                  <li className="recent-activity" key={item.key}>
-                    <span className="recent-activity-dot" data-tone={item.tone} aria-hidden="true" />
-                    <span className="recent-activity-body"><span>{item.text}</span><small>{item.time}</small></span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </article>
-
-          <article className="rail-card keep-going-card">
-            <span className="keep-going-mascot" aria-hidden="true"><InkoMascot state={state} className="keep-going-inko" fit="cover" /></span>
-            <div className="keep-going-body">
-              <strong>Keep going!</strong>
-              <span>Explore the contradictions or open the full source list.</span>
-            </div>
-            <button className="keep-going-button" onClick={() => research.setActiveTab("contradictions")} type="button" aria-label="Explore contradictions"><ArrowRight size={16} /></button>
-          </article>
-        </aside>
       </div>
     </div>
   );
