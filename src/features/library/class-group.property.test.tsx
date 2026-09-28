@@ -86,7 +86,7 @@ describe("Property 14: File grouping by class", () => {
      */
     fc.assert(
       fc.property(arbClassWithFiles(1, 6), ({ libraryClass, files }) => {
-        const { unmount } = render(
+        const { container, unmount } = render(
           <ClassGroup
             libraryClass={libraryClass}
             files={files}
@@ -94,7 +94,7 @@ describe("Property 14: File grouping by class", () => {
           />,
         );
 
-        const section = screen.getByRole("region");
+        const section = within(container).getByRole("region");
         for (const file of files) {
           expect(within(section).getByText(file.name)).toBeInTheDocument();
         }
@@ -210,7 +210,7 @@ describe("Property 19: Empty class shows indicator", () => {
      */
     fc.assert(
       fc.property(arbLibraryClass, (libraryClass) => {
-        const { unmount } = render(
+        const { container, unmount } = render(
           <ClassGroup
             libraryClass={libraryClass}
             files={[]}
@@ -218,7 +218,7 @@ describe("Property 19: Empty class shows indicator", () => {
           />,
         );
 
-        const section = screen.getByRole("region");
+        const section = within(container).getByRole("region");
 
         // Class name must remain visible even when empty
         expect(within(section).getByText(libraryClass.name)).toBeInTheDocument();

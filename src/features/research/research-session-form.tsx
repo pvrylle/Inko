@@ -7,7 +7,7 @@ import { researchQuestionSchema } from "./research-schema";
 
 type Props = {
   /** Async handler provided by `useResearch()`; called only when validation passes. */
-  createSession: (question: string) => Promise<void>;
+  createSession: (question: string) => Promise<unknown>;
   /** Validation / server error surfaced by the hook (null when none). */
   sessionError: string | null;
 };

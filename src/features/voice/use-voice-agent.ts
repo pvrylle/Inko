@@ -204,6 +204,9 @@ export function useVoiceAgent() {
   const pendingToolsRef = useRef(new Map<string, ToolResult>());
   const latestEventRef = useRef("");
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const recordingRef = useRef<MediaRecorder | null>(null);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
+  const recordingTimeoutRef = useRef<number | null>(null);
   const dictationFinalRef = useRef("");
   const interimRef = useRef("");
   const handsFreeRef = useRef(false);
@@ -577,18 +580,95 @@ export function useVoiceAgent() {
     }
   }, [clearSilenceTimer, dispatch, setPartialTranscript]);
 
+  const startRecording = useCallback(async () => {
+    if (!window.MediaRecorder) {
+      handsFreeRef.current = true;
+      return startDictation();
+    }
+    try {
+      const stream = await acquireMicrophone();
+      recordingStreamRef.current = stream;
+      const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"]
+        .find((type) => MediaRecorder.isTypeSupported(type));
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const chunks: BlobPart[] = [];
+      let failed = false;
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) chunks.push(event.data);
+      };
+      recorder.onerror = () => {
+        failed = true;
+        const message = "Microphone recording failed. Tap to try again.";
+        setError(message);
+        setConnection("error");
+        dispatch({ type: "ERROR", message });
+      };
+      recorder.onstop = () => {
+        if (recordingTimeoutRef.current !== null) window.clearTimeout(recordingTimeoutRef.current);
+        recordingTimeoutRef.current = null;
+        recordingRef.current = null;
+        recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+        recordingStreamRef.current = null;
+        setDictating(false);
+        if (failed) return;
+        void (async () => {
+          const audio = new Blob(chunks, { type: recorder.mimeType });
+          if (!audio.size) throw new Error("No audio was captured. Tap the microphone and try again.");
+          const form = new FormData();
+          form.set("audio", audio, "recording");
+          const response = await inkoFetch("/api/voice/transcribe", { method: "POST", body: form });
+          const result = (await response.json()) as { text?: string };
+          if (!response.ok) throw new Error("Voice transcription failed. Tap the microphone and try again.");
+          const transcript = result.text?.trim();
+          if (!transcript) throw new Error("I couldn't hear any words. Tap the microphone and speak again.");
+          setPartialTranscript("");
+          setConnection("idle");
+          sendTextRef.current(transcript);
+        })().catch((caught: unknown) => {
+          const message = caught instanceof Error ? caught.message : "Voice transcription failed.";
+          setError(message);
+          setConnection("error");
+          dispatch({ type: "ERROR", message });
+        });
+      };
+      recordingRef.current = recorder;
+      recorder.start();
+      recordingTimeoutRef.current = window.setTimeout(() => {
+        if (recorder.state === "recording") {
+          setDictating(false);
+          setConnection("ending");
+          setPartialTranscript("Transcribing your voice…");
+          dispatch({ type: "USER_STOPPED" });
+          recorder.stop();
+        }
+      }, 45_000);
+      setDictating(true);
+      setConnection("connected");
+      dispatch({ type: "USER_STARTED" });
+      return true;
+    } catch (caught) {
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recordingStreamRef.current = null;
+      const message = getVoiceStartErrorMessage(caught);
+      setError(message);
+      setConnection("error");
+      dispatch({ type: "ERROR", message });
+      return false;
+    }
+  }, [dispatch, startDictation]);
+
   const start = useCallback(async () => {
     if (connection === "connecting" || connection === "connected" || dictating) return;
     window.speechSynthesis?.cancel();
     setError(null);
     setConnection("connecting");
 
-    // The live agent only runs on Research. Home answers through browser speech
-    // and the fast chat model, so a question is not left waiting on AssemblyAI.
+    // The live agent only runs on Research. Elsewhere, record in the browser and
+    // transcribe through the server using the configured Gemini key.
     if (!liveVoice) {
-      handsFreeRef.current = true;
+      handsFreeRef.current = false;
       pauseForReplyRef.current = false;
-      startDictation();
+      await startRecording();
       return;
     }
 
@@ -654,7 +734,7 @@ export function useVoiceAgent() {
       setConnection("error");
       dispatch({ type: "ERROR", message });
     }
-  }, [cleanUpMedia, connection, dictating, dispatch, finalizeProviderSession, handleEvent, liveVoice, markReplyPending, send, setAmplitude, startDictation]);
+  }, [cleanUpMedia, connection, dictating, dispatch, finalizeProviderSession, handleEvent, liveVoice, markReplyPending, send, setAmplitude, startDictation, startRecording]);
 
   const resumeListening = useCallback(() => {
     pauseForReplyRef.current = false;
@@ -665,10 +745,20 @@ export function useVoiceAgent() {
     startDictation();
   }, [startDictation]);
 
-  resumeListeningRef.current = resumeListening;
-  startDictationRef.current = startDictation;
+  useEffect(() => {
+    resumeListeningRef.current = resumeListening;
+    startDictationRef.current = startDictation;
+  }, [resumeListening, startDictation]);
 
   const end = useCallback(() => {
+    if (recordingRef.current) {
+      setDictating(false);
+      setConnection("ending");
+      setPartialTranscript("Transcribing your voice…");
+      dispatch({ type: "USER_STOPPED" });
+      recordingRef.current.stop();
+      return;
+    }
     if (handsFreeRef.current || recognitionRef.current) {
       handsFreeRef.current = false;
       pauseForReplyRef.current = false;
@@ -700,9 +790,18 @@ export function useVoiceAgent() {
       setConnection("idle");
       void finalizeProviderSession();
     }
-  }, [cleanUpMedia, clearSilenceTimer, finalizeProviderSession, markReplyPending, send, setPartialTranscript]);
+  }, [cleanUpMedia, clearSilenceTimer, dispatch, finalizeProviderSession, markReplyPending, send, setPartialTranscript]);
 
   const clearConversation = useCallback(() => {
+    if (recordingRef.current) {
+      recordingRef.current.onstop = null;
+      recordingRef.current.stop();
+      recordingRef.current = null;
+    }
+    if (recordingTimeoutRef.current !== null) window.clearTimeout(recordingTimeoutRef.current);
+    recordingTimeoutRef.current = null;
+    recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+    recordingStreamRef.current = null;
     handsFreeRef.current = false;
     pauseForReplyRef.current = false;
     clearSilenceTimer();
@@ -829,6 +928,15 @@ export function useVoiceAgent() {
     window.addEventListener("pagehide", finalizeOnPageHide);
     return () => {
       window.removeEventListener("pagehide", finalizeOnPageHide);
+      if (recordingRef.current) {
+        recordingRef.current.onstop = null;
+        recordingRef.current.stop();
+        recordingRef.current = null;
+      }
+      if (recordingTimeoutRef.current !== null) window.clearTimeout(recordingTimeoutRef.current);
+      recordingTimeoutRef.current = null;
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recordingStreamRef.current = null;
       if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify({ type: "session.end" }));
       try { socketRef.current?.close(); } catch {}
       try { recognitionRef.current?.abort(); } catch {}

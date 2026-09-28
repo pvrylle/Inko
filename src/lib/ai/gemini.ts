@@ -25,6 +25,20 @@ export function getGeminiChatModel() {
   return process.env.GEMINI_CHAT_MODEL?.trim() || "gemini-flash-lite-latest";
 }
 
+/** Transcribe a short browser recording without exposing the API key to the client. */
+export async function transcribeAudio(data: Buffer, mimeType: string) {
+  return withGeminiFallback(async (client) => {
+    const response = await client.models.generateContent({
+      model: getGeminiModel(),
+      contents: [
+        { text: "Transcribe the speech in this audio exactly. Return only the spoken words. If there is no intelligible speech, return an empty response." },
+        { inlineData: { mimeType, data: data.toString("base64") } },
+      ],
+    });
+    return response.text?.trim() ?? "";
+  });
+}
+
 function isRetryableGeminiError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   return /429|500|502|503|504|RESOURCE_EXHAUSTED|UNAVAILABLE|high demand|overloaded/i.test(message);
