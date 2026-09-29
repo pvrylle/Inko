@@ -44,7 +44,7 @@ Without Supabase variables the browser uses isolated localStorage demo data.
 | --- | --- | --- |
 | `GEMINI_API_KEY` | Server only | Primary Gemini key — chat, dictation, notes, flashcards, quizzes, research, and live-voice reasoning. |
 | `GEMINI_API_KEY2` | Server only | Optional backup Gemini key if the primary is rate-limited or exhausted. |
-| `GEMINI_MODEL` | Server only | Defaults to `gemini-flash-latest`. |
+| `GEMINI_MODEL` | Server only | Defaults to `gemini-flash-lite-latest`. |
 | `ASSEMBLYAI_API_KEY` | Server only | **Plan A (optional)** live voice token + session deletion. |
 | `ASSEMBLYAI_AGENT_ID` | Server only | **Plan A (optional)** provisioned Voice Agent ID. |
 | `INKO_PUBLIC_URL` | Server only | Public https origin AssemblyAI calls for Gemini reasoning, for example `https://inko.example.com`. |

@@ -150,13 +150,14 @@ export function useResearch(): UseResearchReturn {
           getResearchNote(userId, sessionId),
         ]);
 
-        setActiveSession(sessionData);
-        setSources(sourcesData);
-        setFindings(findingsData);
-        setContradictions(contradictionsData);
-        setOpenQuestions(openQuestionsData);
-        setCanvasContent(canvasData?.content ?? "");
-        setNoteMarkdown(noteData?.content_markdown ?? "");
+        const project = getLocalResearchProject(userId, sessionId);
+        setActiveSession(sessionData ?? project?.session ?? null);
+        setSources(sourcesData.length > 0 ? sourcesData : project?.sources ?? []);
+        setFindings(findingsData.length > 0 ? findingsData : project?.findings ?? []);
+        setContradictions(contradictionsData.length > 0 ? contradictionsData : project?.contradictions ?? []);
+        setOpenQuestions(openQuestionsData.length > 0 ? openQuestionsData : project?.openQuestions ?? []);
+        setCanvasContent(canvasData?.content || project?.canvas?.content || "");
+        setNoteMarkdown(noteData?.content_markdown || project?.note?.content_markdown || "");
         setActivity([]);
       } catch {
         setError("Failed to load session data.");
@@ -185,17 +186,23 @@ export function useResearch(): UseResearchReturn {
   // ── setActive: pick a session from the sidebar (Requirement 8.3) ────────────
   const setActive = useCallback((id: string, tab?: ResearchTab) => {
     const nextTab = tab ?? "overview";
-    setActiveSession(sessions.find((session) => session.id === id) ?? null);
+    if (id === activeSessionId) {
+      setActiveTab(nextTab);
+      syncResearchUrl(id, nextTab);
+      return;
+    }
+    const project = userId ? getLocalResearchProject(userId, id) : null;
+    setActiveSession(sessions.find((session) => session.id === id) ?? project?.session ?? null);
     setActiveSessionId(id);
-    setSources([]);
-    setFindings([]);
-    setContradictions([]);
-    setOpenQuestions([]);
-    setCanvasContent("");
-    setNoteMarkdown("");
+    setSources(project?.sources ?? []);
+    setFindings(project?.findings ?? []);
+    setContradictions(project?.contradictions ?? []);
+    setOpenQuestions(project?.openQuestions ?? []);
+    setCanvasContent(project?.canvas?.content ?? "");
+    setNoteMarkdown(project?.note?.content_markdown ?? "");
     setActiveTab(nextTab);
     syncResearchUrl(id, nextTab);
-  }, [sessions]);
+  }, [activeSessionId, sessions, userId]);
 
   const startNewProject = useCallback(() => {
     setActiveSessionId(null);

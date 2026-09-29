@@ -17,10 +17,10 @@ export function getGeminiClient() {
 }
 
 export function getGeminiModel() {
-  return process.env.GEMINI_MODEL || "gemini-flash-latest";
+  return process.env.GEMINI_MODEL || "gemini-flash-lite-latest";
 }
 
-/** Home and spoken replies. Study work keeps GEMINI_MODEL. */
+/** Home and spoken replies. Same fast model as study work unless overridden. */
 export function getGeminiChatModel() {
   return process.env.GEMINI_CHAT_MODEL?.trim() || "gemini-flash-lite-latest";
 }
@@ -102,7 +102,7 @@ async function* streamModel(client: GoogleGenAI, model: string, prompt: string) 
   const stream = await client.models.generateContentStream({
     model,
     contents: prompt,
-    config: { maxOutputTokens: 48, temperature: 0.4 },
+    config: { maxOutputTokens: 720, temperature: 0.5 },
   });
   for await (const chunk of stream) {
     if (chunk.text) yield chunk.text;
@@ -119,7 +119,7 @@ export async function generateStudyAnswer(prompt: string) {
         const response = await client.models.generateContent({
           model,
           contents: prompt,
-          config: { maxOutputTokens: 360, temperature: 0.3 },
+          config: { maxOutputTokens: 640, temperature: 0.4 },
         });
         const text = response.text?.trim();
         if (!text) throw new Error("GEMINI_EMPTY_RESPONSE");
@@ -218,7 +218,7 @@ export async function generateGeminiChat(input: {
 }
 
 export async function generateGeminiJson(prompt: string, responseJsonSchema: Record<string, unknown>) {
-  const models = [getGeminiModel(), getGeminiChatModel()].filter((model, index, all) => all.indexOf(model) === index);
+  const models = [getGeminiChatModel(), getGeminiModel()].filter((model, index, all) => all.indexOf(model) === index);
   let lastError: unknown;
   for (const model of models) {
     try {
@@ -230,6 +230,7 @@ export async function generateGeminiJson(prompt: string, responseJsonSchema: Rec
             responseMimeType: "application/json",
             responseJsonSchema,
             temperature: 0.25,
+            maxOutputTokens: 8192,
           },
         });
         const text = response.text?.trim();
@@ -239,7 +240,7 @@ export async function generateGeminiJson(prompt: string, responseJsonSchema: Rec
     } catch (error) {
       lastError = error;
       const message = error instanceof Error ? error.message : "";
-      if (message !== "GEMINI_UNAVAILABLE" && message !== "GEMINI_MODEL_UNAVAILABLE") throw error;
+      if (message !== "GEMINI_UNAVAILABLE" && message !== "GEMINI_MODEL_UNAVAILABLE" && message !== "GEMINI_FAILED") throw error;
     }
   }
   throw lastError instanceof Error ? lastError : new Error("GEMINI_FAILED");

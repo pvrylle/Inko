@@ -78,22 +78,45 @@ async function postTool(path: string, body: Record<string, unknown>) {
 }
 
 export function StudyAnswerText({ text, sources }: { text: string; sources: StudySourceLink[] }) {
-  const parts = text.split(/(\[\d+\])/g);
+  const blocks = text.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean);
+  const paragraphs = blocks.length > 0 ? blocks : [text];
   return (
-    <p>
-      {parts.map((part, index) => {
-        const cite = part.match(/^\[(\d+)\]$/);
-        if (!cite) return <span key={index}>{part}</span>;
-        const source = sources[Number(cite[1]) - 1];
-        if (!source) return <span key={index}>{part}</span>;
-        return (
-          <a key={index} className="study-cite" href={source.url} rel="noopener noreferrer" target="_blank">
-            {cite[1]}
-          </a>
-        );
+    <>
+      {paragraphs.map((block, index) => {
+        const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
+        const isList = lines.length > 1 && lines.every((line) => /^[-*]\s+/.test(line));
+        if (isList) {
+          return (
+            <ul key={index}>
+              {lines.map((line, lineIndex) => (
+                <li key={lineIndex}>{renderStudyInline(line.replace(/^[-*]\s+/, ""), sources)}</li>
+              ))}
+            </ul>
+          );
+        }
+        return <p key={index}>{renderStudyInline(lines.join(" "), sources)}</p>;
       })}
-    </p>
+    </>
   );
+}
+
+function renderStudyInline(text: string, sources: StudySourceLink[]) {
+  const parts = text.split(/(\[\d+\]|\*\*[^*]+\*\*)/g);
+  return parts.map((part, index) => {
+    const cite = part.match(/^\[(\d+)\]$/);
+    if (cite) {
+      const source = sources[Number(cite[1]) - 1];
+      if (!source) return <span key={index}>{part}</span>;
+      return (
+        <a key={index} className="study-cite" href={source.url} rel="noopener noreferrer" target="_blank">
+          {cite[1]}
+        </a>
+      );
+    }
+    const bold = part.match(/^\*\*([^*]+)\*\*$/);
+    if (bold) return <strong key={index}>{bold[1]}</strong>;
+    return <span key={index}>{part}</span>;
+  });
 }
 
 function useStudyToolRunner(answer: VoiceMessage, question: string, sessionId: string | null, onResearchSessionCreated?: (id: string) => void) {

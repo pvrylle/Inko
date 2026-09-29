@@ -4523,6 +4523,12 @@ body {
 .assistant-turn[data-role="student"] .assistant-chat-head { background: var(--workspace-accent); border-color: transparent; color: #fff; }
 .inko-mascot-wrap.assistant-chat-mascot { background: transparent; border: 0; border-radius: 0; flex: 0 0 auto; height: 36px; overflow: visible; width: auto; }
 .assistant-bubble { background: #fff; border: 1px solid var(--workspace-line); border-radius: 16px 16px 16px 4px; max-width: calc(100% - 40px); min-width: 0; padding: 8px 10px; }
+.assistant-bubble p + p,
+.assistant-bubble ul,
+.assistant-bubble p + ul,
+.assistant-bubble ul + p { margin-top: 8px; }
+.assistant-bubble ul { padding-left: 18px; }
+.assistant-bubble li + li { margin-top: 4px; }
 .assistant-turn[data-role="student"] .assistant-bubble { background: #eef3ff; border-color: #d5e3fb; border-radius: 16px 16px 4px 16px; }
 .assistant-turn-speaker { color: var(--workspace-muted); display: block; font-size: 10px; font-weight: 800; letter-spacing: 0.04em; margin-bottom: 3px; text-transform: uppercase; }
 .assistant-turn p, .assistant-turn .study-answer-text { color: var(--workspace-ink); font-size: 13px; line-height: 1.5; margin: 0; overflow-wrap: anywhere; }

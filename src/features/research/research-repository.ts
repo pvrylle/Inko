@@ -69,7 +69,7 @@ export async function createResearchSession(
   const session = payload.session?.id ? payload.session : payload;
   if (!session.id) throw new Error("CREATE_FAILED");
   const project = projectFromPayload(payload, session);
-  if (await usesLocalStudyData()) saveLocalResearchProject(userId, project);
+  saveLocalResearchProject(userId, project);
   return project.session;
 }
 

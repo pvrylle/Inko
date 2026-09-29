@@ -205,7 +205,8 @@ export function HomeChat({ controller, home = false, onClose }: { controller: Vo
       )}
 
       <div className="assistant-composer-area">
-        <ChatSuggestions brief={brief} onSend={(text) => void controller.sendText(text)} />
+        {/* Default nav chips live on the home composer. The panel only shows page-context chips. */}
+        {brief ? <ChatSuggestions brief={brief} onSend={(text) => void controller.sendText(text)} /> : null}
         {!home ? <form className="assistant-composer" onSubmit={submit}>
           <label className="sr-only" htmlFor="assistant-input">Message Inko</label>
           <textarea id="assistant-input" maxLength={4000} onChange={(event) => setDraft(event.target.value)} onKeyDown={onDraftKeyDown} placeholder="Ask or tell Inko anything" rows={2} value={draft} />

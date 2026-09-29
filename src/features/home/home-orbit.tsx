@@ -136,7 +136,12 @@ export function HomeOrbit() {
             {controller?.partialTranscript ? <p aria-live="polite" className="home-live-transcript"><span>{controller.replyPending ? "Inko" : "Listening"}</span> {controller.partialTranscript}</p> : null}
             {controller?.error ? <p className="home-conversation-error" role="status">{controller.error}</p> : null}
             {uploadError ? <p className="home-conversation-error" role="alert">{uploadError}</p> : null}
-            <ChatSuggestions />
+            <ChatSuggestions
+              messages={messages}
+              sessionTitle={activeChat?.title}
+              researchSessionId={activeChat?.research_session_id ?? null}
+              onResearchSessionCreated={(id) => controller?.linkResearchSession(id)}
+            />
             <form className="home-conversation-composer" onSubmit={(event) => void send(event)}>
               {attachment ? <div className="home-attachment"><Paperclip size={16} /><span>{attachment.name}</span><button aria-label="Remove attachment" onClick={() => setAttachment(null)} type="button"><X size={16} /></button></div> : null}
               <label className="sr-only" htmlFor="home-chat-input">Message Inko</label>

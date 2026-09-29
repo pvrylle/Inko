@@ -4,7 +4,7 @@ try { process.loadEnvFile?.(".env.local"); } catch {}
 
 const assemblyKey = process.env.ASSEMBLYAI_API_KEY;
 const geminiKey = process.env.GEMINI_API_KEY;
-const model = process.env.GEMINI_MODEL || "gemini-flash-latest";
+const model = process.env.GEMINI_MODEL || "gemini-flash-lite-latest";
 const existingAgentId = process.env.ASSEMBLYAI_AGENT_ID;
 const publicUrl = process.env.INKO_PUBLIC_URL?.trim().replace(/\/$/, "");
 const brainSecret = process.env.VOICE_BRAIN_SECRET?.trim();

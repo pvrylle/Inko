@@ -30,11 +30,20 @@ function studyPrompt(question: string, sources: StudySource[], history: Array<{ 
   const pageBlock = page
     ? `\n[Student's current page — use for context only, do not repeat verbatim]\n${page.label}\n${page.detail}\n`
     : "";
+  const teaching = `You are Inko, a patient study tutor. Answer like a teacher explaining the idea to a student, not like a search snippet.
+
+- Open with the answer in plain language.
+- Explain why it is true, and define any term a student might not know.
+- Give one concrete example.
+- Close with one line on what to remember.
+- Write two to four short paragraphs, separated by a blank line. Use a short bullet list only when the student asks for steps.
+- If the question is unclear, ask one question and still give the most useful explanation you can.
+- Do not invent citations, paper titles, links, or claim that an app action already happened.`;
   if (sources.length === 0) {
-    return `You are Inko, an AI study companion. Continue the conversation naturally and answer the student's latest message. Ask one concise clarifying question when the topic or requested action is unclear. No sources were found; say so when factual claims need verification. Do not invent citations, paper titles, links, or completed app actions. Keep the answer concise.${pageBlock}\n${context}\nLatest student message: ${question}`;
+    return `${teaching} No sources were found. Teach from well-established knowledge, and say so when a claim still needs a source.${pageBlock}\n${context}\nLatest student message: ${question}`;
   }
   const block = sources.map((source, index) => `[${index + 1}] ${source.title}\n${source.snippet}`).join("\n\n");
-  return `You are Inko, an AI study companion. Continue the conversation naturally. Use the recent conversation for context, but ground factual claims in the sources below. Cite a source inline as [1] or [2]. If sources disagree, say so. If the request is broad or unclear, ask one concise question about scope or preferred sources before a detailed answer. Never claim to have executed an app action unless a tool actually did it. Do not add a link list.${pageBlock}\n${context}\nSources:\n${block}\n\nLatest student message: ${question}`;
+  return `${teaching} Ground factual claims in the sources below and cite them inline as [1] or [2]. If sources disagree, explain the disagreement. Do not add a link list.${pageBlock}\n${context}\nSources:\n${block}\n\nLatest student message: ${question}`;
 }
 
 function guestAddress(request: NextRequest) {

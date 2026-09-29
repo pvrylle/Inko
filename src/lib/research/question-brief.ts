@@ -230,24 +230,100 @@ export function fallbackQuestionBrief(question: string): QuestionBrief {
   };
 }
 
+function clip(value: unknown, max: number) {
+  return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+function normalizeQuestionBrief(raw: unknown, question: string): QuestionBrief {
+  const fallback = fallbackQuestionBrief(question);
+  const data = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+  const sourceItems = Array.isArray(data.sources) ? data.sources : [];
+  const seen = new Set<string>();
+  const sources = sourceItems.slice(0, 6).map((item, index) => {
+    const source = item && typeof item === "object" ? item as Record<string, unknown> : {};
+    const urlText = clip(source.url, 2000);
+    const url = /^https?:\/\//i.test(urlText) ? urlText : null;
+    const tag = source.tag === "contradicts" ? "contradicts" as const : "supports" as const;
+    let key = clip(source.key, 20) || `s${index + 1}`;
+    if (seen.has(key)) key = `s${index + 1}`;
+    seen.add(key);
+    return {
+      key,
+      title: clip(source.title, 200) || `Source ${index + 1}`,
+      url,
+      type: source.type === "url" || source.type === "document" ? source.type : url ? "url" as const : "document" as const,
+      tag,
+      meta: clip(source.meta, 200) || (tag === "contradicts" ? "Counterpoint" : "Evidence"),
+    };
+  }).filter((source) => source.title.length > 0);
+  const mergedSources = (sources.length >= 3 ? sources : [...sources, ...fallback.sources]).slice(0, 6);
+  const keys = mergedSources.map((source) => source.key);
+
+  const findingItems = Array.isArray(data.findings) ? data.findings : [];
+  const findings = findingItems.slice(0, 8).map((item, index) => {
+    const finding = item && typeof item === "object" ? item as Record<string, unknown> : {};
+    const sourceKey = clip(finding.sourceKey ?? finding.source, 20);
+    return {
+      statement: clip(finding.statement ?? finding.text ?? finding.claim, 2000),
+      sourceKey: keys.includes(sourceKey) ? sourceKey : keys[index % keys.length] ?? keys[0],
+    };
+  }).filter((finding) => finding.statement.length > 0);
+  const mergedFindings = (findings.length >= 3 ? findings : [...findings, ...fallback.findings]).slice(0, 8);
+
+  const contradictionItems = Array.isArray(data.contradictions) ? data.contradictions : [];
+  const contradictions = contradictionItems.slice(0, 4).map((item) => {
+    const contradiction = item && typeof item === "object" ? item as Record<string, unknown> : {};
+    const rawKeys = Array.isArray(contradiction.sourceKeys) ? contradiction.sourceKeys : [];
+    const sourceKeys = rawKeys.map((key) => clip(key, 20)).filter((key) => keys.includes(key)).slice(0, 4);
+    return {
+      explanation: clip(contradiction.explanation ?? contradiction.text, 2000),
+      sourceKeys: sourceKeys.length >= 2 ? sourceKeys : keys.slice(0, 2),
+    };
+  }).filter((item) => item.explanation.length > 0 && item.sourceKeys.length >= 2);
+  const mergedContradictions = contradictions.length >= 1
+    ? contradictions
+    : fallback.contradictions.map((item) => ({ explanation: item.explanation, sourceKeys: keys.slice(0, 2) }));
+
+  const questionItems = Array.isArray(data.openQuestions) ? data.openQuestions : [];
+  const openQuestions = questionItems.slice(0, 6).map((item) => {
+    if (typeof item === "string") return { text: clip(item, 500) };
+    const questionItem = item && typeof item === "object" ? item as Record<string, unknown> : {};
+    return { text: clip(questionItem.text ?? questionItem.question, 500) };
+  }).filter((item) => item.text.length > 0);
+  const mergedQuestions = (openQuestions.length >= 2 ? openQuestions : [...openQuestions, ...fallback.openQuestions]).slice(0, 6);
+
+  return {
+    title: clip(data.title, 160) || fallback.title,
+    description: clip(data.description, 1000),
+    noteMarkdown: clip(data.noteMarkdown ?? data.note, 20_000) || fallback.noteMarkdown,
+    sources: mergedSources,
+    findings: mergedFindings,
+    contradictions: mergedContradictions,
+    openQuestions: mergedQuestions,
+  };
+}
+
 export async function generateQuestionBrief(question: string): Promise<QuestionBrief> {
   try {
-    return briefSchema.parse(await generateJson(
-      `You are Inko, a careful research companion. Build a first-pass research brief for this student question.
+    const raw = await generateJson(
+      `You are Inko, a study tutor. Teach this question, then organize the lesson as a research brief.
 
 Rules:
-- Each finding is one sentence a student could defend or challenge.
+- description is two or three sentences that explain the idea in plain language.
+- Each finding is one or two sentences a student could learn from and later defend. Say what is true and why it matters.
 - Give each source a short key like s1. Every finding sourceKey and every contradiction source key must be one of those keys.
 - Tag a source "supports" when it backs the question, or "contradicts" when it pushes the other way.
 - Use well-established public knowledge only. Do not invent paywalled quotes, paper titles, or DOIs. If a URL is not confidently real, set url to null and type to document.
-- Each contradiction names the tension between two or more of those sources in one or two sentences.
-- Open questions are gaps the student could claim: what is still unproven, local, or missing a primary source.
-- noteMarkdown is short study notes with headings, not an essay.
+- Each contradiction explains the disagreement in plain language, in one or two sentences.
+- Open questions are things a curious student would still ask.
+- noteMarkdown is a short lesson with these headings: The idea, Why it matters, An example, What is still debated. Write complete sentences that teach. Do not write an outline or a slogan list.
+- Fill sources, findings, contradictions, open questions, and notes. Do not leave a section empty.
 
 Question:
 ${question}`,
       briefJsonSchema as unknown as Record<string, unknown>,
-    ));
+    );
+    return briefSchema.parse(normalizeQuestionBrief(raw, question));
   } catch {
     return fallbackQuestionBrief(question);
   }
