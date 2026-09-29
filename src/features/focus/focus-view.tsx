@@ -31,6 +31,7 @@ import { focusScenes, defaultSceneId, type FocusScene } from "./focus-scenes";
 import { focusProgress, formatFocusTime } from "./focus-timer";
 import { useDailyGoal, useSelectedScene } from "./use-daily-goal";
 import { useFocusSession } from "./use-focus-session";
+import { usePublishBrief } from "@/features/page-brief/page-brief";
 
 const presets = [15, 25, 45, 60];
 const spring = { type: "spring" as const, stiffness: 240, damping: 24 };
@@ -107,6 +108,8 @@ export function FocusView() {
     setGoalMinutes(goalDraft);
     setEditingGoal(false);
   };
+
+  usePublishBrief(current ? { kind: "focus", label: `Focus: ${current.duration_minutes} minutes`, detail: `The student is in a ${current.duration_minutes}-minute focus session (${current.status}).` } : null);
 
   const breathing = current?.status === "active" && !reduced;
 

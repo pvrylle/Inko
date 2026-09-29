@@ -6,6 +6,7 @@ import { ToastProvider } from "@/features/toast/toast-provider";
 import { AuthModalProvider } from "@/features/auth/auth-modal-provider";
 import { AuthProvider } from "./auth-provider";
 import { ProjectProvider } from "@/features/projects/project-provider";
+import { PageBriefProvider } from "@/features/page-brief/page-brief";
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
@@ -14,7 +15,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         <MascotProvider>
           <AuthModalProvider>
             <ProjectProvider>
-              <VoiceAgentProvider>{children}</VoiceAgentProvider>
+              <PageBriefProvider>
+                <VoiceAgentProvider>{children}</VoiceAgentProvider>
+              </PageBriefProvider>
             </ProjectProvider>
           </AuthModalProvider>
         </MascotProvider>

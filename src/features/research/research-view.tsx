@@ -8,6 +8,7 @@ import { useMascot } from "@/features/mascot/mascot-provider";
 import { ResearchSessionForm } from "./research-session-form";
 import { ResearchTabs } from "./research-tabs";
 import { useResearch } from "./use-research";
+import { usePublishBrief } from "@/features/page-brief/page-brief";
 
 function relativeTime(iso: string) {
   const elapsed = Date.now() - new Date(iso).getTime();
@@ -48,10 +49,13 @@ export function ResearchView() {
     const key = `${sessionFromUrl ?? ""}|${tabFromUrl ?? ""}|${questionFromUrl}`;
     if (appliedParam.current === key) return;
     appliedParam.current = key;
-    const tab = tabFromUrl === "sources" || tabFromUrl === "findings" || tabFromUrl === "contradictions" || tabFromUrl === "canvas" || tabFromUrl === "notes" || tabFromUrl === "open-questions" || tabFromUrl === "overview" ? tabFromUrl : undefined;
+    const tab = tabFromUrl === "sources" || tabFromUrl === "findings" || tabFromUrl === "contradictions" || tabFromUrl === "notes" || tabFromUrl === "open-questions" || tabFromUrl === "overview" ? tabFromUrl : undefined;
     if (sessionFromUrl) setActive(sessionFromUrl, tab);
     else if (questionFromUrl) startNewProject();
   }, [questionFromUrl, sessionFromUrl, setActive, startNewProject, tabFromUrl]);
+
+  const researchQuestion = activeSession?.question?.trim().slice(0, 300) ?? null;
+  usePublishBrief(researchQuestion ? { kind: "research", label: `Research: ${researchQuestion.slice(0, 80)}`, detail: `Research question: ${researchQuestion}` } : null);
 
   return (
     <div className="research-view-page page-enter">

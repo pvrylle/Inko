@@ -2,7 +2,6 @@
 
 import { FileText, GitCompare, HelpCircle, Lightbulb } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
 import type {
   OpenQuestion,
   ResearchContradiction,
@@ -29,12 +28,11 @@ type Props = {
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
-const TABS: { id: ResearchTab; label: string }[] = [
+const TABS: { id: Exclude<ResearchTab, "canvas">; label: string }[] = [
   { id: "overview",       label: "Overview" },
   { id: "sources",        label: "Sources" },
   { id: "findings",       label: "Findings" },
   { id: "contradictions", label: "Contradictions" },
-  { id: "canvas",         label: "Canvas" },
   { id: "notes",          label: "Notes" },
   { id: "open-questions", label: "Open Questions" },
 ];
@@ -321,76 +319,7 @@ function ContradictionsPanel({
   );
 }
 
-/** Canvas tab — free-form textarea auto-saved on change (debounced 400 ms) and on blur (Requirement 8.13). */
-function CanvasPanel({
-  canvasContent,
-  saveCanvas,
-  sessionId,
-}: {
-  canvasContent: string;
-  saveCanvas: (content: string) => Promise<void>;
-  sessionId: string;
-}) {
-  const [value, setValue] = useState(canvasContent);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const savingRef = useRef(false);
-
-  useEffect(() => {
-    // Canvas drafts intentionally synchronize when persisted content or the
-    // active research session changes.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setValue(canvasContent);
-  }, [canvasContent, sessionId]);
-
-  const persist = (text: string) => {
-    if (savingRef.current) return;
-    savingRef.current = true;
-    saveCanvas(text).finally(() => {
-      savingRef.current = false;
-    });
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const text = e.target.value;
-    setValue(text);
-
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => persist(text), 400);
-  };
-
-  const handleBlur = () => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-      debounceRef.current = null;
-    }
-    persist(value);
-  };
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, []);
-
-  return (
-    <div className="research-panel research-canvas-panel">
-      <label className="sr-only" htmlFor="research-canvas">
-        Canvas notes
-      </label>
-      <textarea
-        className="research-canvas-textarea"
-        id="research-canvas"
-        onChange={handleChange}
-        onBlur={handleBlur}
-        placeholder="Write anything here — scratch notes, raw ideas, working hypotheses…"
-        value={value}
-      />
-    </div>
-  );
-}
-
-/** Notes tab — structured markdown display (Requirement 8.14). */
+/** Notes tab — structured markdown the brief writes for this session. */
 function NotesPanel({ session, noteMarkdown }: { session: ResearchSession; noteMarkdown?: string }) {
   return (
     <div className="research-panel research-notes-panel">
@@ -433,9 +362,8 @@ function OpenQuestionsPanel({ openQuestions }: { openQuestions: OpenQuestion[] }
 /**
  * Tabbed interface for a Research Session.
  *
- * Renders 7 tabs in order: Overview, Sources, Findings, Contradictions,
- * Canvas, Notes, Open Questions. Uses WAI-ARIA `tablist` / `tab` /
- * `tabpanel` pattern throughout (Requirements 8.4–8.8, 8.13, 8.14).
+ * Tabs match what a research brief produces: overview, sources, findings,
+ * contradictions, notes, and open questions.
  */
 export function ResearchTabs({
   activeSession,
@@ -443,12 +371,11 @@ export function ResearchTabs({
   findings,
   contradictions,
   openQuestions,
-  canvasContent,
   noteMarkdown,
-  saveCanvas,
   activeTab,
   setActiveTab,
 }: Props) {
+  const shownTab = activeTab === "canvas" ? "overview" : activeTab;
   const panelId = (id: ResearchTab) => `research-panel-${id}`;
   const tabId   = (id: ResearchTab) => `research-tab-${id}`;
 
@@ -465,10 +392,10 @@ export function ResearchTabs({
             key={id}
             id={tabId(id)}
             role="tab"
-            aria-selected={activeTab === id}
+            aria-selected={shownTab === id}
             aria-controls={panelId(id)}
             className="research-tab"
-            data-active={activeTab === id ? "true" : undefined}
+            data-active={shownTab === id ? "true" : undefined}
             onClick={() => setActiveTab(id)}
             type="button"
           >
@@ -484,20 +411,17 @@ export function ResearchTabs({
           id={panelId(id)}
           role="tabpanel"
           aria-labelledby={tabId(id)}
-          hidden={activeTab !== id}
+          hidden={shownTab !== id}
           tabIndex={0}
           className="research-tabpanel"
         >
-          {/* Render only the active panel to avoid wasted work */}
-          {activeTab === id && renderPanel(id, {
+          {shownTab === id && renderPanel(id, {
             activeSession,
             sources,
             findings,
             contradictions,
             openQuestions,
-            canvasContent,
             noteMarkdown,
-            saveCanvas,
             setActiveTab,
           })}
         </div>
@@ -516,11 +440,9 @@ function renderPanel(
     findings,
     contradictions,
     openQuestions,
-    canvasContent,
     noteMarkdown,
-    saveCanvas,
     setActiveTab,
-  }: Omit<Props, "activeTab">,
+  }: Omit<Props, "activeTab" | "canvasContent" | "saveCanvas">,
 ) {
   switch (tab) {
     case "overview":
@@ -543,14 +465,6 @@ function renderPanel(
         <ContradictionsPanel
           contradictions={contradictions}
           sources={sources}
-        />
-      );
-    case "canvas":
-      return (
-        <CanvasPanel
-          canvasContent={canvasContent}
-          saveCanvas={saveCanvas}
-          sessionId={activeSession.id}
         />
       );
     case "notes":

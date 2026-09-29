@@ -694,7 +694,19 @@ a {
 .deck-voice-row { display: flex; flex: 1 1 100%; flex-wrap: wrap; gap: 8px; }
 .deck-voice-row .secondary-button { align-items: center; display: inline-flex; gap: 6px; }
 .flashcard-error { margin: 14px 2px 0; }
-.review-session { margin: 28px auto 0; max-width: 760px; }
+.review-session { margin: 8px auto 0; max-width: 760px; }
+.deck-board { display: grid; gap: 12px; margin-top: 8px; }
+.deck-pick { align-items: flex-start; background: #fff; border: 1px solid var(--color-border); border-radius: 16px; color: var(--color-text); cursor: pointer; display: grid; gap: 6px; min-height: 132px; padding: 16px; text-align: left; }
+.deck-pick:hover { border-color: rgba(115, 87, 246, .35); box-shadow: var(--shadow-card); }
+.deck-pick > span { align-items: center; background: #f0ecff; border-radius: 12px; color: #7257e8; display: flex; height: 36px; justify-content: center; width: 36px; }
+.deck-pick[data-new="true"] { border-style: dashed; }
+.deck-pick[data-new="true"] > span { background: var(--color-accent-soft); color: #168f86; }
+.deck-pick strong { font-size: 15px; letter-spacing: -.02em; line-height: 1.3; }
+.deck-pick small { color: var(--color-text-secondary); font-size: 12px; }
+.card-nav { display: flex; gap: 8px; justify-content: space-between; margin-top: 12px; }
+.card-nav .secondary-button,
+.card-nav .primary-button { align-items: center; display: inline-flex; gap: 4px; }
+.deck-generator > div:first-child .secondary-button { margin-left: auto; }
 .review-progress { align-items: center; color: var(--color-text-secondary); display: flex; font-size: 11px; font-weight: 750; justify-content: space-between; margin: 0 4px 10px; }
 .review-progress span { align-items: center; display: flex; gap: 6px; }
 .review-progress strong { color: var(--color-primary); }
@@ -738,6 +750,7 @@ a {
 .answer-retry { background: transparent; border: 0; color: var(--color-text-secondary); cursor: pointer; display: block; font-size: 10px; font-weight: 750; margin: 12px auto 0; padding: 5px; text-decoration: underline; }
 
 @media (min-width: 680px) {
+  .deck-board { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .deck-generator { padding: 18px 20px; }
   .deck-generator-controls { width: 100%; }
   .flashcard-study { min-height: 275px; padding: 36px; }
@@ -4484,6 +4497,7 @@ body {
 .assistant-panel-header > div:first-child { min-width: 0; }
 .assistant-panel-header strong { display: block; max-width: 175px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .assistant-panel-header span { align-items: center; color: var(--workspace-muted); display: flex; font-size: 11px; gap: 6px; }
+.assistant-panel-brief { color: var(--workspace-accent, var(--color-primary)); font-size: 11px; font-weight: 700; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .assistant-panel-header i { background: #37b9a1; border-radius: 50%; height: 6px; width: 6px; }
 .assistant-panel-header i[data-status="Needs attention"] { background: #d45663; }
 .assistant-panel-actions { display: flex; gap: 3px; }
@@ -4571,8 +4585,9 @@ body {
 .chat-suggestions[data-dragging="true"] { cursor: grabbing; user-select: none; }
 .chat-suggestions[data-dragging="true"] a { pointer-events: none; }
 .chat-suggestions::-webkit-scrollbar { display: none; }
-.chat-suggestions a { background: #fff; border: 1px solid #e3e9f5; border-radius: 999px; color: #3e527f; flex: 0 0 auto; font-size: 12.5px; font-weight: 650; padding: 8px 14px; white-space: nowrap; }
-.chat-suggestions a:hover { border-color: #b9cff6; color: var(--workspace-accent, var(--color-primary)); }
+.chat-suggestions a, .chat-suggestion-btn { background: #fff; border: 1px solid #e3e9f5; border-radius: 999px; color: #3e527f; cursor: pointer; flex: 0 0 auto; font-size: 12.5px; font-weight: 650; padding: 8px 14px; text-decoration: none; white-space: nowrap; }
+.chat-suggestions a:hover, .chat-suggestion-btn:hover { border-color: #b9cff6; color: var(--workspace-accent, var(--color-primary)); }
+.chat-suggestions[data-dragging="true"] .chat-suggestion-btn { pointer-events: none; }
 .assistant-composer-area .chat-suggestions { margin: 0 0 8px; max-width: none; }
 .home-live-transcript, .home-conversation-error { color: var(--workspace-muted); font-size: 12px; line-height: 1.45; margin: 0 auto 8px; max-width: 740px; overflow-wrap: anywhere; }
 .home-live-transcript span { color: var(--workspace-accent); font-weight: 700; margin-right: 6px; }

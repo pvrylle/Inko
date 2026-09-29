@@ -1,6 +1,6 @@
 "use client";
 
-import { Brain, CalendarClock, CheckCircle2, Flame, Layers3, Mic, RotateCcw, Sparkles, Square, Upload, Volume2 } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Flame, Layers3, Mic, Plus, RotateCcw, Sparkles, Square, Upload, Volume2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { inkoFetch } from "@/lib/auth/api-client";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -9,13 +9,13 @@ import { useMascot } from "@/features/mascot/mascot-provider";
 import { generateNoteFromContent } from "@/features/notes/notes-repository";
 import { useNotes } from "@/features/notes/use-notes";
 import { useToasts } from "@/features/toast/toast-provider";
-import { PageVoiceControl } from "@/features/voice/page-voice-control";
 import { usesLocalStudyData } from "@/lib/data/local-study";
 import { upsertLocalRecord } from "@/lib/data/local-store";
 import type { Flashcard, Note, StudyRating } from "@/lib/data/models";
 import { topicToNote } from "@/lib/study/topic-note";
 import { commitFlashcardReview, generateFlashcards } from "./flashcards-repository";
 import { useFlashcards } from "./use-flashcards";
+import { usePublishBrief } from "@/features/page-brief/page-brief";
 
 const ratings: { value: StudyRating; label: string; hint: string }[] = [
   { value: "again", label: "Again", hint: "Forgot" },
@@ -24,24 +24,17 @@ const ratings: { value: StudyRating; label: string; hint: string }[] = [
   { value: "easy", label: "Easy", hint: "Effortless" },
 ];
 
-function nextDueDescription(card: Flashcard, now: number) {
-  const diffMs = Date.parse(card.due) - now;
-  if (diffMs <= 0) return "Due now";
-  const minutes = Math.round(diffMs / 60_000);
-  if (minutes < 60) return `Due in ${minutes}m`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `Due in ${hours}h`;
-  const days = Math.round(hours / 24);
-  return `Due in ${days}d`;
-}
 
 export function FlashcardsView() {
-  const { notes, loading: notesLoading } = useNotes();
+  const { notes } = useNotes();
   const { flashcards, loading, error, reload, userId } = useFlashcards();
   const { celebrate: mascotCelebrate, dispatch } = useMascot();
   const { celebrate } = useToasts();
-  const [deckChoice, setDeckChoice] = useState("new");
   const [topic, setTopic] = useState("");
+  const [making, setMaking] = useState(false);
+  const [reviewNoteId, setReviewNoteId] = useState<string | null>(null);
+  const [queue, setQueue] = useState<string[]>([]);
+  const [cardCursor, setCardCursor] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [practiceWithInko, setPracticeWithInko] = useState(false);
   const [reading, setReading] = useState(false);
@@ -57,11 +50,6 @@ export function FlashcardsView() {
   const audioInputRef = useRef<HTMLInputElement>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [reviewClock, setReviewClock] = useState(() => Date.now());
-  const [todayEndsAt] = useState(() => {
-    const date = new Date();
-    date.setHours(23, 59, 59, 999);
-    return date.getTime();
-  });
 
   useEffect(() => {
     const interval = window.setInterval(() => setReviewClock(Date.now()), 15_000);
@@ -80,17 +68,29 @@ export function FlashcardsView() {
     };
   }, []);
 
-  const dueCards = useMemo(() => flashcards.filter((card) => Date.parse(card.due) <= reviewClock), [flashcards, reviewClock]);
-  const upcomingCards = useMemo(
-    () => flashcards.filter((card) => Date.parse(card.due) > reviewClock).sort((a, b) => Date.parse(a.due) - Date.parse(b.due)).slice(0, 4),
-    [flashcards, reviewClock],
-  );
-  const activeCard = dueCards[0] ?? null;
-  const selectedNote = notes.find((note) => note.id === deckChoice) ?? null;
-  const dueToday = flashcards.filter((card) => Date.parse(card.due) <= todayEndsAt).length;
-  const learning = flashcards.filter((card) => card.state === 1 || card.state === 3).length;
-  const mastered = flashcards.filter((card) => card.state === 2 && card.stability >= 21).length;
-  const masteredPercent = flashcards.length ? Math.round((mastered / flashcards.length) * 100) : 0;
+  const decks = useMemo(() => {
+    const groups = new Map<string, Flashcard[]>();
+    for (const card of flashcards) {
+      const list = groups.get(card.note_id) ?? [];
+      list.push(card);
+      groups.set(card.note_id, list);
+    }
+    return [...groups.entries()].map(([noteId, cards]) => {
+      const note = notes.find((item) => item.id === noteId);
+      const ordered = [...cards].sort((a, b) => Date.parse(a.due) - Date.parse(b.due));
+      return {
+        noteId,
+        title: note?.title || "Deck",
+        cards: ordered,
+        due: ordered.filter((card) => Date.parse(card.due) <= reviewClock).length,
+      };
+    });
+  }, [flashcards, notes, reviewClock]);
+  const activeCard = flashcards.find((card) => card.id === queue[cardCursor]) ?? null;
+  const reviewDeck = decks.find((deck) => deck.noteId === reviewNoteId) ?? null;
+
+  const flashBriefLabel = reviewDeck?.title || (topic.trim().length >= 8 ? topic.trim() : null);
+  usePublishBrief(flashBriefLabel ? { kind: "flashcards", label: `Flashcards: ${flashBriefLabel.slice(0, 80)}`, detail: `The student is reviewing flashcards: ${flashBriefLabel}.` } : null);
 
   if ((activeCard?.id ?? null) !== activeCardKey) {
     setActiveCardKey(activeCard?.id ?? null);
@@ -145,7 +145,24 @@ export function FlashcardsView() {
       }
       return generateNoteFromContent(userId, prompt, kind);
     }
-    return deckChoice === "new" ? null : selectedNote;
+    return null;
+  };
+
+  const openDeck = (noteId: string, cards: Flashcard[]) => {
+    setMaking(false);
+    setReviewNoteId(noteId);
+    setQueue(cards.map((card) => card.id));
+    setCardCursor(0);
+    setFlipped(false);
+    setPracticeWithInko(false);
+  };
+
+  const leaveReview = () => {
+    setReviewNoteId(null);
+    setQueue([]);
+    setCardCursor(0);
+    setFlipped(false);
+    setPracticeWithInko(false);
   };
 
   const transcribeAudio = async (audio: Blob) => {
@@ -224,6 +241,9 @@ export function FlashcardsView() {
       const generatedCards = await generateFlashcards(userId, note);
       await reload();
       setReviewClock((current) => Math.max(current, ...generatedCards.map((card) => Date.parse(card.due))));
+      openDeck(note.id, generatedCards);
+      setTopic("");
+      setSource("");
       mascotCelebrate("Your new cards are ready!");
       celebrate("Deck ready", `${generatedCards.length} card${generatedCards.length === 1 ? "" : "s"} from ${note.title}`);
     } catch (caught) {
@@ -241,6 +261,7 @@ export function FlashcardsView() {
     try {
       const result = await commitFlashcardReview(userId, activeCard, rating, "", null);
       setFlipped(false);
+      setCardCursor((index) => Math.min(queue.length - 1, index + 1));
       await reload();
       setReviewClock(Date.parse(result.review.reviewed_at));
       if (rating === "good" || rating === "easy") {
@@ -261,70 +282,22 @@ export function FlashcardsView() {
 
   return (
     <div className="content-page page-enter">
-      <PageHeading eyebrow="Remember for longer" title="Flashcards" description="Type a topic, paste notes, or speak them. AssemblyAI transcribes your voice, then you can flip each card or let Inko read it aloud." action={<PageVoiceControl />} />
-
-      <div className="stat-strip" aria-label="Flashcard statistics">
-        <span><strong>{dueToday}</strong><small>Due today</small></span>
-        <span><strong>{learning}</strong><small>Learning</small></span>
-        <span><strong>{mastered}</strong><small>Mastered</small></span>
-      </div>
-
-      {flashcards.length > 0 && (
-        <div className="mastery-ring" role="progressbar" aria-label="Mastered percentage" aria-valuenow={masteredPercent} aria-valuemin={0} aria-valuemax={100} style={{ ["--mastery-progress" as string]: `${masteredPercent}%` }}>
-          <div>
-            <strong>{masteredPercent}%</strong>
-            <small>Mastered</small>
-          </div>
-        </div>
-      )}
-
-      <section className="deck-generator" aria-label="Create a flashcard deck">
-        <div><span className="deck-generator-icon"><Sparkles size={19} /></span><div><h2>Make a deck</h2><p>Use a saved note, type the ideas, or record them. AssemblyAI turns the audio into notes before the cards are made.</p></div></div>
-        <div className="deck-generator-controls">
-          <label className="deck-choice-field">
-            <span>Deck</span>
-            <select aria-label="Deck" onChange={(event) => setDeckChoice(event.target.value)} value={deckChoice}>
-              <option value="new">Create a new deck</option>
-              {!notesLoading && notes.map((note) => <option key={note.id} value={note.id}>{note.title}</option>)}
-            </select>
-          </label>
-          <label className="topic-field">
-            <span className="sr-only">Study topic</span>
-            <input onChange={(event) => setTopic(event.target.value)} placeholder="Topic, e.g. mitosis checkpoints" value={topic} />
-          </label>
-          <label className="deck-source-field">
-            <span className="sr-only">Notes to turn into cards</span>
-            <textarea className="deck-source" maxLength={8000} onChange={(event) => { setSource(event.target.value); setSourceKind("text"); }} placeholder="Or paste notes, or record them below" rows={4} value={source} />
-          </label>
-          <div className="deck-voice-row">
-            <button className="secondary-button" disabled={working !== null} onClick={() => recording ? stopRecording() : void startRecording()} type="button">
-              {recording ? <Square size={15} /> : <Mic size={15} />}
-              {recording ? "Stop and transcribe" : working === "transcribe" ? "Transcribing…" : "Record with AssemblyAI"}
-            </button>
-            <button className="secondary-button" disabled={working !== null || recording} onClick={() => audioInputRef.current?.click()} type="button"><Upload size={15} /> Upload audio</button>
-            <input accept="audio/webm,audio/mp4,audio/ogg,.webm,.mp4,.m4a,.ogg" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void transcribeAudio(file); }} ref={audioInputRef} type="file" />
-            <button className="primary-button" disabled={working !== null || recording} onClick={() => void createCards()} type="button">{working === "generate" ? "Creating deck…" : "Create deck"}</button>
-          </div>
-        </div>
-      </section>
+      <PageHeading eyebrow="Remember for longer" title="Flashcards" description="Pick a topic deck to review, or make a new one. Next moves through that deck, and Inko can read each card aloud." />
 
       {(error || formError) && <p className="form-error flashcard-error" role="alert">{formError || error}</p>}
 
-      {!loading && flashcards.length === 0 ? (
-        <EmptyState icon={Layers3} title="No cards yet" message="Choose a note, type the ideas, or record them. AssemblyAI transcribes the audio, then Inko turns the key ideas into a deck." />
-      ) : !loading && !activeCard ? (
-        <EmptyState icon={CheckCircle2} title="You are caught up" message="Nothing is due right now. FSRS will bring each idea back when reviewing helps most." />
-      ) : activeCard ? (
+      {reviewNoteId && activeCard ? (
         <section className="review-session" aria-label="Flashcard review">
           <div className="review-progress">
-            <span><Brain size={17} /> Review queue</span>
+            <button className="secondary-button card-read-button" onClick={leaveReview} type="button"><ArrowLeft size={14} /> Decks</button>
             <div className="review-progress-meta">
+              <strong>{reviewDeck?.title}</strong>
+              <span>{cardCursor + 1} of {queue.length}</span>
               <button aria-pressed={practiceWithInko} className="secondary-button card-read-button" onClick={() => setPracticeWithInko((on) => !on)} type="button">
                 {practiceWithInko ? <Square size={14} /> : <Volume2 size={14} />}
                 {practiceWithInko ? "Stop Inko" : "Practice with Inko"}
               </button>
               {sessionStreak > 1 && <span className="streak-chip"><Flame size={13} /> {sessionStreak} in a row</span>}
-              <strong>{dueCards.length} due now</strong>
             </div>
           </div>
           <div className="flashcard-flip" data-flipped={flipped}>
@@ -340,29 +313,60 @@ export function FlashcardsView() {
               <button className="flip-hint" onClick={() => setFlipped(false)} type="button"><RotateCcw size={13} /> Back to question</button>
             </article>
           </div>
-
+          <div className="card-nav">
+            <button className="secondary-button" disabled={cardCursor === 0} onClick={() => { setCardCursor((index) => Math.max(0, index - 1)); setFlipped(false); }} type="button"><ChevronLeft size={16} /> Previous</button>
+            <button className="primary-button" disabled={cardCursor >= queue.length - 1} onClick={() => { setCardCursor((index) => Math.min(queue.length - 1, index + 1)); setFlipped(false); }} type="button">Next <ChevronRight size={16} /></button>
+          </div>
           {reading ? <p className="card-read-status" role="status">Inko is reading this card.</p> : null}
           <p className="rating-prompt">How well did you remember it?</p>
           <div className="rating-grid">
             {ratings.map((rating) => <button key={rating.value} className="rating-button" disabled={working !== null} onClick={() => void confirmRating(rating.value)} type="button"><strong>{rating.label}</strong><small>{rating.hint}</small></button>)}
           </div>
         </section>
-      ) : null}
-
-      {upcomingCards.length > 0 && (
-        <section className="upcoming-cards" aria-label="Upcoming reviews">
-          <div className="section-title-row">
-            <div><p className="eyebrow">Coming up</p><h2>Next reviews</h2></div>
-            <span className="upcoming-meta"><CalendarClock size={14} /> FSRS scheduled</span>
+      ) : making ? (
+        <section className="deck-generator" aria-label="Create a flashcard deck">
+          <div>
+            <span className="deck-generator-icon"><Sparkles size={19} /></span>
+            <div><h2>New deck</h2><p>Type a topic, paste notes, or record them. AssemblyAI turns the audio into cards.</p></div>
+            <button className="secondary-button card-read-button" onClick={() => setMaking(false)} type="button">Cancel</button>
           </div>
-          <ol className="upcoming-list">
-            {upcomingCards.map((card) => (
-              <li key={card.id}>
-                <span className="upcoming-front">{card.front}</span>
-                <span className="upcoming-due">{nextDueDescription(card, reviewClock)}</span>
-              </li>
+          <div className="deck-generator-controls">
+            <label className="topic-field">
+              <span className="sr-only">Study topic</span>
+              <input onChange={(event) => setTopic(event.target.value)} placeholder="Topic, e.g. mitosis checkpoints" value={topic} />
+            </label>
+            <label className="deck-source-field">
+              <span className="sr-only">Notes to turn into cards</span>
+              <textarea className="deck-source" maxLength={8000} onChange={(event) => { setSource(event.target.value); setSourceKind("text"); }} placeholder="Or paste notes, or record them below" rows={4} value={source} />
+            </label>
+            <div className="deck-voice-row">
+              <button className="secondary-button" disabled={working !== null} onClick={() => recording ? stopRecording() : void startRecording()} type="button">
+                {recording ? <Square size={15} /> : <Mic size={15} />}
+                {recording ? "Stop and transcribe" : working === "transcribe" ? "Transcribing…" : "Record with AssemblyAI"}
+              </button>
+              <button className="secondary-button" disabled={working !== null || recording} onClick={() => audioInputRef.current?.click()} type="button"><Upload size={15} /> Upload audio</button>
+              <input accept="audio/webm,audio/mp4,audio/ogg,.webm,.mp4,.m4a,.ogg" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void transcribeAudio(file); }} ref={audioInputRef} type="file" />
+              <button className="primary-button" disabled={working !== null || recording} onClick={() => void createCards()} type="button">{working === "generate" ? "Creating deck…" : "Create deck"}</button>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section aria-label="Choose a deck">
+          {!loading && decks.length === 0 ? <EmptyState icon={Layers3} title="No decks yet" message="Create a deck from a topic, notes, or a recording." /> : null}
+          <div className="deck-board">
+            <button className="deck-pick" data-new="true" onClick={() => setMaking(true)} type="button">
+              <span><Plus size={18} /></span>
+              <strong>New deck</strong>
+              <small>Topic, notes, or audio</small>
+            </button>
+            {decks.map((deck) => (
+              <button className="deck-pick" key={deck.noteId} onClick={() => openDeck(deck.noteId, deck.cards)} type="button">
+                <span><Layers3 size={18} /></span>
+                <strong>{deck.title}</strong>
+                <small>{deck.cards.length} card{deck.cards.length === 1 ? "" : "s"}{deck.due > 0 ? ` · ${deck.due} due` : ""}</small>
+              </button>
             ))}
-          </ol>
+          </div>
         </section>
       )}
     </div>

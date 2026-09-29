@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 
-const suggestions = [
-  { label: "What should I study today?", href: "/flashcards" },
+const defaultSuggestions = [
+  { label: "What should I study today?", href: "/practice" },
   { label: "Research AI tutors", href: "/research?question=How%20do%20AI%20tutors%20affect%20student%20learning%3F" },
   { label: "Debate a claim", href: "/debate?mode=debate" },
   { label: "Quiz me", href: "/quiz" },
@@ -12,9 +12,21 @@ const suggestions = [
   { label: "Start a focus session", href: "/focus" },
 ] as const;
 
-export function ChatSuggestions() {
+type PageBriefKind = "debate" | "research" | "quiz" | "flashcards" | "focus";
+type PageBriefLike = { kind: PageBriefKind; label: string } | null;
+
+const contextChips: Record<PageBriefKind, string[]> = {
+  debate: ["Help me answer this", "Find a source for this claim", "Summarize the other side"],
+  research: ["What is still unclear?", "Summarize the evidence", "What should I investigate next?"],
+  quiz: ["Quiz me on this", "Explain the hard part", "Give me a hint"],
+  flashcards: ["Quiz me on this", "Explain the hard part", "Add more cards on this"],
+  focus: ["What should I work on?", "Suggest a study plan", "How am I doing today?"],
+};
+
+export function ChatSuggestions({ brief, onSend }: { brief?: PageBriefLike | null; onSend?: (text: string) => void }) {
   const scroller = useRef<HTMLDivElement>(null);
   const drag = useRef({ pointer: -1, x: 0, left: 0, moved: false });
+  const chips = brief ? contextChips[brief.kind] : null;
 
   useEffect(() => {
     const el = scroller.current;
@@ -79,9 +91,13 @@ export function ChatSuggestions() {
       onPointerUp={endDrag}
       ref={scroller}
     >
-      {suggestions.map((item) => (
-        <Link href={item.href} key={item.label}>{item.label}</Link>
-      ))}
+      {chips
+        ? chips.map((label) => (
+          <button className="chat-suggestion-btn" key={label} onClick={() => onSend?.(label)} type="button">{label}</button>
+        ))
+        : defaultSuggestions.map((item) => (
+          <Link href={item.href} key={item.label}>{item.label}</Link>
+        ))}
     </div>
   );
 }

@@ -202,7 +202,7 @@ function useStudyToolRunner(answer: VoiceMessage, question: string, sessionId: s
         const markdown = [`# Study answer`, "", answer.text, "", "## Sources", ...sources.map((source, index) => `${index + 1}. [${source.title}](${source.url})`)].join("\n");
         await upsertCanvasNote(userId, sessionId, markdown);
         showToast({ tone: "success", title: "Added to the canvas" });
-        router.push(`/research?session=${sessionId}&tab=canvas`);
+        router.push(`/research?session=${sessionId}`);
         return;
       }
       showToast({ tone: "success", title: "Research project opened" });

@@ -13,6 +13,7 @@ import { upsertLocalRecord } from "@/lib/data/local-store";
 import type { Note, QuizAnswerResult } from "@/lib/data/models";
 import { topicToNote } from "@/lib/study/topic-note";
 import { generateQuiz, submitQuizAnswer } from "./quizzes-repository";
+import { usePublishBrief } from "@/features/page-brief/page-brief";
 import { useQuizzes } from "./use-quizzes";
 
 const optionLetters = ["A", "B", "C", "D"];
@@ -40,6 +41,9 @@ export function QuizzesView() {
   const currentQuestion = resultQuestion ?? activeQuestions.find((question) => !attemptedIds.has(question.id)) ?? null;
   const score = activeAttempts.filter((attempt) => attempt.correct).length;
   const complete = Boolean(activeQuiz && activeQuestions.length > 0 && activeAttempts.length === activeQuestions.length && !result);
+
+  const quizBriefLabel = activeQuiz?.title || (topic.trim().length >= 8 ? topic.trim() : null);
+  usePublishBrief(quizBriefLabel ? { kind: "quiz", label: `Quiz: ${quizBriefLabel.slice(0, 80)}`, detail: `The student is working on a quiz: ${quizBriefLabel}.` } : null);
 
   const resolveNote = async (): Promise<Note | null> => {
     const prompt = topic.trim();

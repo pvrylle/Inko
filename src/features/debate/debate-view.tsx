@@ -9,6 +9,7 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { useOptionalProjects } from "@/features/projects/project-provider";
 import { listContradictions, listFindings, listSources } from "@/features/research/research-repository";
 import { inkoFetch } from "@/lib/auth/api-client";
+import { usePublishBrief } from "@/features/page-brief/page-brief";
 
 export type DebateMode = "debate" | "socratic" | "defense";
 
@@ -86,6 +87,11 @@ export function DebateView({
     });
     return () => { cancelled = true; };
   }, [sessionId, userId]);
+
+  const debateDetail = started
+    ? `Mode: ${mode}. Claim: ${position.slice(0, 300)}.\n\nRecent turns:\n${turns.slice(-4).map((turn) => `${turn.role === "student" ? "Student" : "Inko"}: ${turn.text}`).join("\n")}`.slice(0, 2000)
+    : null;
+  usePublishBrief(started ? { kind: "debate", label: `Debating: ${position.slice(0, 80)}`, detail: debateDetail ?? "" } : null);
 
   const begin = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

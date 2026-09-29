@@ -15,6 +15,7 @@ import { conversationTitleFromMessages } from "@/lib/chat/conversation-title";
 import { deleteCompanionSession, getCompanionSessionSyncIssue, listCompanionSessions, makeCompanionSession, saveCompanionSession, subscribeToCompanionSessions, type CompanionSession } from "@/lib/data/companion-sessions";
 import { executeVoiceTool } from "./voice-tools";
 import type { StudySourceLink, ToolCall, VoiceConnectionState, VoiceMessage, VoiceServerEvent } from "./voice-types";
+import { usePageBrief } from "@/features/page-brief/page-brief";
 
 type TokenResponse = { token: string; agentId: string; voiceSessionId: string; maxSessionDurationSeconds: number; error?: string; message?: string };
 type ToolResult = { callId: string; result: string; isError: boolean };
@@ -241,6 +242,7 @@ export function useVoiceAgent() {
   const router = useRouter();
   const projects = useOptionalProjects();
   const pathname = usePathname() ?? "";
+  const { brief } = usePageBrief();
   // The signed-in companion can use its supported tools from Home or Research.
   const liveVoice = !isGuest && (pathname === "/" || pathname.startsWith("/research"));
   const { dispatch, setAmplitude, celebrate } = useMascot();
@@ -1363,7 +1365,10 @@ export function useVoiceAgent() {
       return;
     }
     if (socketRef.current?.readyState === WebSocket.OPEN && readyRef.current) {
-      send({ type: "conversation.message", role: "user", content: trimmed });
+      const liveContent = brief
+        ? `${trimmed}\n\n[Context: The student is currently on the ${brief.label} page. ${brief.detail}]`
+        : trimmed;
+      send({ type: "conversation.message", role: "user", content: liveContent });
       send({ type: "reply.create" });
       dispatch({ type: "USER_STOPPED" });
       return;
@@ -1374,7 +1379,11 @@ export function useVoiceAgent() {
     try {
       response = await inkoFetch("/api/chat", {
         method: "POST",
-        body: JSON.stringify({ message: trimmed, history: messagesRef.current.slice(-12, -1).map(({ role, text }) => ({ role, text })) }),
+        body: JSON.stringify({
+          message: trimmed,
+          history: messagesRef.current.slice(-12, -1).map(({ role, text }) => ({ role, text })),
+          ...(brief ? { page: { kind: brief.kind, label: brief.label, detail: brief.detail } } : {}),
+        }),
         signal: AbortSignal.timeout(22_000),
       });
     } catch {

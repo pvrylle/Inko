@@ -10,6 +10,7 @@ import { VoiceCapsule } from "@/features/voice/voice-capsule";
 import type { VoiceAgentController } from "@/features/voice/voice-agent-provider";
 import type { VoiceMessage } from "@/features/voice/voice-types";
 import { ChatSuggestions } from "./chat-suggestions";
+import { usePageBrief } from "@/features/page-brief/page-brief";
 import { AnswerToolIcons, StudyAnswerText } from "./study-answer-card";
 
 function questionBefore(messages: VoiceMessage[], index: number) {
@@ -69,6 +70,7 @@ export function HomeChat({ controller, home = false, onClose }: { controller: Vo
   const active = controller.sessions.find((session) => session.id === activeSessionId);
   const visibleSessions = controller.sessions.filter((session) => !session.archived_at && (!projects?.activeId || projects.conversationProjects[session.id] === projects.activeId));
   const { partialTranscript, spokenCaption, replySpeaking } = controller;
+  const { brief } = usePageBrief();
   const status = error ? "Needs attention" : replySpeaking ? "Speaking" : replyPending ? "Thinking" : controller.connection === "connected" ? "Listening" : "Ready";
 
   useEffect(() => {
@@ -101,7 +103,11 @@ export function HomeChat({ controller, home = false, onClose }: { controller: Vo
   return (
     <section className="assistant-panel" aria-label="Inko assistant">
       <header className="assistant-panel-header">
-        <div><strong title={active?.title || "Inko"}>{active?.title || "Inko"}</strong><span><i data-status={status} />{status}</span></div>
+        <div>
+          <strong title={active?.title || "Inko"}>{active?.title || "Inko"}</strong>
+          {brief ? <span className="assistant-panel-brief">{brief.label}</span> : null}
+          <span><i data-status={status} />{status}</span>
+        </div>
         <div className="assistant-panel-actions">
           <button aria-label={historyOpen ? "Hide conversations" : "Show conversations"} aria-expanded={historyOpen} onClick={() => setHistoryOpen((open) => !open)} title="Conversations" type="button"><History size={18} /></button>
           <button aria-label="New conversation" onClick={newConversation} title="New conversation" type="button"><Plus size={18} /></button>
@@ -199,7 +205,7 @@ export function HomeChat({ controller, home = false, onClose }: { controller: Vo
       )}
 
       <div className="assistant-composer-area">
-        <ChatSuggestions />
+        <ChatSuggestions brief={brief} onSend={(text) => void controller.sendText(text)} />
         {!home ? <form className="assistant-composer" onSubmit={submit}>
           <label className="sr-only" htmlFor="assistant-input">Message Inko</label>
           <textarea id="assistant-input" maxLength={4000} onChange={(event) => setDraft(event.target.value)} onKeyDown={onDraftKeyDown} placeholder="Ask or tell Inko anything" rows={2} value={draft} />

@@ -21,7 +21,7 @@ export function CanvasView() {
       ) : (
         <div className="source-collection-grid">
           {sessions.map((session) => (
-            <Link className="source-collection" href={`/research?session=${session.id}&tab=canvas`} key={session.id}>
+            <Link className="source-collection" href={`/research?session=${session.id}`} key={session.id}>
               <span className="source-collection-icon" data-tone="purple"><LayoutGrid size={18} /></span>
               <div><strong>{session.question}</strong><small>Open canvas</small></div>
               <ArrowRight size={15} />
