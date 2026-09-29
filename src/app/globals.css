@@ -4687,14 +4687,17 @@ body {
 .home-conversation-messages { display: flex; flex-direction: column; gap: 22px; margin: 0 auto; max-width: 740px; padding: 20px 0 30px; }
 .home-conversation-message { color: var(--workspace-ink); max-width: 100%; }
 .home-conversation-message[data-role="student"] { align-self: flex-end; background: var(--workspace-accent-soft); border-radius: 8px; max-width: 85%; padding: 13px 16px; }
+.home-conversation-message[data-role="student"][data-editing="true"] { align-self: stretch; margin-left: auto; max-width: 100%; width: 100%; }
 .home-message-head { align-items: center; display: flex; gap: 8px; justify-content: space-between; margin-bottom: 7px; }
 .home-message-head > span, .home-message-head .assistant-turn-speaker { color: var(--workspace-muted); display: block; font-size: 11px; font-weight: 700; margin: 0; }
 .home-message-edit { align-items: center; background: transparent; border: 0; color: var(--workspace-muted); cursor: pointer; display: inline-flex; font-size: 11px; font-weight: 700; gap: 4px; padding: 0; }
 .home-message-edit:hover { color: var(--workspace-accent); }
-.student-message-edit { display: flex; flex-direction: column; gap: 8px; }
-.student-message-edit textarea { background: #fff; border: 1px solid var(--workspace-line); border-radius: 8px; color: var(--workspace-ink); font: inherit; font-size: 14px; line-height: 1.5; min-height: 88px; padding: 10px 12px; resize: vertical; width: 100%; }
+.student-message-edit { display: flex; flex-direction: column; gap: 8px; min-width: 0; width: 100%; }
+.student-message-edit textarea { background: #fff; border: 1px solid var(--workspace-line); border-radius: 8px; box-sizing: border-box; color: var(--workspace-ink); display: block; font: inherit; font-size: 14px; line-height: 1.6; max-height: 360px; min-height: 120px; overflow-y: auto; padding: 12px 14px; resize: none; width: 100%; }
 .student-message-edit textarea:focus { border-color: var(--workspace-accent); outline: 0; box-shadow: 0 0 0 2px var(--workspace-accent-soft); }
 .student-message-edit-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.assistant-turn[data-editing="true"] { width: 100%; }
+.assistant-turn[data-editing="true"] .assistant-bubble { flex: 1; max-width: calc(100% - 40px); width: 100%; }
 .home-conversation-message p, .home-conversation-message .study-answer-text { color: var(--workspace-ink); font-size: 14px; line-height: 1.7; margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 .home-conversation-message details { color: var(--workspace-muted); font-size: 12px; margin-top: 10px; }
 .home-conversation-message details a { color: var(--workspace-accent); text-decoration: underline; }

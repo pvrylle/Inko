@@ -124,7 +124,7 @@ export function HomeOrbit() {
             ) : (
               <div className="home-conversation-messages">
                 {messages.map((message) => (
-                  <article className="home-conversation-message" data-role={message.role} key={message.id}>
+                  <article className="home-conversation-message" data-editing={editingId === message.id ? "true" : undefined} data-role={message.role} key={message.id}>
                     <div className="home-message-head">
                       <span>{message.role === "inko" ? "Inko" : "You"}</span>
                       {message.role === "student" && editingId !== message.id ? (

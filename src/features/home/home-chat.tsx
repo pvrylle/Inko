@@ -53,7 +53,7 @@ function ChatTurn({
   const isInko = message.role === "inko";
   const sources = message.sources ?? [];
   return (
-    <article className="assistant-turn" data-role={message.role}>
+    <article className="assistant-turn" data-editing={editing ? "true" : undefined} data-role={message.role}>
       {isInko ? <ChatHead inko /> : null}
       <div className="assistant-bubble">
         <div className="home-message-head">
