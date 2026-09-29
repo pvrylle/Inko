@@ -9,6 +9,12 @@ export const metadata: Metadata = {
     template: "%s · Inko",
   },
   description: "A voice-first AI study companion for notes, flashcards, quizzes, and focus sessions.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "64x64", type: "image/x-icon" },
+      { url: "/icon.png", sizes: "64x64", type: "image/png" },
+    ],
+  },
 };
 
 export const viewport: Viewport = {

@@ -82,8 +82,10 @@ export async function warmAnnaToken() {
   cachedToken = { value, expiresAt: Date.now() + 80_000 };
 }
 
-async function streamChunk(apiKey: string, spoken: string, onAudio: (audio: string) => void) {
+async function streamChunk(apiKey: string, spoken: string, onAudio: (audio: string) => void, signal?: AbortSignal) {
+  if (signal?.aborted) throw new Error("ANNA_TTS_CANCELLED");
   const token = await takeAgentToken(apiKey);
+  if (signal?.aborted) throw new Error("ANNA_TTS_CANCELLED");
   let heard = false;
 
   await new Promise<void>((resolve, reject) => {
@@ -93,14 +95,19 @@ async function streamChunk(apiKey: string, spoken: string, onAudio: (audio: stri
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
       try { ws.send(JSON.stringify({ type: "session.end" })); } catch { /* already closed */ }
       try { ws.close(); } catch { /* ignore */ }
-      if (error) reject(error);
+      if (error?.message === "ANNA_TTS_CANCELLED" && heard) resolve();
+      else if (error) reject(error);
       else resolve();
     };
+    const onAbort = () => finish(new Error("ANNA_TTS_CANCELLED"));
     const timer = setTimeout(() => finish(heard ? undefined : new Error("ANNA_TTS_TIMEOUT")), 25_000);
+    signal?.addEventListener("abort", onAbort, { once: true });
 
     ws.addEventListener("open", () => {
+      if (settled) return;
       ws.send(JSON.stringify({
         type: "session.update",
         session: {
@@ -117,13 +124,14 @@ async function streamChunk(apiKey: string, spoken: string, onAudio: (audio: stri
     });
 
     ws.addEventListener("message", (event) => {
+      if (settled) return;
       const payload = jsonPayload(event.data);
       if (!payload?.type) return;
       if (payload.type === "reply.audio" && payload.data) {
         heard = true;
-        onAudio(payload.data);
+        try { onAudio(payload.data); } catch { finish(new Error("ANNA_TTS_CANCELLED")); return; }
       }
-      if (payload.type === "reply.done" || payload.type === "transcript.agent") {
+      if (payload.type === "reply.done") {
         if (heard) finish();
       }
       if (payload.type === "session.error" || payload.type === "error") finish(new Error("ANNA_TTS_FAILED"));
@@ -135,15 +143,19 @@ async function streamChunk(apiKey: string, spoken: string, onAudio: (audio: stri
     });
   });
 
+  if (signal?.aborted && !heard) throw new Error("ANNA_TTS_CANCELLED");
   if (!heard) throw new Error("ANNA_TTS_FAILED");
 }
 
-export async function streamAnnaSpeech(text: string, onAudio: (audio: string) => void) {
+export async function streamAnnaSpeech(text: string, onAudio: (audio: string) => void, signal?: AbortSignal) {
   const apiKey = process.env.ASSEMBLYAI_API_KEY?.trim();
   if (!apiKey) throw new Error("VOICE_NOT_CONFIGURED");
   const parts = splitAnnaSpeakChunks(text);
   if (!parts.length) throw new Error("EMPTY_SPEECH");
-  for (const part of parts) await streamChunk(apiKey, part, onAudio);
+  for (const part of parts) {
+    if (signal?.aborted) throw new Error("ANNA_TTS_CANCELLED");
+    await streamChunk(apiKey, part, onAudio, signal);
+  }
 }
 
 export async function synthesizeAnnaSpeech(text: string) {

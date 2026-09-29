@@ -13,6 +13,21 @@ const bodySchema = z.union([
   z.object({ text: z.string().trim().min(1).max(2_400) }),
 ]);
 
+function writeFrame(controller: ReadableStreamDefaultController<Uint8Array>, encoder: TextEncoder, payload: object) {
+  if (controller.desiredSize === null) return false;
+  try {
+    controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function closeFrame(controller: ReadableStreamDefaultController<Uint8Array>) {
+  if (controller.desiredSize === null) return;
+  try { controller.close(); } catch { /* already closed by the client */ }
+}
+
 export async function POST(request: NextRequest) {
   const user = await getRequestUser(request);
   const address = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim().slice(0, 64) || "local";
@@ -35,21 +50,28 @@ export async function POST(request: NextRequest) {
 
   const encoder = new TextEncoder();
   const spoken = body.data.text;
+  const abort = new AbortController();
+  const stop = () => abort.abort();
+  request.signal.addEventListener("abort", stop, { once: true });
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
         await streamAnnaSpeech(spoken, (audio) => {
-          controller.enqueue(encoder.encode(`${JSON.stringify({ audio })}\n`));
-        });
-        controller.enqueue(encoder.encode(`${JSON.stringify({ done: true, sampleRate: 24_000, voice: "anna" })}\n`));
-        controller.close();
+          if (!writeFrame(controller, encoder, { audio })) abort.abort();
+        }, abort.signal);
+        writeFrame(controller, encoder, { done: true, sampleRate: 24_000, voice: "anna" });
+        closeFrame(controller);
       } catch (caught) {
-        const error = caught instanceof Error && caught.message === "VOICE_NOT_CONFIGURED"
-          ? "VOICE_NOT_CONFIGURED"
-          : "ANNA_TTS_FAILED";
-        controller.enqueue(encoder.encode(`${JSON.stringify({ error })}\n`));
-        controller.close();
+        const cancelled = abort.signal.aborted || (caught instanceof Error && caught.message === "ANNA_TTS_CANCELLED");
+        if (!cancelled) writeFrame(controller, encoder, { error: "ANNA_TTS_FAILED" });
+        closeFrame(controller);
+      } finally {
+        request.signal.removeEventListener("abort", stop);
       }
+    },
+    cancel() {
+      abort.abort();
     },
   });
 

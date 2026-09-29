@@ -124,7 +124,7 @@ describe("voice routes", () => {
     const body = await response.text();
     expect(body).toContain("\"audio\":\"AAAA\"");
     expect(body).toContain("\"voice\":\"anna\"");
-    expect(streamAnnaSpeech).toHaveBeenCalledWith("Hello from Inko.", expect.any(Function));
+    expect(streamAnnaSpeech).toHaveBeenCalledWith("Hello from Inko.", expect.any(Function), expect.any(AbortSignal));
   });
 
   it("warms an Anna token before the first sentence", async () => {

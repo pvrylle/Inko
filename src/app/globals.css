@@ -3265,8 +3265,8 @@ body {
 }
 .topbar-account:hover { border-color: #b9cdf5; box-shadow: 0 8px 18px rgba(53, 104, 244, 0.1); }
 .topbar-avatar { align-items: center; background: linear-gradient(140deg, #3568f4, #6f5cf5); border-radius: 50%; color: white; display: flex; flex: 0 0 auto; font-size: 11px; font-weight: 900; height: 32px; justify-content: center; width: 32px; }
-.topbar-account-name { color: #14265e; font-size: 12px; font-weight: 800; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (max-width: 620px) { .topbar-account-name { display: none; } .topbar-account { padding: 3px; } }
+.topbar-account-name { color: #14265e; font-size: 13px; font-weight: 700; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button.topbar-account { cursor: pointer; font: inherit; }
 
 /* ΓöÇΓöÇ Home screen ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 .home-screen { display: flex; flex-direction: column; margin: 0 auto; max-width: 1240px; }
@@ -4590,9 +4590,9 @@ body {
 .assistant-shell .conversation-topbar-title span { color: var(--workspace-muted); font-size: 10px; line-height: 1.2; }
 .assistant-shell .conversation-topbar-title strong { color: var(--workspace-ink); font-size: 13px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .assistant-shell .topbar-date { color: var(--workspace-muted); font-size: 11px; font-weight: 500; letter-spacing: 0; }
-.assistant-shell .topbar-account { background: transparent; border-color: var(--workspace-line); box-shadow: none; }
-.assistant-shell .topbar-avatar { background: var(--workspace-accent); }
-.assistant-shell .topbar-account-name { color: var(--workspace-ink); font-weight: 600; }
+.assistant-shell .topbar-account { background: transparent; border: 0; box-shadow: none; flex: 0 0 auto; gap: 10px; padding: 0; }
+.assistant-shell .topbar-avatar { background: linear-gradient(145deg, #8eb4ff, #b388f8 48%, #ff8fb3); font-size: 11px; height: 34px; width: 34px; }
+.assistant-shell .topbar-account-name { color: var(--workspace-ink); display: inline; font-size: 13px; font-weight: 700; max-width: 240px; }
 .assistant-shell:has(.assistant-home) { height: 100dvh; overflow: hidden; }
 .assistant-shell:has(.assistant-home) .main-content { height: 100dvh; min-height: 0; overflow: hidden; }
 
@@ -5087,7 +5087,7 @@ body {
 
 @media (max-width: 620px) {
   .research-topbar .back-home, .research-topbar .page-voice-toggle { font-size: 0; gap: 0; min-width: 34px; padding: 8px; }
-  .research-topbar .topbar-account { display: none; }
+  .research-topbar .topbar-account { padding: 0; }
   .research-topbar-actions { gap: 4px; }
   .research-topbar-actions .secondary-button { font-size: 11px; padding: 7px 9px; }
   .research-conversation { padding: 16px 16px 110px; }
@@ -5258,5 +5258,5 @@ body {
   .research-detail-heading { flex-wrap: wrap; }
   .research-library-time { display: none; }
   .research-hub, .research-detail { padding-bottom: 120px; }
-  .assistant-shell .research-topbar .topbar-account-name { display: none; }
+  .assistant-shell .research-topbar .topbar-account-name { max-width: 120px; }
 }
