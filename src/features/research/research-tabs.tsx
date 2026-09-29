@@ -9,6 +9,8 @@ import type {
   ResearchSession,
   ResearchSource,
 } from "./research-schema";
+import { inlineMarkdown } from "@/components/ui/inline-markdown";
+import { MarkdownNote } from "@/features/notes/markdown-note";
 import type { ResearchTab } from "./use-research";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -82,7 +84,7 @@ function OverviewPanel({
         <div className="overview-section-head"><FileText size={16} /> <h3 id="overview-question-title">Question</h3></div>
         <div className="overview-question-box">
           <p>{session.question}</p>
-          {session.description ? <p>{session.description}</p> : null}
+          {session.description ? <p>{inlineMarkdown(session.description)}</p> : null}
         </div>
       </section>
 
@@ -180,7 +182,7 @@ function FindingEntry({
 
   return (
     <article className="finding-entry">
-      <p className="finding-statement">{finding.statement}</p>
+      <p className="finding-statement">{inlineMarkdown(finding.statement)}</p>
       <div className="overview-claim-actions">
         {attributedSource ? (
           <span className="finding-attribution">
@@ -250,7 +252,7 @@ function GapsPanel({
       <ul className="overview-claim-list" role="list">
         {gaps.map((gap) => (
           <li className="overview-claim" key={gap.id}>
-            <p>{gap.text}</p>
+            <p>{inlineMarkdown(gap.text)}</p>
             <div className="overview-claim-actions">
               <Link className="overview-debate-link" href={debateHref(sessionId, gap.text, gap.mode)}>Debate this</Link>
             </div>
@@ -285,7 +287,7 @@ function ContradictionGroup({
           </div>
         ))}
       </div>
-      <p className="contradiction-explanation">{contradiction.explanation}</p>
+      <p className="contradiction-explanation">{inlineMarkdown(contradiction.explanation)}</p>
     </article>
   );
 }
@@ -326,9 +328,9 @@ function NotesPanel({ session, noteMarkdown }: { session: ResearchSession; noteM
       <p className="research-notes-hint">
         {noteMarkdown ? "Notes Inko wrote from the sources in this session." : "Structured notes for this session will appear here once generated."}
       </p>
-      <pre className="research-notes-pre" aria-label="Session notes">
-        {noteMarkdown || `Session: ${session.question}`}
-      </pre>
+      <div aria-label="Session notes">
+        <MarkdownNote markdown={noteMarkdown || `Session: ${session.question}`} />
+      </div>
     </div>
   );
 }
@@ -349,7 +351,7 @@ function OpenQuestionsPanel({ openQuestions }: { openQuestions: OpenQuestion[] }
         {openQuestions.map((q) => (
           <li key={q.id} className="open-question-item">
             <span className="open-question-bullet" aria-hidden="true">?</span>
-            <p className="open-question-text">{q.text}</p>
+            <p className="open-question-text">{inlineMarkdown(q.text)}</p>
           </li>
         ))}
       </ul>

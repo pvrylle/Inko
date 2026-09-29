@@ -11,6 +11,7 @@ import type { StudySourceLink, VoiceMessage } from "@/features/voice/voice-types
 import { inkoFetch } from "@/lib/auth/api-client";
 import { upsertLocalRecord } from "@/lib/data/local-store";
 import type { Flashcard, FocusSession, Note, Quiz, QuizAnswerKey, QuizQuestion } from "@/lib/data/models";
+import { inlineMarkdown } from "@/components/ui/inline-markdown";
 import { suggestStudyTools, type StudyToolId } from "./suggest-study-tools";
 
 type ToolId = StudyToolId;
@@ -101,21 +102,14 @@ export function StudyAnswerText({ text, sources }: { text: string; sources: Stud
 }
 
 function renderStudyInline(text: string, sources: StudySourceLink[]) {
-  const parts = text.split(/(\[\d+\]|\*\*[^*]+\*\*)/g);
-  return parts.map((part, index) => {
-    const cite = part.match(/^\[(\d+)\]$/);
-    if (cite) {
-      const source = sources[Number(cite[1]) - 1];
-      if (!source) return <span key={index}>{part}</span>;
-      return (
-        <a key={index} className="study-cite" href={source.url} rel="noopener noreferrer" target="_blank">
-          {cite[1]}
-        </a>
-      );
-    }
-    const bold = part.match(/^\*\*([^*]+)\*\*$/);
-    if (bold) return <strong key={index}>{bold[1]}</strong>;
-    return <span key={index}>{part}</span>;
+  return inlineMarkdown(text, (label, index) => {
+    const source = sources[Number(label) - 1];
+    if (!source) return <span key={index}>[{label}]</span>;
+    return (
+      <a key={index} className="study-cite" href={source.url} rel="noopener noreferrer" target="_blank">
+        {label}
+      </a>
+    );
   });
 }
 

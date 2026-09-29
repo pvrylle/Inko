@@ -778,7 +778,7 @@ export function useVoiceAgent() {
         if (speakingRef.current || pauseForReplyRef.current || replyPendingRef.current || !handsFreeRef.current) return;
         const text = `${dictationFinalRef.current} ${interimRef.current}`.trim();
         if (text.replace(/[^\p{L}\p{N}]/gu, "").length < 2) return;
-        dictationFinalRef.current = "";
+      dictationFinalRef.current = "";
         interimRef.current = "";
         carriedSpeechRef.current = "";
         pauseForReplyRef.current = true;
@@ -1449,8 +1449,8 @@ export function useVoiceAgent() {
         setDictating(false);
         setConnection("idle");
         window.dispatchEvent(new Event("inko:guest-limit"));
-        return;
-      }
+      return;
+    }
       resumeListeningRef.current();
       return;
     }

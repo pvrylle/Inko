@@ -7,6 +7,8 @@ import { ContentTopbar } from "@/components/layout/content-topbar";
 import { useMascot } from "@/features/mascot/mascot-provider";
 import { ResearchSessionForm } from "./research-session-form";
 import { ResearchTabs } from "./research-tabs";
+import { ResearchTutor } from "./research-tutor";
+import { researchTutorDetail } from "./research-tutor-brief";
 import { useResearch } from "./use-research";
 import { usePublishBrief } from "@/features/page-brief/page-brief";
 
@@ -55,7 +57,13 @@ export function ResearchView() {
   }, [questionFromUrl, sessionFromUrl, setActive, startNewProject, tabFromUrl]);
 
   const researchQuestion = activeSession?.question?.trim().slice(0, 300) ?? null;
-  usePublishBrief(researchQuestion ? { kind: "research", label: `Research: ${researchQuestion.slice(0, 80)}`, detail: `Research question: ${researchQuestion}` } : null);
+  const firstFinding = research.findings[0]?.statement ?? null;
+  const firstGap = research.contradictions[0]?.explanation ?? research.openQuestions[0]?.text ?? null;
+  usePublishBrief(researchQuestion ? {
+    kind: "research",
+    label: `Research: ${researchQuestion.slice(0, 80)}`,
+    detail: researchTutorDetail({ question: researchQuestion, tab: research.activeTab, finding: firstFinding, gap: firstGap }),
+  } : null);
 
   return (
     <div className="research-view-page page-enter">
@@ -113,7 +121,10 @@ export function ResearchView() {
               {visibleInvestigations.map((session) => <button aria-current={session.id === activeSession.id ? "true" : undefined} aria-label={`Open ${session.title || session.question}`} key={session.id} onClick={() => setActive(session.id)} title={session.title || session.question} type="button"><FolderOpen size={16} /><span><strong>{session.title || session.question}</strong><small>Updated {relativeTime(session.updated_at)}</small></span></button>)}
               <button className="research-investigations-all" onClick={startNewProject} type="button">View all {sessions.length} investigations <ArrowRight size={15} /></button>
             </aside>
-            <ResearchTabs activeSession={activeSession} sources={research.sources} findings={research.findings} contradictions={research.contradictions} openQuestions={research.openQuestions} canvasContent={research.canvasContent} noteMarkdown={research.noteMarkdown} saveCanvas={research.saveCanvas} activeTab={research.activeTab} setActiveTab={research.setActiveTab} />
+            <div className="research-detail-main">
+              <ResearchTutor />
+              <ResearchTabs activeSession={activeSession} sources={research.sources} findings={research.findings} contradictions={research.contradictions} openQuestions={research.openQuestions} canvasContent={research.canvasContent} noteMarkdown={research.noteMarkdown} saveCanvas={research.saveCanvas} activeTab={research.activeTab} setActiveTab={research.setActiveTab} />
+            </div>
           </div>
         </div>
       )}

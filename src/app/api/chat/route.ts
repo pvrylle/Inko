@@ -37,6 +37,7 @@ function studyPrompt(question: string, sources: StudySource[], history: Array<{ 
 - Give one concrete example.
 - Close with one line on what to remember.
 - Write two to four short paragraphs, separated by a blank line. Use a short bullet list only when the student asks for steps.
+- Do not wrap words in asterisks or other markup.
 - If the question is unclear, ask one question and still give the most useful explanation you can.
 - Do not invent citations, paper titles, links, or claim that an app action already happened.`;
   if (sources.length === 0) {

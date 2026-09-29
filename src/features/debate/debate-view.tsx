@@ -5,6 +5,7 @@ import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ContentTopbar } from "@/components/layout/content-topbar";
+import { inlineMarkdown } from "@/components/ui/inline-markdown";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useOptionalProjects } from "@/features/projects/project-provider";
 import { listContradictions, listFindings, listSources } from "@/features/research/research-repository";
@@ -194,7 +195,7 @@ export function DebateView({
               {turns.length === 0 ? <p className="debate-evidence-note">Make your opening argument below.</p> : turns.map((turn, index) => (
                 <article className="debate-turn" key={`${turn.role}-${index}`}>
                   <h2>{turn.role === "student" ? "You" : "Inko"}</h2>
-                  <p>{turn.text}</p>
+                  <p>{inlineMarkdown(turn.text)}</p>
                 </article>
               ))}
               {pending ? <p className="debate-evidence-note">Thinking through your point...</p> : null}
