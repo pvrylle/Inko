@@ -49,7 +49,7 @@ export function ResearchView() {
     const key = `${sessionFromUrl ?? ""}|${tabFromUrl ?? ""}|${questionFromUrl}`;
     if (appliedParam.current === key) return;
     appliedParam.current = key;
-    const tab = tabFromUrl === "sources" || tabFromUrl === "findings" || tabFromUrl === "contradictions" || tabFromUrl === "notes" || tabFromUrl === "open-questions" || tabFromUrl === "overview" ? tabFromUrl : undefined;
+    const tab = tabFromUrl === "sources" || tabFromUrl === "findings" || tabFromUrl === "gaps" || tabFromUrl === "contradictions" || tabFromUrl === "notes" || tabFromUrl === "open-questions" || tabFromUrl === "overview" ? tabFromUrl : undefined;
     if (sessionFromUrl) setActive(sessionFromUrl, tab);
     else if (questionFromUrl) startNewProject();
   }, [questionFromUrl, sessionFromUrl, setActive, startNewProject, tabFromUrl]);

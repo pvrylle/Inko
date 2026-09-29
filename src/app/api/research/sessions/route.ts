@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   if (user.isDemo) return NextResponse.json(bundle);
 
   const supabase = await createServerSupabaseClient();
-  if (!supabase) return NextResponse.json(bundle);
+  if (!supabase) return NextResponse.json({ ...bundle, persisted: false });
   const { data, error } = await supabase.from("research_sessions").insert({
     id: bundle.session.id,
     owner_id: user.userId,
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     description: body.data.description ?? brief.description,
     status: "ready",
   }).select(columns).single();
-  if (error || !data) return apiError(mapDbError(error), 502);
+  if (error || !data) return NextResponse.json({ ...bundle, persisted: false });
 
   await Promise.all([
     supabase.from("research_sources").insert(

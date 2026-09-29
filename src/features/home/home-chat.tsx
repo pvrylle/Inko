@@ -60,7 +60,7 @@ export function HomeChat({ controller, home = false, onClose }: { controller: Vo
   const router = useRouter();
   const { state } = useMascot();
   const projects = useOptionalProjects();
-  const { messages, replyPending, error, activeSessionId } = controller;
+  const { messages, replyPending, draftReply, error, activeSessionId } = controller;
   const [draft, setDraft] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -73,10 +73,11 @@ export function HomeChat({ controller, home = false, onClose }: { controller: Vo
   const { brief } = usePageBrief();
   const status = error ? "Needs attention" : replySpeaking ? "Speaking" : replyPending ? "Thinking" : controller.connection === "connected" ? "Listening" : "Ready";
 
+  const threadScrollKey = `${activeSessionId ?? ""}:${messages.length}:${draftReply?.length ?? 0}`;
   useEffect(() => {
     const thread = threadRef.current;
     if (thread) thread.scrollTop = thread.scrollHeight;
-  }, [activeSessionId, messages.length]);
+  }, [threadScrollKey]);
 
   const newConversation = () => {
     controller.clearConversation();
@@ -173,6 +174,11 @@ export function HomeChat({ controller, home = false, onClose }: { controller: Vo
                   <p className="assistant-caption">{partialTranscript}</p>
                   {replyPending ? <p className="assistant-pending">Inko is working</p> : null}
                 </>
+              ) : draftReply ? (
+                <>
+                  <span>Inko</span>
+                  <p className="assistant-caption">{draftReply}</p>
+                </>
               ) : replyPending ? (
                 <>
                   <span>Inko</span>
@@ -192,7 +198,12 @@ export function HomeChat({ controller, home = false, onClose }: { controller: Vo
               {messages.map((message, index) => (
                 <ChatTurn key={message.id} message={message} question={questionBefore(messages, index)} sessionId={active?.research_session_id ?? null} onResearchSessionCreated={controller.linkResearchSession} />
               ))}
-              {replyPending ? (
+              {draftReply ? (
+                <article aria-live="polite" className="assistant-turn" data-role="inko">
+                  <ChatHead inko />
+                  <div className="assistant-bubble"><StudyAnswerText sources={[]} text={draftReply} /></div>
+                </article>
+              ) : replyPending ? (
                 <article aria-live="polite" className="assistant-turn" data-role="inko">
                   <ChatHead inko />
                   <div className="assistant-bubble"><p className="assistant-pending">Inko is thinking...</p></div>

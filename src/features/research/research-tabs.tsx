@@ -32,6 +32,7 @@ const TABS: { id: Exclude<ResearchTab, "canvas">; label: string }[] = [
   { id: "overview",       label: "Overview" },
   { id: "sources",        label: "Sources" },
   { id: "findings",       label: "Findings" },
+  { id: "gaps",           label: "Gaps" },
   { id: "contradictions", label: "Contradictions" },
   { id: "notes",          label: "Notes" },
   { id: "open-questions", label: "Open Questions" },
@@ -49,13 +50,7 @@ function debateHref(sessionId: string, claim: string, mode: "debate" | "defense"
   return `/debate?${params.toString()}`;
 }
 
-function sourceTagLabel(tag: ResearchSource["tag"]) {
-  if (tag === "supports") return "Supports";
-  if (tag === "contradicts") return "Contradicts";
-  return "Untagged";
-}
-
-/** Overview tab — claims and gaps from the research brief. */
+/** Overview tab — the question and shortcuts into the other tabs. */
 function OverviewPanel({
   session,
   sources,
@@ -71,15 +66,14 @@ function OverviewPanel({
   openQuestions: OpenQuestion[];
   setActiveTab: (tab: ResearchTab) => void;
 }) {
+  const gapCount = contradictions.length + openQuestions.length;
+  const firstFinding = findings[0]?.statement;
+  const firstGap = contradictions[0]?.explanation ?? openQuestions[0]?.text;
   const stats = [
     { key: "sources" as const, label: "Sources", value: sources.length, Icon: FileText, tone: "blue" },
-    { key: "findings" as const, label: "Key Findings", value: findings.length, Icon: Lightbulb, tone: "teal" },
-    { key: "contradictions" as const, label: "Contradiction" + (contradictions.length === 1 ? "" : "s"), value: contradictions.length, Icon: GitCompare, tone: "purple" },
+    { key: "findings" as const, label: "Findings", value: findings.length, Icon: Lightbulb, tone: "teal" },
+    { key: "gaps" as const, label: "Gaps", value: gapCount, Icon: GitCompare, tone: "purple" },
     { key: "open-questions" as const, label: "Open Question" + (openQuestions.length === 1 ? "" : "s"), value: openQuestions.length, Icon: HelpCircle, tone: "coral" },
-  ];
-  const gaps = [
-    ...contradictions.map((item) => ({ id: item.id, text: item.explanation, mode: "defense" as const })),
-    ...openQuestions.map((item) => ({ id: item.id, text: item.text, mode: "socratic" as const })),
   ];
 
   return (
@@ -102,55 +96,18 @@ function OverviewPanel({
         ))}
       </div>
 
-      <section className="overview-findings" aria-labelledby="overview-findings-title">
-        <div className="overview-section-head overview-section-head--row">
-          <span><Lightbulb size={16} /> <h3 id="overview-findings-title">Findings</h3></span>
-          {findings.length > 0 && (
-            <button className="overview-view-all" onClick={() => setActiveTab("findings")} type="button">View all →</button>
-          )}
-        </div>
-        {findings.length === 0 ? (
-          <p className="overview-empty">Inko will list key findings here as your sources are analysed.</p>
-        ) : (
-          <ul className="overview-claim-list">
-            {findings.map((finding) => {
-              const source = sources.find((item) => item.id === finding.source_id);
-              return (
-                <li className="overview-claim" key={finding.id}>
-                  <p>{finding.statement}</p>
-                  <div className="overview-claim-actions">
-                    {source ? (
-                      <button className="overview-source-chip" data-tag={source.tag} onClick={() => setActiveTab("sources")} type="button">
-                        {source.title}
-                        <span>{sourceTagLabel(source.tag)}</span>
-                      </button>
-                    ) : null}
-                    <Link className="overview-debate-link" href={debateHref(session.id, finding.statement, "debate")}>Debate this</Link>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-
-      <section className="overview-gaps" aria-labelledby="overview-gaps-title">
-        <div className="overview-section-head"><GitCompare size={16} /> <h3 id="overview-gaps-title">Gaps</h3></div>
-        {gaps.length === 0 ? (
-          <p className="overview-empty">Contradictions and open questions will show up here.</p>
-        ) : (
-          <ul className="overview-claim-list">
-            {gaps.map((gap) => (
-              <li className="overview-claim" key={gap.id}>
-                <p>{gap.text}</p>
-                <div className="overview-claim-actions">
-                  <Link className="overview-debate-link" href={debateHref(session.id, gap.text, gap.mode)}>Debate this</Link>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <div className="overview-jumps">
+        <button className="overview-jump" onClick={() => setActiveTab("findings")} type="button">
+          <span><Lightbulb size={16} /> Findings</span>
+          <strong>{firstFinding ?? "Findings will show up here."}</strong>
+          <small>{findings.length > 0 ? "Open" : "Empty"}</small>
+        </button>
+        <button className="overview-jump" onClick={() => setActiveTab("gaps")} type="button">
+          <span><GitCompare size={16} /> Gaps</span>
+          <strong>{firstGap ?? "Gaps will show up here."}</strong>
+          <small>{gapCount > 0 ? "Open" : "Empty"}</small>
+        </button>
+      </div>
     </div>
   );
 }
@@ -213,21 +170,26 @@ function SourcesPanel({ sources }: { sources: ResearchSource[] }) {
 function FindingEntry({
   finding,
   sources,
+  sessionId,
 }: {
   finding: ResearchFinding;
   sources: ResearchSource[];
+  sessionId: string;
 }) {
   const attributedSource = sources.find((s) => s.id === finding.source_id);
 
   return (
     <article className="finding-entry">
       <p className="finding-statement">{finding.statement}</p>
-      {attributedSource && (
-        <footer className="finding-attribution">
-          <span className="finding-source-label">Source:</span>{" "}
-          <span className="finding-source-title">{attributedSource.title}</span>
-        </footer>
-      )}
+      <div className="overview-claim-actions">
+        {attributedSource ? (
+          <span className="finding-attribution">
+            <span className="finding-source-label">Source:</span>{" "}
+            <span className="finding-source-title">{attributedSource.title}</span>
+          </span>
+        ) : null}
+        <Link className="overview-debate-link" href={debateHref(sessionId, finding.statement, "debate")}>Debate this</Link>
+      </div>
     </article>
   );
 }
@@ -236,9 +198,11 @@ function FindingEntry({
 function FindingsPanel({
   findings,
   sources,
+  sessionId,
 }: {
   findings: ResearchFinding[];
   sources: ResearchSource[];
+  sessionId: string;
 }) {
   if (findings.length === 0) {
     return (
@@ -253,7 +217,43 @@ function FindingsPanel({
       <ul className="finding-list" role="list">
         {findings.map((finding) => (
           <li key={finding.id}>
-            <FindingEntry finding={finding} sources={sources} />
+            <FindingEntry finding={finding} sources={sources} sessionId={sessionId} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function GapsPanel({
+  sessionId,
+  contradictions,
+  openQuestions,
+}: {
+  sessionId: string;
+  contradictions: ResearchContradiction[];
+  openQuestions: OpenQuestion[];
+}) {
+  const gaps = [
+    ...contradictions.map((item) => ({ id: item.id, text: item.explanation, mode: "defense" as const })),
+    ...openQuestions.map((item) => ({ id: item.id, text: item.text, mode: "socratic" as const })),
+  ];
+  if (gaps.length === 0) {
+    return (
+      <div className="research-panel research-empty-panel">
+        <p className="research-empty-text">Contradictions and open questions will show up here.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="research-panel">
+      <ul className="overview-claim-list" role="list">
+        {gaps.map((gap) => (
+          <li className="overview-claim" key={gap.id}>
+            <p>{gap.text}</p>
+            <div className="overview-claim-actions">
+              <Link className="overview-debate-link" href={debateHref(sessionId, gap.text, gap.mode)}>Debate this</Link>
+            </div>
           </li>
         ))}
       </ul>
@@ -459,7 +459,9 @@ function renderPanel(
     case "sources":
       return <SourcesPanel sources={sources} />;
     case "findings":
-      return <FindingsPanel findings={findings} sources={sources} />;
+      return <FindingsPanel findings={findings} sources={sources} sessionId={activeSession.id} />;
+    case "gaps":
+      return <GapsPanel sessionId={activeSession.id} contradictions={contradictions} openQuestions={openQuestions} />;
     case "contradictions":
       return (
         <ContradictionsPanel

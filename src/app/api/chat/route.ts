@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
   const searchQuery = searchBase.length < 35 && previousQuestion
     ? `${previousQuestion} ${searchBase}`.slice(0, 500)
     : searchBase.slice(0, 500);
-  const sources = await searchStudySources(searchQuery, 2_500);
+  const sources = await searchStudySources(searchQuery, 800);
   const links = sources.map(({ title, url }) => ({ title, url }));
   const prompt = studyPrompt(body.data.message, sources, history, page);
   const encoder = new TextEncoder();

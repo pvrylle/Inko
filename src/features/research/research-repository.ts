@@ -51,8 +51,10 @@ export async function listResearchSessions(userId: string): Promise<ResearchSess
     .eq("owner_id", userId)
     .order("updated_at", { ascending: false });
 
-  if (error) throw error;
-  return data ?? [];
+  const local = listLocalResearchProjects(userId).map((project) => project.session);
+  if (error) return local;
+  const seen = new Set((data ?? []).map((session) => session.id));
+  return [...(data ?? []), ...local.filter((session) => !seen.has(session.id))];
 }
 
 export async function createResearchSession(
@@ -91,7 +93,7 @@ export async function getResearchSession(
     .eq("owner_id", userId)
     .maybeSingle();
 
-  if (error) throw error;
+  if (error || !data) return getLocalResearchProject(userId, sessionId)?.session ?? null;
   return data;
 }
 

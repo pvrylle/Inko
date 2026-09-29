@@ -14,7 +14,7 @@ import { persistChatTurn } from "./voice-persistence";
 import { conversationTitleFromMessages } from "@/lib/chat/conversation-title";
 import { deleteCompanionSession, getCompanionSessionSyncIssue, listCompanionSessions, makeCompanionSession, saveCompanionSession, subscribeToCompanionSessions, type CompanionSession } from "@/lib/data/companion-sessions";
 import { executeVoiceTool } from "./voice-tools";
-import type { StudySourceLink, ToolCall, VoiceConnectionState, VoiceMessage, VoiceServerEvent } from "./voice-types";
+import type { ChatSessionLink, StudySourceLink, ToolCall, VoiceConnectionState, VoiceMessage, VoiceServerEvent } from "./voice-types";
 import { usePageBrief } from "@/features/page-brief/page-brief";
 
 type TokenResponse = { token: string; agentId: string; voiceSessionId: string; maxSessionDurationSeconds: number; error?: string; message?: string };
@@ -68,7 +68,7 @@ const microphoneConstraints: MediaTrackConstraints = {
   autoGainControl: true,
 };
 
-const replyPauseMs = 2_000;
+const replyPauseMs = 900;
 const resumeGapMs = 400;
 const networkRestartLimit = 5;
 
@@ -261,6 +261,7 @@ export function useVoiceAgent() {
   const [dictating, setDictating] = useState(false);
   const [replyPending, setReplyPending] = useState(false);
   const replyPendingRef = useRef(false);
+  const [draftReply, setDraftReply] = useState("");
   const [replySpeaking, setReplySpeaking] = useState(false);
   const [spokenCaption, setSpokenCaption] = useState("");
   const [pauseArmed, setPauseArmed] = useState(false);
@@ -271,6 +272,9 @@ export function useVoiceAgent() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const workletRef = useRef<AudioWorkletNode | null>(null);
   const readyRef = useRef(false);
+  // Live-agent replies wait for a full model turn. Once speech is captured, answer
+  // through /api/chat instead and drop the agent's own audio, text, and tools.
+  const suppressLiveReplyRef = useRef(false);
   const voiceSessionIdRef = useRef<string | null>(null);
   const nextPlaybackTimeRef = useRef(0);
   const playbackSourcesRef = useRef(new Set<AudioBufferSourceNode>());
@@ -400,6 +404,7 @@ export function useVoiceAgent() {
     const nextMessages = [...messagesRef.current, message];
     messagesRef.current = nextMessages;
     setMessages(nextMessages);
+    setDraftReply("");
     if (message.role === "inko") markReplyPending(false);
     else if (message.role === "student") markReplyPending(true);
     if (userId) {
@@ -652,6 +657,7 @@ export function useVoiceAgent() {
         break;
       case "input.speech.started":
         if (speakingRef.current || pauseForReplyRef.current || replyPendingRef.current || playbackSourcesRef.current.size > 0) break;
+        suppressLiveReplyRef.current = false;
         stopPlayback();
         dispatch({ type: "USER_STARTED" });
         break;
@@ -665,17 +671,20 @@ export function useVoiceAgent() {
       case "transcript.user":
         if (speakingRef.current || pauseForReplyRef.current || replyPendingRef.current || playbackSourcesRef.current.size > 0) break;
         pauseForReplyRef.current = true;
+        suppressLiveReplyRef.current = true;
         clearSilenceTimer();
         try { recognitionRef.current?.abort(); } catch {}
         recognitionRef.current = null;
         stopInputMeter();
-        setPartialTranscript(event.text);
-        addMessage({ id: crypto.randomUUID(), role: "student", text: event.text, createdAt: new Date().toISOString() });
+        setPartialTranscript("");
+        sendTextRef.current(event.text);
         break;
       case "reply.started":
+        if (suppressLiveReplyRef.current) break;
         dispatch({ type: "USER_STOPPED" });
         break;
       case "reply.audio":
+        if (suppressLiveReplyRef.current) break;
         speakingRef.current = true;
         setReplySpeaking(true);
         setPartialTranscript("");
@@ -683,6 +692,7 @@ export function useVoiceAgent() {
         playAudio(event.data);
         break;
       case "transcript.agent":
+        if (suppressLiveReplyRef.current) break;
         speakingRef.current = true;
         setReplySpeaking(true);
         setPartialTranscript("");
@@ -690,9 +700,11 @@ export function useVoiceAgent() {
         addMessage({ id: crypto.randomUUID(), role: "inko", text: event.text, createdAt: new Date().toISOString(), interrupted: event.interrupted });
         break;
       case "tool.call":
+        if (suppressLiveReplyRef.current) break;
         handleToolCall(event);
         break;
       case "reply.done":
+        if (suppressLiveReplyRef.current) break;
         if (event.status === "interrupted") stopPlayback();
         if (playbackSourcesRef.current.size === 0) {
           const generation = ++releaseGenerationRef.current;
@@ -770,6 +782,7 @@ export function useVoiceAgent() {
         interimRef.current = "";
         carriedSpeechRef.current = "";
         pauseForReplyRef.current = true;
+        setPartialTranscript("");
         setConnection("connected");
         dispatch({ type: "USER_STOPPED" });
         try { recognitionRef.current?.abort(); } catch {}
@@ -968,13 +981,15 @@ export function useVoiceAgent() {
     setError(null);
     setConnection("connecting");
 
-    // Prefer live interim words for guests; retain recorded transcription as a
-    // fallback when the browser does not provide speech recognition.
-    if (!liveVoice) {
+    // Browser speech, then the same fast chat reply as typing. The live voice
+    // agent holds the answer until a full model turn (and any tools) finishes.
+    if (getSpeechRecognitionConstructor()) {
       handsFreeRef.current = true;
       pauseForReplyRef.current = false;
-      if (getSpeechRecognitionConstructor() && startDictation()) return;
+      if (startDictation()) return;
       handsFreeRef.current = false;
+    }
+    if (!liveVoice) {
       setError(null);
       await startRecording();
       return;
@@ -1238,6 +1253,21 @@ export function useVoiceAgent() {
     setMessages(session.messages);
   }, [clearConversation, sessions]);
 
+  const pinSessionLink = useCallback((link: ChatSessionLink) => {
+    const href = link.href.slice(0, 2000);
+    const title = link.title.trim().slice(0, 160);
+    if (!href || !title) return;
+    if (messagesRef.current.some((message) => message.link?.kind === link.kind && message.link.href === href)) return;
+    addMessage({
+      id: crypto.randomUUID(),
+      role: "inko",
+      text: title,
+      createdAt: new Date().toISOString(),
+      link: { kind: link.kind, title, href },
+    });
+    if (link.kind === "research" || link.kind === "debate") projects?.addActivity(link.kind, title, href);
+  }, [addMessage, projects]);
+
   const linkResearchSession = useCallback((researchSessionId: string) => {
     if (!userId || !activeSessionRef.current) return;
     const linked = { ...activeSessionRef.current, research_session_id: researchSessionId };
@@ -1364,17 +1394,8 @@ export function useVoiceAgent() {
       }
       return;
     }
-    if (socketRef.current?.readyState === WebSocket.OPEN && readyRef.current) {
-      const liveContent = brief
-        ? `${trimmed}\n\n[Context: The student is currently on the ${brief.label} page. ${brief.detail}]`
-        : trimmed;
-      send({ type: "conversation.message", role: "user", content: liveContent });
-      send({ type: "reply.create" });
-      dispatch({ type: "USER_STOPPED" });
-      return;
-    }
-
     dispatch({ type: "USER_STOPPED" });
+    setDraftReply("");
     let response: Response;
     try {
       response = await inkoFetch("/api/chat", {
@@ -1462,6 +1483,9 @@ export function useVoiceAgent() {
         if (done) break;
         if (version !== conversationVersionRef.current) { await reader.cancel(); return; }
         raw += decoder.decode(value, { stream: true });
+        const markerAt = raw.indexOf(chatSourceTrailer);
+        const visible = (markerAt === -1 ? raw : raw.slice(0, markerAt)).trim();
+        if (visible) setDraftReply(visible);
         feed(false);
       }
       raw += decoder.decode();
@@ -1494,7 +1518,7 @@ export function useVoiceAgent() {
     speakingRef.current = true;
     setReplySpeaking(true);
     addMessage({ id: crypto.randomUUID(), role: "inko", text: answer, createdAt: new Date().toISOString(), sources });
-  }, [addMessage, clearSilenceTimer, dispatch, linkResearchSession, markReplyPending, projects, router, send, speakReply, userId]);
+  }, [addMessage, brief, clearSilenceTimer, dispatch, linkResearchSession, markReplyPending, projects, router, speakReply, userId]);
 
   const sendAttachment = useCallback(async (file: File, question: string) => {
     if (!file.size || file.size > 8 * 1024 * 1024 || !["application/pdf", "image/png", "image/jpeg", "image/webp"].includes(file.type)) {
@@ -1573,5 +1597,5 @@ export function useVoiceAgent() {
                 ? "listening"
                 : "idle";
 
-  return { connection, phase, pauseEpoch, messages, sessions, activeSessionId, sessionError, openConversation, linkResearchSession, renameConversation, archiveConversation, restoreConversation, removeConversation, partialTranscript, spokenCaption, replySpeaking, error, dictating, replyPending, start, end, sendText, sendAttachment, clearConversation };
+  return { connection, phase, pauseEpoch, messages, sessions, activeSessionId, sessionError, openConversation, linkResearchSession, pinSessionLink, renameConversation, archiveConversation, restoreConversation, removeConversation, partialTranscript, spokenCaption, draftReply, replySpeaking, error, dictating, replyPending, start, end, sendText, sendAttachment, clearConversation };
 }

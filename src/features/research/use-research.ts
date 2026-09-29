@@ -30,6 +30,7 @@ export type ResearchTab =
   | "overview"
   | "sources"
   | "findings"
+  | "gaps"
   | "contradictions"
   | "canvas"
   | "notes"
@@ -160,7 +161,19 @@ export function useResearch(): UseResearchReturn {
         setNoteMarkdown(noteData?.content_markdown || project?.note?.content_markdown || "");
         setActivity([]);
       } catch {
-        setError("Failed to load session data.");
+        const project = getLocalResearchProject(userId, sessionId);
+        if (!project) {
+          setError("Failed to load session data.");
+          return;
+        }
+        setActiveSession(project.session);
+        setSources(project.sources);
+        setFindings(project.findings);
+        setContradictions(project.contradictions);
+        setOpenQuestions(project.openQuestions);
+        setCanvasContent(project.canvas?.content ?? "");
+        setNoteMarkdown(project.note?.content_markdown ?? "");
+        setError(null);
       }
     },
     [userId],

@@ -165,7 +165,7 @@ function issueFromError(operation: CompanionSessionSyncIssue["operation"], error
   const status = typeof value.status === "number" ? value.status : null;
   let kind: CompanionSessionSyncIssue["kind"] = "unknown";
   if (operation === "configuration") kind = "unconfigured";
-  else if (code === "42P01" || code === "PGRST205" || missingArchiveColumn(error)) kind = "schema";
+  else if (code === "42P01" || code === "PGRST205" || status === 404 || /could not find the table/i.test(detail) || missingArchiveColumn(error)) kind = "schema";
   else if (code === "42501" || code === "28000" || status === 401 || status === 403) kind = "permission";
   else if (value.name === "AbortError" || /failed to fetch|network|offline|aborted/i.test(detail)) kind = "offline";
   const message = kind === "schema" ? "Cloud history is not ready yet. Conversations are saved on this device."
@@ -178,6 +178,7 @@ function issueFromError(operation: CompanionSessionSyncIssue["operation"], error
 function recordIssue(userId: string, key: string, operation: CompanionSessionSyncIssue["operation"], error: unknown) {
   const issue = issueFromError(operation, error);
   const issues = syncIssues.get(userId) ?? new Map<string, CompanionSessionSyncIssue>();
+  if (issue.code === "42P01" || issue.code === "PGRST205" || /could not find the table/i.test(issue.detail)) cloudSchemaMissing.add(userId);
   if (JSON.stringify(issues.get(key)) === JSON.stringify(issue)) return;
   issues.delete(key);
   issues.set(key, issue);
@@ -222,8 +223,10 @@ function ordered(sessions: CompanionSession[]) {
   return sessions.sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at));
 }
 
+const cloudSchemaMissing = new Set<string>();
+
 function cloudClient(userId: string, isGuest: boolean) {
-  if (isGuest) return null;
+  if (isGuest || cloudSchemaMissing.has(userId)) return null;
   const client = getBrowserSupabaseClient();
   if (!client) {
     recordIssue(userId, "configuration", "configuration", new Error("Supabase browser client is not configured."));

@@ -5,6 +5,12 @@ export type StudySourceLink = {
   url: string;
 };
 
+export type ChatSessionLink = {
+  kind: "research" | "debate" | "flashcards";
+  title: string;
+  href: string;
+};
+
 export type VoiceMessage = {
   id: string;
   role: "student" | "inko";
@@ -13,6 +19,7 @@ export type VoiceMessage = {
   interrupted?: boolean;
   sources?: StudySourceLink[];
   attachment?: { name: string; type: string };
+  link?: ChatSessionLink;
 };
 
 export type ToolCall = {

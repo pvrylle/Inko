@@ -5,7 +5,7 @@ import { type DragEvent, type FormEvent, type KeyboardEvent, useEffect, useRef, 
 import { ContentTopbar } from "@/components/layout/content-topbar";
 import { useOptionalProjects } from "@/features/projects/project-provider";
 import { useOptionalVoiceAgent } from "@/features/voice/voice-agent-provider";
-import { ChatSuggestions } from "./chat-suggestions";
+import { ChatSuggestions, SessionDirectory, sessionLinksFrom } from "./chat-suggestions";
 import { StudyAnswerText } from "./study-answer-card";
 import { ProjectWorkspacePanel, type ProjectTab } from "./project-workspace-panel";
 
@@ -36,12 +36,13 @@ export function HomeOrbit() {
     if (requested && controller?.sessions.some((session) => session.id === requested)) controller.openConversation(requested);
   }, [controller]);
 
+  const threadScrollKey = `${controller?.messages.length ?? 0}:${controller?.replyPending ? 1 : 0}:${controller?.draftReply?.length ?? 0}`;
   useEffect(() => {
     const thread = threadRef.current;
     if (!thread) return;
     const distance = thread.scrollHeight - thread.scrollTop - thread.clientHeight;
     if (distance < 220) thread.scrollTop = thread.scrollHeight;
-  }, [controller?.messages, controller?.replyPending]);
+  }, [threadScrollKey]);
 
   const chooseFile = (file: File | undefined) => {
     if (!file) return;
@@ -124,11 +125,16 @@ export function HomeOrbit() {
                   <article className="home-conversation-message" data-role={message.role} key={message.id}>
                     <span>{message.role === "inko" ? "Inko" : "You"}</span>
                     {message.attachment ? <div className="home-message-file">{message.attachment.type === "application/pdf" ? <FileText size={16} /> : <FileImage size={16} />}{message.attachment.name}</div> : null}
-                    {message.role === "inko" ? <StudyAnswerText sources={message.sources ?? []} text={message.text} /> : <p>{message.text}</p>}
+                    {message.link ? <SessionDirectory links={[message.link]} /> : message.role === "inko" ? <StudyAnswerText sources={message.sources ?? []} text={message.text} /> : <p>{message.text}</p>}
                     {message.sources?.length ? <details><summary>Sources ({message.sources.length})</summary><ul>{message.sources.map((source) => <li key={source.url}><a href={source.url} rel="noopener noreferrer" target="_blank">{source.title}</a></li>)}</ul></details> : null}
                   </article>
                 ))}
-                {controller?.replyPending ? <p aria-live="polite" className="home-conversation-pending">Inko is thinking...</p> : null}
+                {controller?.draftReply ? (
+                  <article className="home-conversation-message" data-role="inko">
+                    <span>Inko</span>
+                    <StudyAnswerText sources={[]} text={controller.draftReply} />
+                  </article>
+                ) : controller?.replyPending ? <p aria-live="polite" className="home-conversation-pending">Inko is thinking...</p> : null}
               </div>
             )}
           </div>
@@ -136,11 +142,13 @@ export function HomeOrbit() {
             {controller?.partialTranscript ? <p aria-live="polite" className="home-live-transcript"><span>{controller.replyPending ? "Inko" : "Listening"}</span> {controller.partialTranscript}</p> : null}
             {controller?.error ? <p className="home-conversation-error" role="status">{controller.error}</p> : null}
             {uploadError ? <p className="home-conversation-error" role="alert">{uploadError}</p> : null}
+            <SessionDirectory links={sessionLinksFrom(messages)} />
             <ChatSuggestions
               messages={messages}
               sessionTitle={activeChat?.title}
               researchSessionId={activeChat?.research_session_id ?? null}
               onResearchSessionCreated={(id) => controller?.linkResearchSession(id)}
+              onPinLink={(link) => controller?.pinSessionLink(link)}
             />
             <form className="home-conversation-composer" onSubmit={(event) => void send(event)}>
               {attachment ? <div className="home-attachment"><Paperclip size={16} /><span>{attachment.name}</span><button aria-label="Remove attachment" onClick={() => setAttachment(null)} type="button"><X size={16} /></button></div> : null}

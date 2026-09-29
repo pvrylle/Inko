@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { createResearchSession, createSource } from "@/features/research/research-repository";
 import { useToasts } from "@/features/toast/toast-provider";
-import type { StudySourceLink, VoiceMessage } from "@/features/voice/voice-types";
+import type { ChatSessionLink, StudySourceLink, VoiceMessage } from "@/features/voice/voice-types";
 import { deriveConversationTitle } from "@/lib/chat/conversation-title";
 import { inkoFetch } from "@/lib/auth/api-client";
 import { upsertLocalRecord } from "@/lib/data/local-store";
@@ -85,6 +86,38 @@ export function sessionStudyContext(messages: VoiceMessage[], sessionTitle?: str
   return { answer, question: question || lastStudent, topic };
 }
 
+const linkKindLabel: Record<ChatSessionLink["kind"], string> = {
+  research: "Research",
+  debate: "Debate",
+  flashcards: "Flashcards",
+};
+
+export function sessionLinksFrom(messages: VoiceMessage[]) {
+  const seen = new Set<string>();
+  const links: ChatSessionLink[] = [];
+  for (const message of messages) {
+    const link = message.link;
+    if (!link || seen.has(`${link.kind}:${link.href}`)) continue;
+    seen.add(`${link.kind}:${link.href}`);
+    links.push(link);
+  }
+  return links;
+}
+
+export function SessionDirectory({ links }: { links: ChatSessionLink[] }) {
+  if (!links.length) return null;
+  return (
+    <div aria-label="Saved from this chat" className="chat-session-directory">
+      {links.map((link) => (
+        <Link href={link.href} key={`${link.kind}:${link.href}`}>
+          <span>{linkKindLabel[link.kind]}</span>
+          <strong>{link.title}</strong>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 function clipLabel(prefix: string, topic: string, empty: string) {
   if (!topic) return empty;
   const body = topic.length > 28 ? `${topic.slice(0, 25).trim()}…` : topic;
@@ -98,6 +131,7 @@ export function ChatSuggestions({
   sessionTitle,
   researchSessionId = null,
   onResearchSessionCreated,
+  onPinLink,
 }: {
   brief?: PageBriefLike | null;
   onSend?: (text: string) => void;
@@ -105,6 +139,7 @@ export function ChatSuggestions({
   sessionTitle?: string;
   researchSessionId?: string | null;
   onResearchSessionCreated?: (id: string) => void;
+  onPinLink?: (link: ChatSessionLink) => void;
 }) {
   const router = useRouter();
   const { userId } = useAuth();
@@ -237,8 +272,10 @@ export function ChatSuggestions({
     try {
       if (id === "debate") {
         const claim = (question || topic).trim().slice(0, 500);
-        const params = new URLSearchParams({ topic: claim.slice(0, 200), claim, mode: "debate" });
-        router.push(`/debate?${params}`);
+        const params = new URLSearchParams({ topic: claim.slice(0, 200), claim, mode: "debate", live: "1" });
+        const href = `/debate?${params.toString()}`;
+        onPinLink?.({ kind: "debate", title: topic, href });
+        showToast({ tone: "success", title: "Debate saved in this chat", message: topic });
         return;
       }
       if (id === "research") {
@@ -247,7 +284,8 @@ export function ChatSuggestions({
           return;
         }
         if (researchSessionId) {
-          router.push(`/research?session=${encodeURIComponent(researchSessionId)}`);
+          onPinLink?.({ kind: "research", title: topic, href: `/research?session=${encodeURIComponent(researchSessionId)}` });
+          showToast({ tone: "success", title: "Research saved in this chat", message: topic });
           return;
         }
         const researchQuestion = (question.trim().length >= 10 ? question : topic).trim().slice(0, 500);
@@ -261,8 +299,8 @@ export function ChatSuggestions({
             // A rejected link should not drop the research project.
           }
         }));
-        showToast({ tone: "success", title: "Research project opened", message: topic });
-        router.push(`/research?session=${encodeURIComponent(session.id)}`);
+        onPinLink?.({ kind: "research", title: topic, href: `/research?session=${encodeURIComponent(session.id)}` });
+        showToast({ tone: "success", title: "Research saved in this chat", message: topic });
         return;
       }
       if (id === "cards") {
@@ -285,8 +323,8 @@ export function ChatSuggestions({
           return;
         }
         keepLocal(userId, outcome.result);
-        showToast({ tone: "success", title: "Flashcards ready", message: topic });
-        router.push("/flashcards");
+        onPinLink?.({ kind: "flashcards", title: topic, href: "/flashcards" });
+        showToast({ tone: "success", title: "Flashcards saved in this chat", message: topic });
       }
     } catch (caught) {
       fail({ error: caught instanceof Error ? caught.message : "TOOL_FAILED" });
