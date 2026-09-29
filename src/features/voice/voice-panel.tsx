@@ -100,7 +100,7 @@ function VoicePanelView({ controller }: { controller: VoiceAgentController }) {
       <div className="talk-panel">
         <div className="voice-wave" data-active={active} aria-hidden="true">
           {Array.from({ length: 16 }, (_, index) => (
-            <span key={index} style={{ "--wave-index": index, "--voice-amp": Math.min(1, amplitude) } as React.CSSProperties} />
+            <span key={index} style={{ "--wave-index": index, "--wave-step": index % 6, "--voice-amp": Math.min(1, amplitude) } as React.CSSProperties} />
           ))}
         </div>
 
@@ -128,7 +128,7 @@ function VoicePanelView({ controller }: { controller: VoiceAgentController }) {
 
         <div className="voice-wave voice-wave-right" data-active={active} aria-hidden="true">
           {Array.from({ length: 16 }, (_, index) => (
-            <span key={index} style={{ "--wave-index": index, "--voice-amp": Math.min(1, amplitude) } as React.CSSProperties} />
+            <span key={index} style={{ "--wave-index": index, "--wave-step": index % 6, "--voice-amp": Math.min(1, amplitude) } as React.CSSProperties} />
           ))}
         </div>
 

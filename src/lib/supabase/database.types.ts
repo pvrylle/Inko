@@ -24,6 +24,12 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["chat_turns"]["Insert"]>;
         Relationships: [];
       };
+      companion_sessions: {
+        Row: Owned & Timestamps & { title: string; messages: Json; research_session_id: string | null; archived_at: string | null; updated_at: string };
+        Insert: { id?: string; owner_id: string; title?: string; messages?: Json; research_session_id?: string | null; archived_at?: string | null; created_at?: string; updated_at?: string };
+        Update: Partial<Database["public"]["Tables"]["companion_sessions"]["Insert"]>;
+        Relationships: [];
+      };
       notes: {
         Row: Owned & Timestamps & { title: string; summary: string; content_markdown: string; source: Database["public"]["Enums"]["note_source"]; storage_path: string | null; updated_at: string };
         Insert: { id?: string; owner_id: string; title: string; summary?: string; content_markdown: string; source?: Database["public"]["Enums"]["note_source"]; storage_path?: string | null; created_at?: string; updated_at?: string };

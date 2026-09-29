@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, GitCompare, HelpCircle, Info, Lightbulb, Mic2, Target } from "lucide-react";
+import { FileText, GitCompare, HelpCircle, Info, Lightbulb } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type {
   OpenQuestion,
@@ -40,12 +40,6 @@ const TABS: { id: ResearchTab; label: string }[] = [
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-const overviewAskChips: { label: string; tab: ResearchTab }[] = [
-  { label: "Show me the sources.", tab: "sources" },
-  { label: "Find contradictory studies.", tab: "contradictions" },
-  { label: "Put the main arguments on the canvas.", tab: "canvas" },
-];
-
 const findingIcons = [
   { Icon: Lightbulb, tone: "teal" },
   { Icon: Info, tone: "blue" },
@@ -54,14 +48,12 @@ const findingIcons = [
 
 /** Overview tab — Inko-guided summary of the active session (Requirement 8.4). */
 function OverviewPanel({
-  session,
   sources,
   findings,
   contradictions,
   openQuestions,
   setActiveTab,
 }: {
-  session: ResearchSession;
   sources: ResearchSource[];
   findings: ResearchFinding[];
   contradictions: ResearchContradiction[];
@@ -79,16 +71,6 @@ function OverviewPanel({
     <div className="research-panel research-overview">
       <div className="overview-section-head"><FileText size={16} /> <h3>Overview</h3></div>
 
-      <div className="overview-ask">
-        <span className="overview-ask-icon" aria-hidden="true"><Mic2 size={16} /></span>
-        <p>Jump into any part of this project. Talk with Inko only if you want to.</p>
-        <div className="overview-ask-chips">
-          {overviewAskChips.map((chip) => (
-            <button key={chip.label} onClick={() => setActiveTab(chip.tab)} type="button">&ldquo;{chip.label}&rdquo;</button>
-          ))}
-        </div>
-      </div>
-
       <div className="overview-stats">
         {stats.map(({ key, label, value, Icon, tone }) => (
           <button className="overview-stat" data-tone={tone} key={key} onClick={() => setActiveTab(key)} type="button">
@@ -98,11 +80,6 @@ function OverviewPanel({
           </button>
         ))}
       </div>
-
-      <section className="overview-question">
-        <div className="overview-section-head"><Target size={16} /> <h3>Research Question</h3></div>
-        <div className="overview-question-box">{session.question}</div>
-      </section>
 
       <section className="overview-findings">
         <div className="overview-section-head overview-section-head--row">
@@ -502,7 +479,6 @@ function renderPanel(
     case "overview":
       return (
         <OverviewPanel
-          session={activeSession}
           sources={sources}
           findings={findings}
           contradictions={contradictions}

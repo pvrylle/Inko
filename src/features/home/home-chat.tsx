@@ -1,157 +1,170 @@
 "use client";
 
-import { Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { useAuth } from "@/components/providers/auth-provider";
+import { ArrowUp, Check, History, MoreHorizontal, Plus, X } from "lucide-react";
+import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { InkoMascot } from "@/features/mascot/inko-mascot";
 import { useMascot } from "@/features/mascot/mascot-provider";
-import { createSource } from "@/features/research/research-repository";
-import type { ResearchSession } from "@/features/research/research-schema";
+import { useOptionalProjects } from "@/features/projects/project-provider";
 import { VoiceCapsule } from "@/features/voice/voice-capsule";
 import type { VoiceAgentController } from "@/features/voice/voice-agent-provider";
 import type { VoiceMessage } from "@/features/voice/voice-types";
-import { AnswerToolIcons, StudyAnswerCard, StudyAnswerText } from "./study-answer-card";
-
-function studyQuestion(question: string) {
-  const asked = question.trim();
-  if (asked.length >= 10) return asked.slice(0, 500);
-  return asked.length > 0 ? `${asked} — explain this for study`.slice(0, 500) : "Study this topic from the sources Inko found.";
-}
-
-function ThinkingTurn() {
-  const { state } = useMascot();
-  return (
-    <article className="home-turn" data-pending="true" data-role="inko">
-      <span className="home-turn-who">
-        <InkoMascot className="home-turn-mascot" fit="cover" state={state} />
-        Inko
-      </span>
-      <p>Looking up sources…</p>
-    </article>
-  );
-}
+import { AnswerToolIcons, StudyAnswerText } from "./study-answer-card";
 
 function questionBefore(messages: VoiceMessage[], index: number) {
   for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
-    const earlier = messages[cursor];
-    if (earlier?.role === "student") return earlier.text;
+    if (messages[cursor]?.role === "student") return messages[cursor].text;
   }
   return "";
 }
 
-function ChatTurn({
-  message,
-  question,
-  sessionId,
-}: {
-  message: VoiceMessage;
-  question: string;
-  sessionId: string | null;
-}) {
+function ChatTurn({ message, question, sessionId, onResearchSessionCreated }: { message: VoiceMessage; question: string; sessionId: string | null; onResearchSessionCreated: (id: string) => void }) {
+  const isInko = message.role === "inko";
   const sources = message.sources ?? [];
   return (
-    <article className="home-turn" data-role={message.role}>
-      <span>{message.role === "inko" ? "Inko" : "You"}</span>
-      {message.role === "inko" ? <StudyAnswerText sources={sources} text={message.text} /> : <p>{message.text}</p>}
-      {message.role === "inko" ? <AnswerToolIcons answer={message} question={question} sessionId={sessionId} /> : null}
+    <article className="assistant-turn" data-role={message.role}>
+      <span className="assistant-turn-speaker">{isInko ? "Inko" : "You"}</span>
+      {isInko ? <StudyAnswerText sources={sources} text={message.text} /> : <p>{message.text}</p>}
+      {isInko && sources.length > 0 ? (
+        <details className="assistant-turn-more">
+          <summary>{sources.length} sources and actions</summary>
+          <ul>
+            {sources.map((source, index) => (
+              <li key={`${source.url}-${index}`}><a href={source.url} rel="noopener noreferrer" target="_blank">{source.title}</a></li>
+            ))}
+          </ul>
+          <AnswerToolIcons answer={message} question={question} sessionId={sessionId} onResearchSessionCreated={onResearchSessionCreated} />
+        </details>
+      ) : null}
     </article>
   );
 }
 
-export function HomeChat({
-  controller,
-  createSession,
-  onNewSession,
-}: {
-  controller: VoiceAgentController;
-  createSession: (question: string) => Promise<ResearchSession | undefined>;
-  onNewSession: () => void;
-}) {
-  const { userId } = useAuth();
-  const { messages, replyPending, error } = controller;
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [sessionStatus, setSessionStatus] = useState<"opening" | "ready" | "saved-chat">("opening");
-  const started = useRef(false);
+export function HomeChat({ controller, home = false, onClose }: { controller: VoiceAgentController; home?: boolean; onClose?: () => void }) {
+  const router = useRouter();
+  const { state } = useMascot();
+  const projects = useOptionalProjects();
+  const { messages, replyPending, error, activeSessionId } = controller;
+  const [draft, setDraft] = useState("");
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [draftTitle, setDraftTitle] = useState("");
   const threadRef = useRef<HTMLDivElement>(null);
-  const question = messages.find((message) => message.role === "student")?.text ?? "New session";
-  const latestAnswer = [...messages].reverse().find((message) => message.role === "inko");
+  const active = controller.sessions.find((session) => session.id === activeSessionId);
+  const visibleSessions = controller.sessions.filter((session) => !session.archived_at && (!projects?.activeId || projects.conversationProjects[session.id] === projects.activeId));
+  const status = error ? "Needs attention" : replyPending ? "Thinking" : controller.connection === "connected" ? "Listening" : "Ready";
 
   useEffect(() => {
     const thread = threadRef.current;
-    if (!thread) return;
-    const distance = thread.scrollHeight - thread.scrollTop - thread.clientHeight;
-    if (distance < 160) thread.scrollTo({ top: thread.scrollHeight, behavior: "smooth" });
-  }, [messages, replyPending]);
+    if (thread) thread.scrollTop = thread.scrollHeight;
+  }, [activeSessionId, messages.length]);
 
-  useEffect(() => {
-    if (!latestAnswer || started.current) return;
-    started.current = true;
-    const sources = latestAnswer.sources ?? [];
-    void (async () => {
-      const session = await createSession(studyQuestion(question));
-      if (!session) {
-        setSessionStatus("saved-chat");
-        return;
-      }
-      if (userId) {
-        await Promise.all(sources.map(async (source) => {
-          try {
-            await createSource(userId, session.id, {
-              title: source.title.slice(0, 200),
-              url: source.url,
-              type: "url",
-              tag: "supports",
-            });
-          } catch {
-            // The session still exists when one link is rejected.
-          }
-        }));
-      }
-      window.history.replaceState(null, "", "/");
-      setSessionId(session.id);
-      setSessionStatus("ready");
-    })();
-  }, [createSession, latestAnswer, question, userId]);
+  const newConversation = () => {
+    controller.clearConversation();
+    setDraft("");
+    setHistoryOpen(false);
+    router.push("/");
+  };
 
-  const title = question.length > 72 ? `${question.slice(0, 72).trim()}…` : question;
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const text = draft.trim();
+    if (!text || replyPending) return;
+    setDraft("");
+    void controller.sendText(text);
+  };
+
+  const onDraftKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+      event.preventDefault();
+      event.currentTarget.form?.requestSubmit();
+    }
+  };
 
   return (
-    <div className="home-chat">
-      <header className="home-chat-bar">
-        <div>
-          <span>{sessionStatus === "opening" ? "Opening session…" : sessionStatus === "ready" ? "Session" : "Chat"}</span>
-          <h1>{title}</h1>
+    <section className="assistant-panel" aria-label="Inko assistant">
+      <header className="assistant-panel-header">
+        <div><strong title={active?.title || "Inko"}>{active?.title || "Inko"}</strong><span><i data-status={status} />{status}</span></div>
+        <div className="assistant-panel-actions">
+          <button aria-label={historyOpen ? "Hide conversations" : "Show conversations"} aria-expanded={historyOpen} onClick={() => setHistoryOpen((open) => !open)} title="Conversations" type="button"><History size={18} /></button>
+          <button aria-label="New conversation" onClick={newConversation} title="New conversation" type="button"><Plus size={18} /></button>
+          {onClose ? <button aria-label="Close assistant" className="assistant-close" onClick={onClose} title="Close assistant" type="button"><X size={18} /></button> : null}
         </div>
-        <button className="home-chat-new" onClick={onNewSession} type="button">
-          <Plus aria-hidden="true" size={14} /> New session
-        </button>
       </header>
 
-      <div className="home-chat-grid">
-        <div className="home-chat-main">
-          <div className="home-chat-thread" ref={threadRef}>
-            {messages.map((message, index) => (
-              <ChatTurn key={message.id} message={message} question={questionBefore(messages, index)} sessionId={sessionId} />
-            ))}
-            {replyPending ? <ThinkingTurn /> : null}
-            {error ? <p className="voice-capsule-error">{error}</p> : null}
-          </div>
-          <VoiceCapsule compact />
+      {historyOpen ? (
+        <div className="assistant-history" aria-label="Conversations">
+          <div className="assistant-history-heading"><strong>Conversations</strong><span>{visibleSessions.length}</span></div>
+          {controller.sessionError ? <p className="assistant-history-error" role="status">{controller.sessionError}</p> : null}
+          {visibleSessions.length === 0 ? <p className="assistant-history-empty">No conversations yet.</p> : null}
+          {visibleSessions.map((session) => (
+            <div className="assistant-history-row" key={session.id}>
+              {editingId === session.id ? (
+                <form onSubmit={(event) => { event.preventDefault(); if (draftTitle.trim()) controller.renameConversation(session.id, draftTitle); setEditingId(null); }}>
+                  <input aria-label="Conversation title" autoFocus maxLength={160} onChange={(event) => setDraftTitle(event.target.value)} value={draftTitle} />
+                  <button aria-label="Save title" type="submit"><Check size={15} /></button>
+                  <button aria-label="Cancel rename" onClick={() => setEditingId(null)} type="button"><X size={15} /></button>
+                </form>
+              ) : deleteId === session.id ? (
+                <div className="assistant-history-confirm"><span>Delete this conversation?</span><button onClick={() => setDeleteId(null)} type="button">Cancel</button><button onClick={() => { controller.removeConversation(session.id); setDeleteId(null); }} type="button">Delete</button></div>
+              ) : (
+                <>
+                  <button aria-current={activeSessionId === session.id ? "true" : undefined} className="assistant-history-item" onClick={() => { controller.openConversation(session.id); setHistoryOpen(false); }} type="button">{session.title || "New conversation"}</button>
+                  <details className="assistant-history-options">
+                    <summary aria-label={`Options for ${session.title || "New conversation"}`} title="Conversation options"><MoreHorizontal size={17} /></summary>
+                    <div>
+                      <button onClick={() => { setDraftTitle(session.title || "New conversation"); setEditingId(session.id); }} type="button">Rename</button>
+                      <button onClick={() => controller.archiveConversation(session.id)} type="button">Archive</button>
+                      <button onClick={() => setDeleteId(session.id)} type="button">Delete</button>
+                      {projects && projects.projects.length > 0 ? (
+                        <label>Project
+                          <select aria-label={`Project for ${session.title || "New conversation"}`} onChange={(event) => projects.assignConversation(session.id, event.target.value || null)} value={projects.conversationProjects[session.id] ?? ""}>
+                            <option value="">No project</option>
+                            {projects.projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                          </select>
+                        </label>
+                      ) : null}
+                    </div>
+                  </details>
+                </>
+              )}
+            </div>
+          ))}
         </div>
-
-        <aside className="home-chat-side" aria-label="Session tools">
-          <p className="home-chat-side-status">
-            {sessionStatus === "opening" && "Saving this as a research session."}
-            {sessionStatus === "ready" && "This chat is a research session. Follow-ups stay here."}
-            {sessionStatus === "saved-chat" && "The chat is open. A saved session needs a free account or a free session slot."}
-          </p>
-          {latestAnswer ? (
-            <StudyAnswerCard answer={latestAnswer} panel question={question} sessionId={sessionId} />
+      ) : (
+        <>
+          <div className="assistant-character">
+            <InkoMascot className="assistant-character-mascot" fit="contain" state={state} />
+            <span aria-live="polite">{status === "Ready" ? "Here with you" : status}</span>
+          </div>
+          {home ? (
+            <div className="assistant-live" aria-live="polite">
+              <span>{controller.partialTranscript ? replyPending ? "Inko" : "Hearing you" : replyPending ? "Thinking" : "Voice companion"}</span>
+              <p>{controller.partialTranscript || (replyPending ? "Working through your question..." : "I'm here whenever you need me.")}</p>
+              {error ? <p className="assistant-error" role="status">{error}</p> : null}
+            </div>
           ) : (
-            <p className="study-answer-note">Sources and tools show up with the answer.</p>
+            <div className="assistant-thread" ref={threadRef}>
+              {messages.length === 0 ? <p className="assistant-empty">Tell me what you want to work on.</p> : null}
+              {messages.map((message, index) => (
+                <ChatTurn key={message.id} message={message} question={questionBefore(messages, index)} sessionId={active?.research_session_id ?? null} onResearchSessionCreated={controller.linkResearchSession} />
+              ))}
+              {replyPending ? <p aria-live="polite" className="assistant-pending">Inko is thinking...</p> : null}
+              {error ? <p className="assistant-error" role="status">{error}</p> : null}
+            </div>
           )}
-        </aside>
+        </>
+      )}
+
+      <div className="assistant-composer-area">
+        {!home ? <form className="assistant-composer" onSubmit={submit}>
+          <label className="sr-only" htmlFor="assistant-input">Message Inko</label>
+          <textarea id="assistant-input" maxLength={4000} onChange={(event) => setDraft(event.target.value)} onKeyDown={onDraftKeyDown} placeholder="Ask or tell Inko anything" rows={2} value={draft} />
+          <button aria-label="Send message" disabled={!draft.trim() || replyPending} title="Send message" type="submit"><ArrowUp size={19} /></button>
+        </form> : null}
+        <VoiceCapsule compact />
       </div>
-    </div>
+    </section>
   );
 }

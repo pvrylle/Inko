@@ -8,6 +8,18 @@ import { initialMascotState } from "@/features/mascot/mascot-state";
 import { AuthForm } from "./auth-form";
 import type { AuthMode } from "./auth-modal-provider";
 
+function AuthModalBody({ mode, ticket }: { mode: AuthMode; ticket: number }) {
+  const [activeMode, setActiveMode] = useState<AuthMode>(mode);
+  const signingUp = activeMode === "signup";
+  return (
+    <div className="auth-modal-body">
+      <h2 id="auth-modal-title">{signingUp ? "Create your free account" : "Welcome back"}</h2>
+      <p>{signingUp ? "Save your research and unlock live voice." : "Sign in and pick up your study session."}</p>
+      <AuthForm key={ticket} initialMode={mode} onModeChange={setActiveMode} hideGuestHint />
+    </div>
+  );
+}
+
 export function AuthModal({
   open,
   mode,
@@ -20,11 +32,6 @@ export function AuthModal({
   onClose: () => void;
 }) {
   const { user } = useAuth();
-  const [activeMode, setActiveMode] = useState<AuthMode>(mode);
-
-  useEffect(() => {
-    if (open) setActiveMode(mode);
-  }, [open, mode, ticket]);
 
   useEffect(() => {
     if (!open) return;
@@ -46,8 +53,6 @@ export function AuthModal({
 
   if (!open) return null;
 
-  const signingUp = activeMode === "signup";
-
   return (
     <div className="auth-modal-backdrop" onClick={onClose}>
       <div
@@ -63,11 +68,7 @@ export function AuthModal({
         <div className="auth-modal-hero" aria-hidden="true">
           <InkoMascot character="octopus" state={initialMascotState} className="auth-modal-mascot" fit="contain" />
         </div>
-        <div className="auth-modal-body">
-          <h2 id="auth-modal-title">{signingUp ? "Create your free account" : "Welcome back"}</h2>
-          <p>{signingUp ? "Save your research and unlock live voice." : "Sign in and pick up your study session."}</p>
-          <AuthForm key={ticket} initialMode={mode} onModeChange={setActiveMode} hideGuestHint />
-        </div>
+        <AuthModalBody key={`${ticket}:${mode}`} mode={mode} ticket={ticket} />
       </div>
     </div>
   );

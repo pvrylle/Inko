@@ -2,9 +2,9 @@ import "server-only";
 import { GoogleGenAI } from "@google/genai";
 
 function geminiKeys() {
-  return [process.env.GEMINI_API_KEY, process.env.GEMINI_API_KEY2]
+  return [...new Set([process.env.GEMINI_API_KEY, process.env.GEMINI_API_KEY2, process.env.GEMINI_API_KEY3]
     .map((key) => key?.trim())
-    .filter((key): key is string => Boolean(key));
+    .filter((key): key is string => Boolean(key)))];
 }
 
 export function isGeminiConfigured() {
@@ -23,6 +23,20 @@ export function getGeminiModel() {
 /** Home and spoken replies. Study work keeps GEMINI_MODEL. */
 export function getGeminiChatModel() {
   return process.env.GEMINI_CHAT_MODEL?.trim() || "gemini-flash-lite-latest";
+}
+
+/** Transcribe a short browser recording without exposing the API key to the client. */
+export async function transcribeAudio(data: Buffer, mimeType: string) {
+  return withGeminiFallback(async (client) => {
+    const response = await client.models.generateContent({
+      model: getGeminiModel(),
+      contents: [
+        { text: "Transcribe the speech in this audio exactly. Return only the spoken words. If there is no intelligible speech, return an empty response." },
+        { inlineData: { mimeType, data: data.toString("base64") } },
+      ],
+    });
+    return response.text?.trim() ?? "";
+  });
 }
 
 function isRetryableGeminiError(error: unknown) {
@@ -119,27 +133,44 @@ export async function generateStudyAnswer(prompt: string) {
   throw lastError instanceof Error ? lastError : new Error("GEMINI_FAILED");
 }
 
+export async function generateAttachmentAnswer(prompt: string, mimeType: string, data: string) {
+  return withGeminiFallback(async (client) => {
+    const response = await client.models.generateContent({
+      model: getGeminiModel(),
+      contents: [{ role: "user", parts: [{ text: prompt }, { inlineData: { mimeType, data } }] }],
+      config: { maxOutputTokens: 800, temperature: 0.2 },
+    });
+    const text = response.text?.trim();
+    if (!text) throw new Error("GEMINI_EMPTY_RESPONSE");
+    return text;
+  });
+}
+
 /** Yields reply text as Gemini writes it, so the home page can leave "Thinking…" early. */
 export async function* generateFastGeminiTextStream(prompt: string) {
   const keys = geminiKeys();
   if (keys.length === 0) throw new Error("GEMINI_NOT_CONFIGURED");
-  const fastModel = getGeminiChatModel();
-  const client = new GoogleGenAI({ apiKey: keys[0] });
-  try {
-    yield* streamModel(client, fastModel, prompt);
-  } catch (error) {
-    if (isMissingModelError(error) && fastModel !== getGeminiModel()) {
-      yield* streamModel(client, getGeminiModel(), prompt);
-      return;
+  const models = [getGeminiChatModel(), getGeminiModel()].filter((model, index, all) => all.indexOf(model) === index);
+  let sawRetryable = false;
+  for (const model of models) {
+    for (const apiKey of keys) {
+      let emitted = false;
+      try {
+        for await (const piece of streamModel(new GoogleGenAI({ apiKey }), model, prompt)) {
+          emitted = true;
+          yield piece;
+        }
+        return;
+      } catch (error) {
+        // Retrying after text is visible would duplicate the beginning of the reply.
+        if (emitted) throw new Error("GEMINI_UNAVAILABLE");
+        if (isMissingModelError(error)) break;
+        if (!isRetryableGeminiError(error)) throw new Error("GEMINI_FAILED");
+        sawRetryable = true;
+      }
     }
-    const backup = keys[1];
-    if (backup && isRetryableGeminiError(error)) {
-      yield* streamModel(new GoogleGenAI({ apiKey: backup }), fastModel, prompt);
-      return;
-    }
-    if (isMissingModelError(error)) throw new Error("GEMINI_MODEL_UNAVAILABLE");
-    throw new Error(isRetryableGeminiError(error) ? "GEMINI_UNAVAILABLE" : "GEMINI_FAILED");
   }
+  throw new Error(sawRetryable ? "GEMINI_UNAVAILABLE" : "GEMINI_MODEL_UNAVAILABLE");
 }
 
 type GeminiChatPart =

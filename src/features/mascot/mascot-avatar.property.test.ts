@@ -81,6 +81,7 @@ import { vi } from "vitest";
 // Mock the provider module so useMascot() returns a controlled value.
 vi.mock("./mascot-provider", () => ({
   useMascot: vi.fn(),
+  useOptionalMascot: () => null,
 }));
 
 // Also mock motion/react to prevent animation side-effects in jsdom.

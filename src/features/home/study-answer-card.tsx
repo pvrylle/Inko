@@ -96,7 +96,7 @@ export function StudyAnswerText({ text, sources }: { text: string; sources: Stud
   );
 }
 
-function useStudyToolRunner(answer: VoiceMessage, question: string, sessionId: string | null) {
+function useStudyToolRunner(answer: VoiceMessage, question: string, sessionId: string | null, onResearchSessionCreated?: (id: string) => void) {
   const router = useRouter();
   const { userId } = useAuth();
   const { showToast } = useToasts();
@@ -144,6 +144,7 @@ function useStudyToolRunner(answer: VoiceMessage, question: string, sessionId: s
     if (sessionRef.current) return sessionRef.current;
     const session = await createResearchSession(userId, studyQuestion(question, answer.text));
     sessionRef.current = session.id;
+    onResearchSessionCreated?.(session.id);
     await Promise.all(sources.map(async (source) => {
       try {
         await createSource(userId, session.id, { title: source.title.slice(0, 200), url: source.url, type: "url", tag: "supports" });
@@ -270,12 +271,14 @@ export function AnswerToolIcons({
   answer,
   question,
   sessionId = null,
+  onResearchSessionCreated,
 }: {
   answer: VoiceMessage;
   question: string;
   sessionId?: string | null;
+  onResearchSessionCreated?: (id: string) => void;
 }) {
-  const { busy, run } = useStudyToolRunner(answer, question, sessionId);
+  const { busy, run } = useStudyToolRunner(answer, question, sessionId, onResearchSessionCreated);
   const suggestions = suggestStudyTools(question, answer.text, answer.sources?.length ?? 0);
   const [open, setOpen] = useState<{ id: string; label: string; hint: string; anchor: HTMLButtonElement } | null>(null);
   const closeTimer = useRef<number | null>(null);

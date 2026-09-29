@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { getLocalResearchProject } from "@/lib/data/research-local";
 import {
@@ -96,7 +96,6 @@ export function useResearch(): UseResearchReturn {
   const [activeTab, setActiveTab] = useState<ResearchTab>("overview");
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
-  const autoOpened = useRef(false);
 
   // ── Load the full session list (Requirement 8.2) ────────────────────────────
   const reloadSessions = useCallback(async () => {
@@ -104,11 +103,6 @@ export function useResearch(): UseResearchReturn {
     try {
       const data = await listResearchSessions(userId);
       setSessions(data);
-      setActiveSessionId((current) => {
-        if (current || autoOpened.current) return current;
-        autoOpened.current = true;
-        return data[0]?.id ?? null;
-      });
       setError(null);
     } catch {
       setError("Your research sessions couldn't be loaded.");
@@ -191,13 +185,19 @@ export function useResearch(): UseResearchReturn {
   // ── setActive: pick a session from the sidebar (Requirement 8.3) ────────────
   const setActive = useCallback((id: string, tab?: ResearchTab) => {
     const nextTab = tab ?? "overview";
+    setActiveSession(sessions.find((session) => session.id === id) ?? null);
     setActiveSessionId(id);
+    setSources([]);
+    setFindings([]);
+    setContradictions([]);
+    setOpenQuestions([]);
+    setCanvasContent("");
+    setNoteMarkdown("");
     setActiveTab(nextTab);
     syncResearchUrl(id, nextTab);
-  }, []);
+  }, [sessions]);
 
   const startNewProject = useCallback(() => {
-    autoOpened.current = true;
     setActiveSessionId(null);
     setActiveSession(null);
     setSources([]);
@@ -215,13 +215,13 @@ export function useResearch(): UseResearchReturn {
     async (question: string) => {
       if (!userId) return undefined;
 
-      // Validate question length (10–500 chars)
+      // Validate topic or question length (2–500 chars)
       const result = researchQuestionSchema.safeParse(question);
       if (!result.success) {
         const issue = result.error.issues[0];
         if (issue?.code === "too_small") {
           setSessionError(
-            "Research question must be at least 10 characters.",
+            "Enter at least two characters for a topic.",
           );
         } else if (issue?.code === "too_big") {
           setSessionError(

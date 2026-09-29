@@ -1,39 +1,29 @@
 "use client";
 
-import {
-  ArrowLeft,
-  ArrowRight,
-  Calendar,
-  Clock,
-  FileText,
-  FolderOpen,
-  Mic2,
-} from "lucide-react";
-import Link from "next/link";
+import { ArrowRight, BookOpen, FileSearch, FolderOpen, Lightbulb, Plus, Search, Sparkles } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { ContentTopbar } from "@/components/layout/content-topbar";
-import { InkoMascot } from "@/features/mascot/inko-mascot";
 import { useMascot } from "@/features/mascot/mascot-provider";
-import { PageVoiceControl } from "@/features/voice/page-voice-control";
 import { ResearchSessionForm } from "./research-session-form";
 import { ResearchTabs } from "./research-tabs";
 import { useResearch } from "./use-research";
 
 function relativeTime(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.round(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
+  const elapsed = Date.now() - new Date(iso).getTime();
+  const hours = Math.max(1, Math.round(elapsed / 3600000));
+  return hours < 24 ? `${hours}h ago` : `${Math.round(hours / 24)}d ago`;
 }
 
 export function ResearchView() {
   const research = useResearch();
-  const { state, dispatch } = useMascot();
+  const { dispatch } = useMascot();
   const { sessions, activeSession, loading, error, setActive, startNewProject } = research;
+  const appliedParam = useRef(false);
   const previousStatus = useRef<string | null>(null);
+  const recentInvestigations = sessions.slice(0, 6);
+  const visibleInvestigations = activeSession && !recentInvestigations.some((session) => session.id === activeSession.id)
+    ? [activeSession, ...recentInvestigations.slice(0, 5)]
+    : recentInvestigations;
 
   useEffect(() => {
     const status = activeSession?.status ?? null;
@@ -47,9 +37,7 @@ export function ResearchView() {
       return () => window.clearTimeout(done);
     }
   }, [activeSession?.status, dispatch]);
-  const appliedParam = useRef(false);
 
-  // Open a specific session when navigated from Home ("/research?session=<id>").
   useEffect(() => {
     if (appliedParam.current) return;
     const params = new URLSearchParams(window.location.search);
@@ -61,164 +49,66 @@ export function ResearchView() {
     }
   }, [setActive]);
 
-  const shortTitle = (question: string) => (question.length > 52 ? `${question.slice(0, 52).trim()}…` : question);
-
-  const derivedActivity = activeSession
-    ? [
-        { key: "created", tone: "teal", text: "You started this research project", time: relativeTime(activeSession.created_at) },
-        research.sources.length ? { key: "sources", tone: "blue", text: `Inko found ${research.sources.length} relevant source${research.sources.length === 1 ? "" : "s"}.`, time: relativeTime(activeSession.updated_at) } : null,
-        research.contradictions.length ? { key: "contradictions", tone: "coral", text: `Inko identified ${research.contradictions.length} contradiction${research.contradictions.length === 1 ? "" : "s"}.`, time: relativeTime(activeSession.updated_at) } : null,
-        research.findings.length ? { key: "findings", tone: "blue", text: `Inko saved ${research.findings.length} key finding${research.findings.length === 1 ? "" : "s"}.`, time: relativeTime(activeSession.updated_at) } : null,
-        research.openQuestions.length ? { key: "questions", tone: "amber", text: `${research.openQuestions.length} open question${research.openQuestions.length === 1 ? "" : "s"} to explore.`, time: relativeTime(activeSession.updated_at) } : null,
-      ].filter(Boolean)
-    : [];
-  const activity = research.activity.length ? research.activity : derivedActivity;
-
-  if (loading && !activeSession) {
-    return (
-      <div className="research-view-page page-enter">
-        <ContentTopbar className="research-topbar"><Link className="back-home" href="/"><ArrowLeft size={15} /> Back to Home</Link></ContentTopbar>
-        <div className="research-loading" aria-live="polite" aria-busy="true">
-          <span className="research-loading-orb" />
-          <p>Organising your research desk…</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!activeSession) {
-    return (
-      <div className="research-view-page page-enter">
-        <ContentTopbar className="research-topbar">
-          <Link className="back-home" href="/"><ArrowLeft size={15} /> Back to Home</Link>
-          <PageVoiceControl />
-        </ContentTopbar>
-        {error && <p className="form-error research-error" role="alert">{error}</p>}
-
-        <div className="research-start">
-          <div className="research-start-card">
-            <span className="research-start-mascot" aria-hidden="true"><InkoMascot state={state} className="research-start-inko" fit="contain" /></span>
-            <h1>Start a research project</h1>
-            <p>Ask a question worth investigating. Inko gathers sources, weighs findings, and surfaces contradictions with you.</p>
-            <ResearchSessionForm createSession={research.createSession} sessionError={research.sessionError} />
-          </div>
-
-          {sessions.length > 0 && (
-            <div className="research-start-recent">
-              <h2>Your research</h2>
-              <ul>
-                {sessions.map((session) => (
-                  <li key={session.id}>
-                    <button className="research-start-session" onClick={() => setActive(session.id)} type="button">
-                      <span className="research-start-folder"><FolderOpen size={16} /></span>
-                      <span><strong>{session.question}</strong><small>Updated {relativeTime(session.updated_at)}</small></span>
-                      <ArrowRight size={15} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="research-view-page page-enter">
       <ContentTopbar className="research-topbar">
-        <Link className="back-home" href="/"><ArrowLeft size={15} /> Back to Home</Link>
-        <div className="research-topbar-actions">
-          <button className="secondary-button" onClick={startNewProject} type="button">New project</button>
-          <PageVoiceControl />
-        </div>
+        <span className="research-topbar-title"><FileSearch size={17} /> Research</span>
       </ContentTopbar>
-
       {error && <p className="form-error research-error" role="alert">{error}</p>}
 
-      <div className="research-workspace">
-        <div className="research-main-col">
-          <header className="project-header">
-            <span className="project-folder" aria-hidden="true"><FolderOpen size={24} /></span>
-            <div className="project-heading">
-              <h1>{activeSession.title ?? shortTitle(activeSession.question)}</h1>
-              <p>{activeSession.description?.trim() ? activeSession.description : "Inko is helping you gather evidence, weigh findings, and track open questions for this research."}</p>
-              <div className="project-meta">
-                <span className="meta-chip"><Mic2 size={12} /> Research Project</span>
-                <span className="meta-chip"><Calendar size={12} /> Last updated {relativeTime(activeSession.updated_at)}</span>
-                <span className="meta-chip meta-chip-active"><i /> Active</span>
-              </div>
-            </div>
-            <div className="project-mascot">
-              <span className="project-mascot-bubble">I&apos;ve gathered some sources for your research!</span>
-              <InkoMascot state={state} className="project-mascot-inko" fit="contain" />
-            </div>
+      {!activeSession ? (
+        <div className="research-hub">
+          <header className="research-hub-heading">
+            <span className="research-kicker"><Sparkles size={14} /> RESEARCH WORKSPACE</span>
+            <h1>Follow the question. Find the evidence.</h1>
+            <p>Build a clear line of inquiry with sources, findings, contradictions, and notes in one place.</p>
           </header>
 
-          <ResearchTabs
-            activeSession={activeSession}
-            sources={research.sources}
-            findings={research.findings}
-            contradictions={research.contradictions}
-            openQuestions={research.openQuestions}
-            canvasContent={research.canvasContent}
-            noteMarkdown={research.noteMarkdown}
-            saveCanvas={research.saveCanvas}
-            activeTab={research.activeTab}
-            setActiveTab={research.setActiveTab}
-          />
+          <div className="research-hub-grid">
+            <section className="research-inquiry-card" aria-labelledby="research-inquiry-title">
+              <div className="research-card-heading"><span className="research-card-icon"><Search size={21} /></span><div><span className="research-step">01 / BEGIN</span><h2 id="research-inquiry-title">What are you investigating?</h2></div></div>
+              <p>Start with a focused question. Inko will gather and organize the evidence around it.</p>
+              <ResearchSessionForm createSession={research.createSession} sessionError={research.sessionError} />
+            </section>
+
+            <aside className="research-process-card" aria-label="Research process">
+              <span className="research-step">YOUR RESEARCH PROCESS</span>
+              <h2>From question to clarity</h2>
+              <ol>
+                <li><span><FileSearch size={18} /></span><div><strong>Gather sources</strong><small>Keep useful references together.</small></div></li>
+                <li><span><Lightbulb size={18} /></span><div><strong>Compare findings</strong><small>See what the evidence supports.</small></div></li>
+                <li><span><BookOpen size={18} /></span><div><strong>Develop your thinking</strong><small>Track tensions, questions, and notes.</small></div></li>
+              </ol>
+            </aside>
+          </div>
+
+          <section className="research-library" aria-labelledby="research-library-title">
+            <div className="research-library-heading"><div><span className="research-step">YOUR WORK</span><h2 id="research-library-title">Research library <span>{sessions.length}</span></h2></div></div>
+            {loading ? <p className="research-library-empty" aria-live="polite">Loading research…</p> : sessions.length === 0 ? (
+              <div className="research-library-empty"><FolderOpen size={25} /><strong>Your investigations will live here.</strong><span>Start a question above to build your first research workspace.</span></div>
+            ) : (
+              <div className="research-library-list">
+                {sessions.map((session) => <button className="research-library-row" key={session.id} onClick={() => setActive(session.id)} type="button"><span className="research-library-icon"><FolderOpen size={18} /></span><span className="research-library-copy"><strong>{session.title || session.question}</strong><small>{session.question}</small></span><span className="research-library-time">{relativeTime(session.updated_at)}</span><ArrowRight size={17} /></button>)}
+              </div>
+            )}
+          </section>
         </div>
-
-        <aside className="research-rail" aria-label="Research overview">
-          <article className="rail-card">
-            <div className="rail-card-head">
-              <span className="rail-card-title"><FileText size={15} /> Recent Sources</span>
-              <button className="rail-view-all" onClick={() => research.setActiveTab("sources")} type="button">View all <ArrowRight size={12} /></button>
-            </div>
-            {research.sources.length === 0 ? (
-              <p className="rail-empty">Inko will list gathered sources here.</p>
-            ) : (
-              <ul className="recent-sources-list">
-                {research.sources.slice(0, 4).map((source) => (
-                  <li className="recent-source" key={source.id}>
-                    <span className="recent-source-icon" aria-hidden="true"><FileText size={15} /></span>
-                    <span className="recent-source-body">
-                      <strong>{source.title}</strong>
-                      <small>{source.meta ?? source.type.toUpperCase()}</small>
-                    </span>
-                    <span className="recent-source-tag" data-tag={source.tag}>{source.tag === "supports" ? "Supports" : "Contradicts"}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </article>
-
-          <article className="rail-card">
-            <span className="rail-card-title"><Clock size={15} /> Recent Activity</span>
-            {activity.length === 0 ? (
-              <p className="rail-empty">Your research activity will appear here.</p>
-            ) : (
-              <ul className="recent-activity-list">
-                {activity.map((item) => item && (
-                  <li className="recent-activity" key={item.key}>
-                    <span className="recent-activity-dot" data-tone={item.tone} aria-hidden="true" />
-                    <span className="recent-activity-body"><span>{item.text}</span><small>{item.time}</small></span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </article>
-
-          <article className="rail-card keep-going-card">
-            <span className="keep-going-mascot" aria-hidden="true"><InkoMascot state={state} className="keep-going-inko" fit="cover" /></span>
-            <div className="keep-going-body">
-              <strong>Keep going!</strong>
-              <span>Explore the contradictions or open the full source list.</span>
-            </div>
-            <button className="keep-going-button" onClick={() => research.setActiveTab("contradictions")} type="button" aria-label="Explore contradictions"><ArrowRight size={16} /></button>
-          </article>
-        </aside>
-      </div>
+      ) : (
+        <div className="research-detail">
+          <div className="research-detail-heading">
+            <div><span className="research-kicker">RESEARCH / INVESTIGATION</span><h1>{activeSession.title || activeSession.question}</h1>{activeSession.title && activeSession.title !== activeSession.question ? <p>{activeSession.question}</p> : null}</div>
+            <button className="research-new-button" onClick={startNewProject} type="button"><Plus size={17} /> New research</button>
+          </div>
+          <div className="research-detail-layout">
+            <aside className="research-investigations" aria-label="Investigations">
+              <span className="research-step">RECENT INVESTIGATIONS</span>
+              {visibleInvestigations.map((session) => <button aria-current={session.id === activeSession.id ? "true" : undefined} aria-label={`Open ${session.title || session.question}`} key={session.id} onClick={() => setActive(session.id)} title={session.title || session.question} type="button"><FolderOpen size={16} /><span><strong>{session.title || session.question}</strong><small>Updated {relativeTime(session.updated_at)}</small></span></button>)}
+              <button className="research-investigations-all" onClick={startNewProject} type="button">View all {sessions.length} investigations <ArrowRight size={15} /></button>
+            </aside>
+            <ResearchTabs activeSession={activeSession} sources={research.sources} findings={research.findings} contradictions={research.contradictions} openQuestions={research.openQuestions} canvasContent={research.canvasContent} noteMarkdown={research.noteMarkdown} saveCanvas={research.saveCanvas} activeTab={research.activeTab} setActiveTab={research.setActiveTab} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
