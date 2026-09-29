@@ -5,6 +5,7 @@ import { type DragEvent, type FormEvent, type KeyboardEvent, useEffect, useRef, 
 import { ContentTopbar } from "@/components/layout/content-topbar";
 import { useOptionalProjects } from "@/features/projects/project-provider";
 import { useOptionalVoiceAgent } from "@/features/voice/voice-agent-provider";
+import { WELCOME_PROMPT_KEY } from "@/features/onboarding/onboarding-flow";
 import { ChatSuggestions, SessionDirectory, sessionLinksFrom } from "./chat-suggestions";
 import { StudentMessageEdit } from "./student-message-edit";
 import { StudyAnswerText } from "./study-answer-card";
@@ -37,6 +38,13 @@ export function HomeOrbit() {
     const requested = new URLSearchParams(window.location.search).get("chat");
     if (requested && controller?.sessions.some((session) => session.id === requested)) controller.openConversation(requested);
   }, [controller]);
+
+  useEffect(() => {
+    const prompt = window.sessionStorage.getItem(WELCOME_PROMPT_KEY);
+    if (!prompt) return;
+    window.sessionStorage.removeItem(WELCOME_PROMPT_KEY);
+    setDraft(prompt);
+  }, []);
 
   const threadScrollKey = `${controller?.messages.length ?? 0}:${controller?.replyPending ? 1 : 0}:${controller?.draftReply?.length ?? 0}`;
   useEffect(() => {
