@@ -3,12 +3,13 @@
 import { Archive, Check, ChevronDown, ChevronRight, FileText, FolderOpen, Layers3, Menu, MessageCircle, MessageSquarePlus, MessageSquareText, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, RotateCcw, Search, Settings, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { InkoLogo } from "@/components/ui/inko-logo";
 import { HomeChat } from "@/features/home/home-chat";
 import { useOptionalProjects } from "@/features/projects/project-provider";
 import { useOptionalVoiceAgent, type VoiceAgentController } from "@/features/voice/voice-agent-provider";
 import { GuestBanner } from "@/features/guest/guest-banner";
+import { AppGuide, hasSeenAppGuide, markAppGuideSeen } from "@/features/onboarding/app-guide";
 
 const links = [
   { href: "/projects", label: "Projects", icon: FolderOpen },
@@ -104,9 +105,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
   const [allChatsOpen, setAllChatsOpen] = useState(true);
-  const [openProjectIds, setOpenProjectIds] = useState<Record<string, boolean>>({});
+  const [guideStep, setGuideStep] = useState<0 | 1 | 2 | null>(null);
+
+  useEffect(() => {
+    if (!hasSeenAppGuide()) setGuideStep(0);
+  }, []);
 
   if (pathname === "/welcome") return <>{children}</>;
+
+  const showGuide = guideStep !== null && Boolean(controller);
 
   const closeSidebar = () => setSidebarOpen(false);
   const liveSessions = controller?.sessions.filter((session) => !session.archived_at) ?? [];
@@ -139,6 +146,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setChatMenuId(null);
   };
 
+  const finishGuide = () => {
+    markAppGuideSeen();
+    setGuideStep(null);
+  };
+
+  const openGuideChat = () => {
+    closeSidebar();
+    setAssistantOpen(true);
+    setGuideStep(1);
+  };
+
   const chatRow = (session: ChatSession) => controller ? (
     <SidebarChatRow
       key={session.id}
@@ -159,7 +177,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   ) : null;
 
   return (
-    <div className="app-frame assistant-shell" data-assistant-open={assistantOpen} data-sidebar-collapsed={sidebarCollapsed}>
+    <div className="app-frame assistant-shell" data-assistant-open={assistantOpen} data-guide={showGuide ? (guideStep === 0 ? "button" : guideStep === 1 ? "panel" : "composer") : undefined} data-sidebar-collapsed={sidebarCollapsed}>
       <a className="skip-link" href="#main-content">Skip to main content</a>
       {sidebarOpen && <button aria-label="Close navigation" className="sidebar-scrim" onClick={closeSidebar} type="button" />}
       <aside className="desktop-sidebar" data-open={sidebarOpen} id="workspace-navigation" aria-label="Primary navigation">
@@ -210,8 +228,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {controller ? <>
         {assistantOpen ? <button aria-label="Close assistant" className="assistant-rail-scrim" onClick={() => setAssistantOpen(false)} type="button" /> : null}
         <aside className="assistant-rail" data-open={assistantOpen} id="inko-assistant"><HomeChat controller={controller} home={pathname === "/"} onClose={() => setAssistantOpen(false)} /></aside>
-        <button aria-controls="inko-assistant" aria-expanded={assistantOpen} aria-label={assistantOpen ? "Hide Inko assistant" : "Show Inko assistant"} className="assistant-rail-toggle" onClick={() => { closeSidebar(); setAssistantOpen((open) => !open); }} type="button"><MessageCircle size={21} /><span>Inko</span></button>
+        <button aria-controls="inko-assistant" aria-expanded={assistantOpen} aria-label={assistantOpen ? "Hide Inko assistant" : "Show Inko assistant"} className="assistant-rail-toggle" onClick={() => { if (guideStep === 0) openGuideChat(); else { closeSidebar(); setAssistantOpen((open) => !open); } }} type="button"><MessageCircle size={21} /><span>Inko</span></button>
       </> : null}
+      {showGuide && guideStep !== null ? (
+        <AppGuide
+          step={pathname === "/" || guideStep < 2 ? guideStep : 1}
+          onOpenChat={openGuideChat}
+          onNext={() => { if (pathname === "/") setGuideStep(2); else finishGuide(); }}
+          onDone={finishGuide}
+        />
+      ) : null}
 
       <nav className="mobile-nav" aria-label="Primary navigation">
         <button aria-label="New chat" onClick={newChat} type="button"><MessageSquarePlus size={20} /><span>Chat</span></button>

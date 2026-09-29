@@ -3987,6 +3987,26 @@ button.topbar-account { cursor: pointer; font: inherit; }
   .welcome-float { animation: none; }
 }
 
+.app-guide-scrim { background: rgba(16, 38, 95, 0.46); inset: 0; position: fixed; z-index: 120; }
+.app-guide-card { background: #fff; border-radius: 18px; box-shadow: 0 18px 50px rgba(16, 38, 95, 0.22); display: grid; gap: 8px; max-width: 320px; padding: 16px; position: fixed; z-index: 122; }
+.app-guide-card[data-place="button"] { bottom: 28px; right: 168px; }
+.app-guide-card[data-place="panel"] { bottom: 28px; right: 348px; }
+.app-guide-card[data-place="composer"] { bottom: 210px; left: max(250px, 22vw); }
+.app-guide-card span { color: var(--color-primary); font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.app-guide-card h2 { color: #14265e; font-size: 18px; letter-spacing: -0.03em; margin: 0; }
+.app-guide-card p { color: #4a5c88; font-size: 13px; line-height: 1.5; margin: 0; }
+.app-guide-card div { display: flex; gap: 8px; margin-top: 4px; }
+.app-guide-card div button { background: transparent; border: 0; color: #6276a6; cursor: pointer; font: inherit; font-size: 13px; font-weight: 750; padding: 8px 4px; }
+.app-guide-card div button:first-child { background: var(--color-primary); border-radius: 999px; color: #fff; padding: 8px 14px; }
+.assistant-shell[data-guide="button"] .assistant-rail-toggle { box-shadow: 0 0 0 6px #fff, 0 0 0 10px #3568f4; z-index: 121; }
+.assistant-shell[data-guide="panel"] .assistant-rail { z-index: 121; }
+.assistant-shell[data-guide="composer"] .home-conversation-composer { border-radius: 16px; box-shadow: 0 0 0 6px #fff, 0 0 0 10px #3568f4; position: relative; z-index: 121; }
+@media (max-width: 800px) {
+  .app-guide-card[data-place="button"],
+  .app-guide-card[data-place="panel"],
+  .app-guide-card[data-place="composer"] { bottom: 96px; left: 16px; right: 16px; max-width: none; }
+}
+
 /* ── Guest banner ─────────────────────────────────────────────────────────── */
 .guest-banner {
   align-items: center;
