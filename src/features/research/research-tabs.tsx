@@ -1,6 +1,7 @@
 "use client";
 
-import { FileText, GitCompare, HelpCircle, Info, Lightbulb } from "lucide-react";
+import { FileText, GitCompare, HelpCircle, Lightbulb } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type {
   OpenQuestion,
@@ -40,20 +41,32 @@ const TABS: { id: ResearchTab; label: string }[] = [
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-const findingIcons = [
-  { Icon: Lightbulb, tone: "teal" },
-  { Icon: Info, tone: "blue" },
-  { Icon: Info, tone: "purple" },
-] as const;
+function debateHref(sessionId: string, claim: string, mode: "debate" | "defense" | "socratic") {
+  const params = new URLSearchParams({
+    session: sessionId,
+    claim: claim.slice(0, 500),
+    topic: claim.slice(0, 200),
+    mode,
+  });
+  return `/debate?${params.toString()}`;
+}
 
-/** Overview tab — Inko-guided summary of the active session (Requirement 8.4). */
+function sourceTagLabel(tag: ResearchSource["tag"]) {
+  if (tag === "supports") return "Supports";
+  if (tag === "contradicts") return "Contradicts";
+  return "Untagged";
+}
+
+/** Overview tab — claims and gaps from the research brief. */
 function OverviewPanel({
+  session,
   sources,
   findings,
   contradictions,
   openQuestions,
   setActiveTab,
 }: {
+  session: ResearchSession;
   sources: ResearchSource[];
   findings: ResearchFinding[];
   contradictions: ResearchContradiction[];
@@ -66,10 +79,20 @@ function OverviewPanel({
     { key: "contradictions" as const, label: "Contradiction" + (contradictions.length === 1 ? "" : "s"), value: contradictions.length, Icon: GitCompare, tone: "purple" },
     { key: "open-questions" as const, label: "Open Question" + (openQuestions.length === 1 ? "" : "s"), value: openQuestions.length, Icon: HelpCircle, tone: "coral" },
   ];
+  const gaps = [
+    ...contradictions.map((item) => ({ id: item.id, text: item.explanation, mode: "defense" as const })),
+    ...openQuestions.map((item) => ({ id: item.id, text: item.text, mode: "socratic" as const })),
+  ];
 
   return (
     <div className="research-panel research-overview">
-      <div className="overview-section-head"><FileText size={16} /> <h3>Overview</h3></div>
+      <section className="overview-question" aria-labelledby="overview-question-title">
+        <div className="overview-section-head"><FileText size={16} /> <h3 id="overview-question-title">Question</h3></div>
+        <div className="overview-question-box">
+          <p>{session.question}</p>
+          {session.description ? <p>{session.description}</p> : null}
+        </div>
+      </section>
 
       <div className="overview-stats">
         {stats.map(({ key, label, value, Icon, tone }) => (
@@ -81,9 +104,9 @@ function OverviewPanel({
         ))}
       </div>
 
-      <section className="overview-findings">
+      <section className="overview-findings" aria-labelledby="overview-findings-title">
         <div className="overview-section-head overview-section-head--row">
-          <span><Lightbulb size={16} /> <h3>Key Findings</h3></span>
+          <span><Lightbulb size={16} /> <h3 id="overview-findings-title">Findings</h3></span>
           {findings.length > 0 && (
             <button className="overview-view-all" onClick={() => setActiveTab("findings")} type="button">View all →</button>
           )}
@@ -91,18 +114,42 @@ function OverviewPanel({
         {findings.length === 0 ? (
           <p className="overview-empty">Inko will list key findings here as your sources are analysed.</p>
         ) : (
-          <ul className="overview-finding-list">
-            {findings.slice(0, 3).map((finding, index) => {
-              const { Icon, tone } = findingIcons[index % findingIcons.length];
-              const count = finding.sourceCount ?? (sources.filter((source) => source.id === finding.source_id).length || 1);
+          <ul className="overview-claim-list">
+            {findings.map((finding) => {
+              const source = sources.find((item) => item.id === finding.source_id);
               return (
-                <li className="overview-finding" key={finding.id}>
-                  <span className="overview-finding-icon" data-tone={tone}><Icon size={15} /></span>
+                <li className="overview-claim" key={finding.id}>
                   <p>{finding.statement}</p>
-                  <span className="overview-finding-tag">{count} source{count === 1 ? "" : "s"}</span>
+                  <div className="overview-claim-actions">
+                    {source ? (
+                      <button className="overview-source-chip" data-tag={source.tag} onClick={() => setActiveTab("sources")} type="button">
+                        {source.title}
+                        <span>{sourceTagLabel(source.tag)}</span>
+                      </button>
+                    ) : null}
+                    <Link className="overview-debate-link" href={debateHref(session.id, finding.statement, "debate")}>Debate this</Link>
+                  </div>
                 </li>
               );
             })}
+          </ul>
+        )}
+      </section>
+
+      <section className="overview-gaps" aria-labelledby="overview-gaps-title">
+        <div className="overview-section-head"><GitCompare size={16} /> <h3 id="overview-gaps-title">Gaps</h3></div>
+        {gaps.length === 0 ? (
+          <p className="overview-empty">Contradictions and open questions will show up here.</p>
+        ) : (
+          <ul className="overview-claim-list">
+            {gaps.map((gap) => (
+              <li className="overview-claim" key={gap.id}>
+                <p>{gap.text}</p>
+                <div className="overview-claim-actions">
+                  <Link className="overview-debate-link" href={debateHref(session.id, gap.text, gap.mode)}>Debate this</Link>
+                </div>
+              </li>
+            ))}
           </ul>
         )}
       </section>
@@ -479,6 +526,7 @@ function renderPanel(
     case "overview":
       return (
         <OverviewPanel
+          session={activeSession}
           sources={sources}
           findings={findings}
           contradictions={contradictions}

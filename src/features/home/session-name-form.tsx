@@ -21,7 +21,7 @@ export function SessionNameForm() {
     setCommitted(name.trim());
     // Persisted to sessionStorage — ephemeral context for Inko, clears on tab close
     sessionStorage.setItem("inko:session-name", name.trim());
-    router.push("/library");
+    router.push("/flashcards");
   };
 
   return (

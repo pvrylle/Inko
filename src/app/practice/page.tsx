@@ -1,7 +1,5 @@
-import { PracticeView } from "@/features/practice/practice-view";
-
-export const metadata = { title: "Practice" };
+import { redirect } from "next/navigation";
 
 export default function PracticePage() {
-  return <PracticeView />;
+  redirect("/flashcards");
 }

@@ -32,8 +32,6 @@ const navigation = [
   { href: "/research",  label: "Research" },
   { href: "/sources",   label: "Sources" },
   { href: "/canvas",    label: "Canvas" },
-  { href: "/practice",  label: "Practice" },
-  { href: "/history",   label: "History" },
   { href: "/settings",  label: "Settings" },
 ] as const;
 
@@ -110,12 +108,8 @@ describe("Property 1: Nav active state follows pathname", () => {
     expect(navHrefs.filter((href) => isActive("/canvas", href))).toEqual(["/canvas"]);
   });
 
-  it('concrete — "/practice" activates Practice and nothing else', () => {
-    expect(navHrefs.filter((href) => isActive("/practice", href))).toEqual(["/practice"]);
-  });
-
-  it('concrete — "/history" activates History and nothing else', () => {
-    expect(navHrefs.filter((href) => isActive("/history", href))).toEqual(["/history"]);
+  it('concrete — "/practice" does not activate any of the nav items', () => {
+    expect(navHrefs.filter((href) => isActive("/practice", href))).toHaveLength(0);
   });
 
   it('concrete — "/settings" activates Settings and nothing else', () => {

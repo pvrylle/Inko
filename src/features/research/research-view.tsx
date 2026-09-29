@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowRight, BookOpen, FileSearch, FolderOpen, Lightbulb, Plus, Search, Sparkles } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { ContentTopbar } from "@/components/layout/content-topbar";
 import { useMascot } from "@/features/mascot/mascot-provider";
@@ -16,9 +17,10 @@ function relativeTime(iso: string) {
 
 export function ResearchView() {
   const research = useResearch();
+  const searchParams = useSearchParams();
   const { dispatch } = useMascot();
   const { sessions, activeSession, loading, error, setActive, startNewProject } = research;
-  const appliedParam = useRef(false);
+  const appliedParam = useRef("");
   const previousStatus = useRef<string | null>(null);
   const recentInvestigations = sessions.slice(0, 6);
   const visibleInvestigations = activeSession && !recentInvestigations.some((session) => session.id === activeSession.id)
@@ -38,16 +40,18 @@ export function ResearchView() {
     }
   }, [activeSession?.status, dispatch]);
 
+  const sessionFromUrl = searchParams.get("session");
+  const tabFromUrl = searchParams.get("tab");
+  const questionFromUrl = searchParams.get("question")?.trim().slice(0, 500) ?? "";
+
   useEffect(() => {
-    if (appliedParam.current) return;
-    const params = new URLSearchParams(window.location.search);
-    const id = params.get("session");
-    const tab = params.get("tab");
-    if (id) {
-      appliedParam.current = true;
-      setActive(id, tab === "sources" || tab === "findings" || tab === "contradictions" || tab === "canvas" || tab === "notes" || tab === "open-questions" || tab === "overview" ? tab : undefined);
-    }
-  }, [setActive]);
+    const key = `${sessionFromUrl ?? ""}|${tabFromUrl ?? ""}|${questionFromUrl}`;
+    if (appliedParam.current === key) return;
+    appliedParam.current = key;
+    const tab = tabFromUrl === "sources" || tabFromUrl === "findings" || tabFromUrl === "contradictions" || tabFromUrl === "canvas" || tabFromUrl === "notes" || tabFromUrl === "open-questions" || tabFromUrl === "overview" ? tabFromUrl : undefined;
+    if (sessionFromUrl) setActive(sessionFromUrl, tab);
+    else if (questionFromUrl) startNewProject();
+  }, [questionFromUrl, sessionFromUrl, setActive, startNewProject, tabFromUrl]);
 
   return (
     <div className="research-view-page page-enter">
@@ -68,7 +72,7 @@ export function ResearchView() {
             <section className="research-inquiry-card" aria-labelledby="research-inquiry-title">
               <div className="research-card-heading"><span className="research-card-icon"><Search size={21} /></span><div><span className="research-step">01 / BEGIN</span><h2 id="research-inquiry-title">What are you investigating?</h2></div></div>
               <p>Start with a focused question. Inko will gather and organize the evidence around it.</p>
-              <ResearchSessionForm createSession={research.createSession} sessionError={research.sessionError} />
+              <ResearchSessionForm key={questionFromUrl} createSession={research.createSession} initialQuestion={questionFromUrl} sessionError={research.sessionError} />
             </section>
 
             <aside className="research-process-card" aria-label="Research process">

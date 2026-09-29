@@ -11,8 +11,7 @@ const pages = [
   ["/research", /Start a research project/i],
   ["/sources", /Sources/i],
   ["/canvas", /Canvas/i],
-  ["/practice", /Practice/i],
-  ["/history", /History/i],
+  ["/flashcards", /Flashcards/i],
   ["/settings", /Settings/i],
 ] as const;
 
@@ -20,7 +19,7 @@ test("all study surfaces render and expose a current route", async ({ page }) =>
   for (const [path, heading] of pages) {
     await page.goto(path);
     await expect(page.getByRole("heading", { name: heading, level: 1 })).toBeVisible({ timeout: 15_000 });
-    if (["/research", "/history"].includes(path) || (page.viewportSize()?.width ?? 0) >= 1100 && ["/sources", "/settings"].includes(path)) {
+    if (path === "/research" || (page.viewportSize()?.width ?? 0) >= 1100 && ["/sources", "/settings"].includes(path)) {
       const currentLinks = page.locator('a[aria-current="page"]:visible');
       await expect(currentLinks.first()).toBeVisible();
     }

@@ -18,10 +18,10 @@ export function RecentNotesStrip() {
     <section className="recent-notes" aria-label="Recent notes">
       <div className="section-title-row">
         <div>
-          <p className="eyebrow"><BookOpen size={13} /> From your library</p>
+          <p className="eyebrow"><BookOpen size={13} /> From your notes</p>
           <h2>Recent captures</h2>
         </div>
-        <Link className="section-link" href="/library">Open library <ArrowUpRight size={14} /></Link>
+        <Link className="section-link" href="/flashcards">Make flashcards <ArrowUpRight size={14} /></Link>
       </div>
       <div className="recent-notes-list">
         {recent.map((note, index) => (
@@ -32,7 +32,7 @@ export function RecentNotesStrip() {
             transition={{ delay: 0.05 + index * 0.06, ...spring }}
             whileHover={reduced ? undefined : { y: -3 }}
           >
-            <Link className="recent-note" href="/library">
+            <Link className="recent-note" href="/flashcards">
               <span className="recent-note-badge" data-source={note.source}>
                 {note.source === "voice" ? <Mic size={11} /> : <BookOpen size={11} />}
                 {note.source === "voice" ? "Voice" : "Note"}

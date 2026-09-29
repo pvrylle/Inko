@@ -2,7 +2,6 @@
 
 import { Brain, CheckCircle2, Sparkles, Trophy } from "lucide-react";
 import { useMemo, useState } from "react";
-import { BackToPractice } from "@/components/layout/content-topbar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeading } from "@/components/ui/page-heading";
 import { useMascot } from "@/features/mascot/mascot-provider";
@@ -110,7 +109,6 @@ export function QuizzesView() {
 
   return (
     <div className="content-page page-enter">
-      <BackToPractice />
       <PageHeading eyebrow="Test your understanding" title="Quiz with Inko" description="Four choices, one grounded answer, and no peeking before you commit." action={<PageVoiceControl />} />
 
       <section className="quiz-generator" aria-label="Generate a quiz">

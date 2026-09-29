@@ -1,7 +1,5 @@
-import { LibraryView } from "@/features/library/library-view";
-
-export const metadata = { title: "Library" };
+import { redirect } from "next/navigation";
 
 export default function LibraryPage() {
-  return <LibraryView />;
+  redirect("/flashcards");
 }

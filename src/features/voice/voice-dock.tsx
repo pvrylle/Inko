@@ -25,7 +25,6 @@ export function PersistentVoiceDock() {
     "/research",
     "/sources",
     "/canvas",
-    "/practice",
     "/flashcards",
     "/quiz",
     "/focus",

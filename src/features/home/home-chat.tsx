@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUp, Check, History, MoreHorizontal, Plus, X } from "lucide-react";
+import { ArrowUp, Check, History, MoreHorizontal, Plus, User, X } from "lucide-react";
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { InkoMascot } from "@/features/mascot/inko-mascot";
@@ -9,6 +9,7 @@ import { useOptionalProjects } from "@/features/projects/project-provider";
 import { VoiceCapsule } from "@/features/voice/voice-capsule";
 import type { VoiceAgentController } from "@/features/voice/voice-agent-provider";
 import type { VoiceMessage } from "@/features/voice/voice-types";
+import { ChatSuggestions } from "./chat-suggestions";
 import { AnswerToolIcons, StudyAnswerText } from "./study-answer-card";
 
 function questionBefore(messages: VoiceMessage[], index: number) {
@@ -18,24 +19,38 @@ function questionBefore(messages: VoiceMessage[], index: number) {
   return "";
 }
 
+function ChatHead({ inko }: { inko: boolean }) {
+  const { state } = useMascot();
+  if (inko) return <InkoMascot className="assistant-chat-mascot" fit="contain" state={state} />;
+  return (
+    <span className="assistant-chat-head" aria-hidden="true">
+      <User size={16} />
+    </span>
+  );
+}
+
 function ChatTurn({ message, question, sessionId, onResearchSessionCreated }: { message: VoiceMessage; question: string; sessionId: string | null; onResearchSessionCreated: (id: string) => void }) {
   const isInko = message.role === "inko";
   const sources = message.sources ?? [];
   return (
     <article className="assistant-turn" data-role={message.role}>
-      <span className="assistant-turn-speaker">{isInko ? "Inko" : "You"}</span>
-      {isInko ? <StudyAnswerText sources={sources} text={message.text} /> : <p>{message.text}</p>}
-      {isInko && sources.length > 0 ? (
-        <details className="assistant-turn-more">
-          <summary>{sources.length} sources and actions</summary>
-          <ul>
-            {sources.map((source, index) => (
-              <li key={`${source.url}-${index}`}><a href={source.url} rel="noopener noreferrer" target="_blank">{source.title}</a></li>
-            ))}
-          </ul>
-          <AnswerToolIcons answer={message} question={question} sessionId={sessionId} onResearchSessionCreated={onResearchSessionCreated} />
-        </details>
-      ) : null}
+      {isInko ? <ChatHead inko /> : null}
+      <div className="assistant-bubble">
+        <span className="assistant-turn-speaker">{isInko ? "Inko" : "You"}</span>
+        {isInko ? <StudyAnswerText sources={sources} text={message.text} /> : <p>{message.text}</p>}
+        {isInko && sources.length > 0 ? (
+          <details className="assistant-turn-more">
+            <summary>{sources.length} sources and actions</summary>
+            <ul>
+              {sources.map((source, index) => (
+                <li key={`${source.url}-${index}`}><a href={source.url} rel="noopener noreferrer" target="_blank">{source.title}</a></li>
+              ))}
+            </ul>
+            <AnswerToolIcons answer={message} question={question} sessionId={sessionId} onResearchSessionCreated={onResearchSessionCreated} />
+          </details>
+        ) : null}
+      </div>
+      {isInko ? null : <ChatHead inko={false} />}
     </article>
   );
 }
@@ -171,7 +186,12 @@ export function HomeChat({ controller, home = false, onClose }: { controller: Vo
               {messages.map((message, index) => (
                 <ChatTurn key={message.id} message={message} question={questionBefore(messages, index)} sessionId={active?.research_session_id ?? null} onResearchSessionCreated={controller.linkResearchSession} />
               ))}
-              {replyPending ? <p aria-live="polite" className="assistant-pending">Inko is thinking...</p> : null}
+              {replyPending ? (
+                <article aria-live="polite" className="assistant-turn" data-role="inko">
+                  <ChatHead inko />
+                  <div className="assistant-bubble"><p className="assistant-pending">Inko is thinking...</p></div>
+                </article>
+              ) : null}
               {error ? <p className="assistant-error" role="status">{error}</p> : null}
             </div>
           )}
@@ -179,6 +199,7 @@ export function HomeChat({ controller, home = false, onClose }: { controller: Vo
       )}
 
       <div className="assistant-composer-area">
+        <ChatSuggestions />
         {!home ? <form className="assistant-composer" onSubmit={submit}>
           <label className="sr-only" htmlFor="assistant-input">Message Inko</label>
           <textarea id="assistant-input" maxLength={4000} onChange={(event) => setDraft(event.target.value)} onKeyDown={onDraftKeyDown} placeholder="Ask or tell Inko anything" rows={2} value={draft} />

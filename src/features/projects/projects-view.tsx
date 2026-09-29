@@ -62,7 +62,7 @@ export function ProjectsView({ startCreating = false }: { startCreating?: boolea
                     <button onClick={() => openProject(project.id)} type="button">Open <ArrowRight size={16} /></button>
                     <button aria-label={`Delete ${project.name}`} onClick={() => setDeletingId(project.id)} title="Delete project" type="button"><Trash2 size={16} /></button>
                   </div>
-                  {deletingId === project.id ? <div className="project-delete-confirm"><span>Delete this project? Its conversations will remain in History.</span><button onClick={() => setDeletingId(null)} type="button">Cancel</button><button onClick={() => { projects.deleteProject(project.id); setDeletingId(null); }} type="button">Delete</button></div> : null}
+                  {deletingId === project.id ? <div className="project-delete-confirm"><span>Delete this project? Its conversations will stay in your chats.</span><button onClick={() => setDeletingId(null)} type="button">Cancel</button><button onClick={() => { projects.deleteProject(project.id); setDeletingId(null); }} type="button">Delete</button></div> : null}
                   {conversations.length > 0 || activities.length > 0 ? (
                     <div className="project-item-recent">
                       {conversations.slice(0, 2).map((session) => <button key={session.id} onClick={() => { openProject(project.id); companion?.openConversation(session.id); }} type="button"><MessageSquareText size={15} />{session.title}</button>)}

@@ -10,7 +10,7 @@
  * - For any non-whitespace string `s` with 1 ≤ s.trim().length ≤ 120,
  *   submitting `s` via SessionNameForm SHALL persist `s.trim()` to
  *   sessionStorage under key "inko:session-name" and SHALL call
- *   router.push("/library").
+ *   router.push("/flashcards").
  * - Validates: Requirements 6.3, 6.4
  *
  * Property 8 (whitespace rejection) is also covered here as it exercises
@@ -131,7 +131,7 @@ describe("Property 7: Valid session name accepted and stored", () => {
    * For any non-whitespace string `s` with 1 ≤ s.trim().length ≤ 120,
    * submitting the form SHALL:
    *   - Write s.trim() to sessionStorage["inko:session-name"]
-   *   - Call router.push("/library") exactly once
+   *   - Call router.push("/flashcards") exactly once
    */
 
   it(
@@ -155,7 +155,7 @@ describe("Property 7: Valid session name accepted and stored", () => {
               validName.trim(),
             );
             expect(mockPush).toHaveBeenCalledOnce();
-            expect(mockPush).toHaveBeenCalledWith("/library");
+            expect(mockPush).toHaveBeenCalledWith("/flashcards");
           },
         ),
         { numRuns: 25 },
@@ -206,7 +206,7 @@ describe("Property 7: Valid session name accepted and stored", () => {
 
     expect(sessionStorage.getItem("inko:session-name")).toBe(name.trim());
     expect(mockPush).toHaveBeenCalledOnce();
-    expect(mockPush).toHaveBeenCalledWith("/library");
+    expect(mockPush).toHaveBeenCalledWith("/flashcards");
   });
 
   it("7d — leading/trailing whitespace is trimmed before storage", () => {
@@ -215,7 +215,7 @@ describe("Property 7: Valid session name accepted and stored", () => {
     submitForm();
 
     expect(sessionStorage.getItem("inko:session-name")).toBe("My Session");
-    expect(mockPush).toHaveBeenCalledWith("/library");
+    expect(mockPush).toHaveBeenCalledWith("/flashcards");
   });
 });
 

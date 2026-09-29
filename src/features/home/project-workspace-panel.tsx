@@ -99,7 +99,7 @@ function DebatePanel({ project, projects }: Pick<Props, "project" | "projects">)
     event.preventDefault();
     const text = topic.trim();
     if (!text) return;
-    const href = `/debate?topic=${encodeURIComponent(text.slice(0, 200))}`;
+    const href = `/debate?topic=${encodeURIComponent(text.slice(0, 200))}&mode=debate`;
     projects.addActivity("debate", text, href);
     router.push(href);
   };

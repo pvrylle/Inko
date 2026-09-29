@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BackToPractice } from "@/components/layout/content-topbar";
 import { PageHeading } from "@/components/ui/page-heading";
 import { PageVoiceControl } from "@/features/voice/page-voice-control";
 import { useMascot } from "@/features/mascot/mascot-provider";
@@ -113,7 +112,6 @@ export function FocusView() {
 
   return (
     <div className="focus-page page-enter">
-      <BackToPractice />
       <PageHeading eyebrow="One thing at a time" title="Focus with Inko" description="Your timer follows real timestamps, so reloads and sleeping tabs never lose your place." action={<PageVoiceControl />} />
 
       <div className="focus-layout">

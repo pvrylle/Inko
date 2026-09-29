@@ -5,7 +5,7 @@ export type StudyPlanStep = {
   title: string;
   detail: string;
   minutes: number;
-  href: "/flashcards" | "/quiz" | "/library" | "/focus" | "/progress";
+  href: "/flashcards" | "/quiz" | "/focus" | "/progress";
 };
 
 export type StudyPlanInputs = {
@@ -38,9 +38,9 @@ export function buildStudyPlan({ dueCards, notesCount, quizzesCount, hasOpenFocu
     steps.push({
       id: "capture-note",
       title: "Capture your first note",
-      detail: "Say what you are learning and I'll shape it into a note you can reuse.",
+      detail: "Type or speak what you are learning and turn it into a deck.",
       minutes: 6,
-      href: "/library",
+      href: "/flashcards",
     });
   }
 

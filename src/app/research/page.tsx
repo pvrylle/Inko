@@ -1,7 +1,12 @@
+import { Suspense } from "react";
 import { ResearchView } from "@/features/research/research-view";
 
 export const metadata = { title: "Research" };
 
 export default function ResearchPage() {
-  return <ResearchView />;
+  return (
+    <Suspense fallback={null}>
+      <ResearchView />
+    </Suspense>
+  );
 }

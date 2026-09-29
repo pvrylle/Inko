@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, Check, ChevronDown, ChevronRight, Clock3, FileText, FolderOpen, Library, Menu, MessageCircle, MessageSquarePlus, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, RotateCcw, Search, Settings, Trash2, X } from "lucide-react";
+import { Archive, Check, ChevronDown, ChevronRight, FileText, FolderOpen, Layers3, Menu, MessageCircle, MessageSquarePlus, MessageSquareText, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, RotateCcw, Search, Settings, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -13,9 +13,9 @@ import { GuestBanner } from "@/features/guest/guest-banner";
 const links = [
   { href: "/projects", label: "Projects", icon: FolderOpen },
   { href: "/research", label: "Research", icon: Search },
+  { href: "/debate", label: "Debate", icon: MessageSquareText },
   { href: "/sources", label: "Sources", icon: FileText },
-  { href: "/library", label: "Library", icon: Library },
-  { href: "/history", label: "History", icon: Clock3 },
+  { href: "/flashcards", label: "Flashcards", icon: Layers3 },
 ] as const;
 
 type ChatSession = VoiceAgentController["sessions"][number];
@@ -217,7 +217,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <button aria-label="New chat" onClick={newChat} type="button"><MessageSquarePlus size={20} /><span>Chat</span></button>
         <Link aria-current={pathname === "/projects" ? "page" : undefined} href="/projects"><FolderOpen size={20} /><span>Projects</span></Link>
         <Link aria-current={pathname === "/research" ? "page" : undefined} href="/research"><Search size={20} /><span>Research</span></Link>
-        <Link aria-current={pathname === "/history" ? "page" : undefined} href="/history"><Clock3 size={20} /><span>History</span></Link>
+        <Link aria-current={pathname === "/debate" ? "page" : undefined} href="/debate"><MessageSquareText size={20} /><span>Debate</span></Link>
       </nav>
     </div>
   );

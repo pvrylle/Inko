@@ -1,6 +1,6 @@
 import type { Note } from "@/lib/data/models";
 
-export function topicToNote(userId: string, topic: string): Note {
+export function topicToNote(userId: string, topic: string, source: Note["source"] = "text"): Note {
   const now = new Date().toISOString();
   const title = topic.trim().slice(0, 80) || "Study topic";
   return {
@@ -9,7 +9,7 @@ export function topicToNote(userId: string, topic: string): Note {
     title,
     summary: topic.trim(),
     content_markdown: `# ${title}\n\n${topic.trim()}`,
-    source: "text",
+    source,
     storage_path: null,
     created_at: now,
     updated_at: now,

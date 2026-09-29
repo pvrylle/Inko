@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, FolderOpen, Upload } from "lucide-react";
+import { ArrowRight, FolderOpen } from "lucide-react";
 import Link from "next/link";
 import { PageHeading } from "@/components/ui/page-heading";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -24,11 +24,6 @@ export function SourcesView() {
         eyebrow="Research"
         title="Sources"
         description="Every source Inko has gathered, grouped by research project."
-        action={
-          <div className="page-heading-actions">
-            <Link className="secondary-button" href="/library"><Upload size={15} /> Upload files</Link>
-          </div>
-        }
       />
 
       {loading ? (

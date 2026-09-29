@@ -174,11 +174,11 @@ function spokenAnswer(text: string) {
 
 const companionDestinations: Record<string, string> = {
   home: "/", projects: "/projects", debate: "/debate", timer: "/timer", research: "/research", sources: "/sources", canvas: "/canvas",
-  practice: "/practice", history: "/history", settings: "/settings",
+  practice: "/flashcards", flashcards: "/flashcards", settings: "/settings",
 };
 
 function navigationCommand(text: string) {
-  const match = text.trim().toLowerCase().match(/^(?:please\s+)?(?:open|go to|show me)\s+(?:the\s+)?(home|projects|debate|timer|research|sources|canvas|practice|history|settings)(?:\s+page)?[.!?]?$/);
+  const match = text.trim().toLowerCase().match(/^(?:please\s+)?(?:open|go to|show me)\s+(?:the\s+)?(home|projects|debate|timer|research|sources|canvas|practice|flashcards|settings)(?:\s+page)?[.!?]?$/);
   return match ? companionDestinations[match[1]] : null;
 }
 
@@ -1372,13 +1372,9 @@ export function useVoiceAgent() {
     dispatch({ type: "USER_STOPPED" });
     let response: Response;
     try {
-      const currentDebate = pathname === "/debate" ? new URLSearchParams(window.location.search).get("topic")?.slice(0, 200) : null;
-      const prompt = currentDebate
-        ? `In a concise study debate about "${currentDebate}", challenge my reasoning with one clear counterargument and one question. My argument: ${trimmed}`
-        : trimmed;
       response = await inkoFetch("/api/chat", {
         method: "POST",
-        body: JSON.stringify({ message: prompt, history: messagesRef.current.slice(-12, -1).map(({ role, text }) => ({ role, text })) }),
+        body: JSON.stringify({ message: trimmed, history: messagesRef.current.slice(-12, -1).map(({ role, text }) => ({ role, text })) }),
         signal: AbortSignal.timeout(22_000),
       });
     } catch {
@@ -1489,7 +1485,7 @@ export function useVoiceAgent() {
     speakingRef.current = true;
     setReplySpeaking(true);
     addMessage({ id: crypto.randomUUID(), role: "inko", text: answer, createdAt: new Date().toISOString(), sources });
-  }, [addMessage, clearSilenceTimer, dispatch, linkResearchSession, markReplyPending, pathname, projects, router, send, speakReply, userId]);
+  }, [addMessage, clearSilenceTimer, dispatch, linkResearchSession, markReplyPending, projects, router, send, speakReply, userId]);
 
   const sendAttachment = useCallback(async (file: File, question: string) => {
     if (!file.size || file.size > 8 * 1024 * 1024 || !["application/pdf", "image/png", "image/jpeg", "image/webp"].includes(file.type)) {

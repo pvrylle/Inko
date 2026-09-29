@@ -1,8 +1,8 @@
 "use client";
 
-import { Brain, CalendarClock, CheckCircle2, Flame, Layers3, RotateCcw, Sparkles } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { BackToPractice } from "@/components/layout/content-topbar";
+import { Brain, CalendarClock, CheckCircle2, Flame, Layers3, Mic, RotateCcw, Sparkles, Square, Upload, Volume2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { inkoFetch } from "@/lib/auth/api-client";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeading } from "@/components/ui/page-heading";
 import { useMascot } from "@/features/mascot/mascot-provider";
@@ -12,9 +12,9 @@ import { useToasts } from "@/features/toast/toast-provider";
 import { PageVoiceControl } from "@/features/voice/page-voice-control";
 import { usesLocalStudyData } from "@/lib/data/local-study";
 import { upsertLocalRecord } from "@/lib/data/local-store";
-import type { Flashcard, Note, SemanticGrade, StudyRating } from "@/lib/data/models";
+import type { Flashcard, Note, StudyRating } from "@/lib/data/models";
 import { topicToNote } from "@/lib/study/topic-note";
-import { commitFlashcardReview, generateFlashcards, gradeFlashcardAnswer } from "./flashcards-repository";
+import { commitFlashcardReview, generateFlashcards } from "./flashcards-repository";
 import { useFlashcards } from "./use-flashcards";
 
 const ratings: { value: StudyRating; label: string; hint: string }[] = [
@@ -40,14 +40,21 @@ export function FlashcardsView() {
   const { flashcards, loading, error, reload, userId } = useFlashcards();
   const { celebrate: mascotCelebrate, dispatch } = useMascot();
   const { celebrate } = useToasts();
-  const [selectedNoteId, setSelectedNoteId] = useState("");
+  const [deckChoice, setDeckChoice] = useState("new");
   const [topic, setTopic] = useState("");
-  const [answer, setAnswer] = useState("");
-  const [grade, setGrade] = useState<SemanticGrade | null>(null);
   const [flipped, setFlipped] = useState(false);
+  const [practiceWithInko, setPracticeWithInko] = useState(false);
+  const [reading, setReading] = useState(false);
   const [activeCardKey, setActiveCardKey] = useState<string | null>(null);
   const [sessionStreak, setSessionStreak] = useState(0);
-  const [working, setWorking] = useState<"generate" | "grade" | "review" | null>(null);
+  const [source, setSource] = useState("");
+  const [sourceKind, setSourceKind] = useState<"text" | "voice">("text");
+  const [recording, setRecording] = useState(false);
+  const [working, setWorking] = useState<"generate" | "review" | "transcribe" | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const aliveRef = useRef(true);
+  const audioInputRef = useRef<HTMLInputElement>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [reviewClock, setReviewClock] = useState(() => Date.now());
   const [todayEndsAt] = useState(() => {
@@ -61,14 +68,25 @@ export function FlashcardsView() {
     return () => window.clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+      const recorder = recorderRef.current;
+      recorderRef.current = null;
+      if (recorder && recorder.state !== "inactive") recorder.stop();
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    };
+  }, []);
+
   const dueCards = useMemo(() => flashcards.filter((card) => Date.parse(card.due) <= reviewClock), [flashcards, reviewClock]);
   const upcomingCards = useMemo(
     () => flashcards.filter((card) => Date.parse(card.due) > reviewClock).sort((a, b) => Date.parse(a.due) - Date.parse(b.due)).slice(0, 4),
     [flashcards, reviewClock],
   );
   const activeCard = dueCards[0] ?? null;
-  const activeNoteId = selectedNoteId || notes[0]?.id || "";
-  const selectedNote = notes.find((note) => note.id === activeNoteId) ?? null;
+  const selectedNote = notes.find((note) => note.id === deckChoice) ?? null;
   const dueToday = flashcards.filter((card) => Date.parse(card.due) <= todayEndsAt).length;
   const learning = flashcards.filter((card) => card.state === 1 || card.state === 3).length;
   const mastered = flashcards.filter((card) => card.state === 2 && card.stability >= 21).length;
@@ -79,17 +97,118 @@ export function FlashcardsView() {
     if (flipped) setFlipped(false);
   }
 
+  const spokenLine = activeCard
+    ? flipped
+      ? `Answer. ${activeCard.back}${activeCard.explanation ? `. ${activeCard.explanation}` : ""}`
+      : `Question. ${activeCard.front}`
+    : "";
+
+  useEffect(() => {
+    const synth = window.speechSynthesis;
+    if (!practiceWithInko || !spokenLine || !synth) return;
+    let cancelled = false;
+    const utterance = new SpeechSynthesisUtterance(spokenLine);
+    utterance.lang = "en-US";
+    utterance.rate = 0.96;
+    utterance.pitch = 1.12;
+    utterance.onstart = () => { if (!cancelled) setReading(true); };
+    utterance.onend = () => { if (!cancelled) setReading(false); };
+    utterance.onerror = () => { if (!cancelled) setReading(false); };
+    const begin = () => {
+      if (cancelled) return;
+      const voices = synth.getVoices();
+      const voice = voices.find((item) => /samantha|aria|jenny|ana/i.test(item.name) && item.lang.toLowerCase().startsWith("en"))
+        ?? voices.find((item) => item.lang.toLowerCase().startsWith("en"));
+      if (voice) utterance.voice = voice;
+      synth.cancel();
+      synth.speak(utterance);
+    };
+    if (synth.getVoices().length > 0) begin();
+    else synth.addEventListener("voiceschanged", begin, { once: true });
+    return () => {
+      cancelled = true;
+      synth.removeEventListener("voiceschanged", begin);
+      synth.cancel();
+      setReading(false);
+    };
+  }, [practiceWithInko, spokenLine]);
+
   const resolveNote = async (): Promise<Note | null> => {
-    const prompt = topic.trim();
+    const spoken = source.trim();
+    const prompt = spoken.length >= 8 ? spoken : topic.trim();
+    const kind = spoken.length >= 8 ? sourceKind : "text";
     if (prompt.length >= 8 && userId) {
       if (await usesLocalStudyData()) {
-        const note = topicToNote(userId, prompt);
+        const note = topicToNote(userId, prompt, kind);
         upsertLocalRecord("notes", userId, note);
         return note;
       }
-      return generateNoteFromContent(userId, prompt);
+      return generateNoteFromContent(userId, prompt, kind);
     }
-    return selectedNote ?? null;
+    return deckChoice === "new" ? null : selectedNote;
+  };
+
+  const transcribeAudio = async (audio: Blob) => {
+    setWorking("transcribe");
+    setFormError(null);
+    try {
+      const mimeType = audio.type.split(";")[0]?.toLowerCase() || "audio/webm";
+      const extension = mimeType.includes("mp4") ? "mp4" : mimeType.includes("ogg") ? "ogg" : "webm";
+      const form = new FormData();
+      form.set("audio", audio, `notes.${extension}`);
+      const response = await inkoFetch("/api/voice/transcribe", { method: "POST", body: form });
+      const payload = (await response.json()) as { text?: string; error?: string };
+      if (!aliveRef.current) return;
+      if (!response.ok || !payload.text?.trim()) {
+        const code = payload.error;
+        setFormError(code === "RATE_LIMITED" ? "Voice transcription is rate limited right now. Type your notes instead." : code === "UNSUPPORTED_AUDIO" ? "Use a WebM, MP4, or Ogg recording." : "AssemblyAI couldn't transcribe that audio. Try again or type your notes.");
+        return;
+      }
+      setSource(payload.text.trim().slice(0, 8000));
+      setSourceKind("voice");
+    } catch {
+      if (aliveRef.current) setFormError("AssemblyAI couldn't transcribe that audio. Try again or type your notes.");
+    } finally {
+      if (aliveRef.current) setWorking(null);
+    }
+  };
+
+  const stopRecording = () => {
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state === "recording") recorder.stop();
+    setRecording(false);
+  };
+
+  const startRecording = async () => {
+    if (!window.MediaRecorder) {
+      setFormError("This browser cannot record audio. Type your notes or upload a file.");
+      return;
+    }
+    setFormError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"].find((type) => MediaRecorder.isTypeSupported(type));
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const chunks: BlobPart[] = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) chunks.push(event.data);
+      };
+      recorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        if (streamRef.current === stream) streamRef.current = null;
+        recorderRef.current = null;
+        if (aliveRef.current) setRecording(false);
+        const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+        if (!aliveRef.current || blob.size === 0) return;
+        void transcribeAudio(blob);
+      };
+      recorderRef.current = recorder;
+      recorder.start();
+      setRecording(true);
+    } catch {
+      setFormError("Microphone access was blocked. Allow it, or type your notes.");
+    }
   };
 
   const createCards = async () => {
@@ -99,7 +218,7 @@ export function FlashcardsView() {
     try {
       const note = await resolveNote();
       if (!note) {
-        setFormError("Choose a note or type a topic of at least 8 characters.");
+        setFormError("Type a topic or paste notes, then choose Create deck.");
         return;
       }
       const generatedCards = await generateFlashcards(userId, note);
@@ -115,31 +234,12 @@ export function FlashcardsView() {
     }
   };
 
-  const checkAnswer = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!userId || !activeCard || !answer.trim()) return;
-    setWorking("grade");
-    setFormError(null);
-    try {
-      const nextGrade = await gradeFlashcardAnswer(userId, activeCard, answer);
-      setGrade(nextGrade);
-      setFlipped(true);
-    } catch (caught) {
-      const code = caught instanceof Error ? caught.message : "FLASHCARD_GRADING_FAILED";
-      setFormError(code === "GEMINI_NOT_CONFIGURED" ? "Add GEMINI_API_KEY for semantic answer feedback." : "Inko couldn't check that answer. Please try again.");
-    } finally {
-      setWorking(null);
-    }
-  };
-
   const confirmRating = async (rating: StudyRating) => {
     if (!userId || !activeCard) return;
     setWorking("review");
     setFormError(null);
     try {
-      const result = await commitFlashcardReview(userId, activeCard, rating, answer, grade);
-      setAnswer("");
-      setGrade(null);
+      const result = await commitFlashcardReview(userId, activeCard, rating, "", null);
       setFlipped(false);
       await reload();
       setReviewClock(Date.parse(result.review.reviewed_at));
@@ -161,8 +261,7 @@ export function FlashcardsView() {
 
   return (
     <div className="content-page page-enter">
-      <BackToPractice />
-      <PageHeading eyebrow="Remember for longer" title="Flashcards" description="Inko checks meaning, then you choose the rating that advances your private FSRS schedule." action={<PageVoiceControl />} />
+      <PageHeading eyebrow="Remember for longer" title="Flashcards" description="Type a topic, paste notes, or speak them. AssemblyAI transcribes your voice, then you can flip each card or let Inko read it aloud." action={<PageVoiceControl />} />
 
       <div className="stat-strip" aria-label="Flashcard statistics">
         <span><strong>{dueToday}</strong><small>Due today</small></span>
@@ -180,23 +279,39 @@ export function FlashcardsView() {
       )}
 
       <section className="deck-generator" aria-label="Create a flashcard deck">
-        <div><span className="deck-generator-icon"><Sparkles size={19} /></span><div><h2>Make cards from a note or topic</h2><p>Pick an existing note, or type a topic and Inko will build a deck.</p></div></div>
+        <div><span className="deck-generator-icon"><Sparkles size={19} /></span><div><h2>Make a deck</h2><p>Use a saved note, type the ideas, or record them. AssemblyAI turns the audio into notes before the cards are made.</p></div></div>
         <div className="deck-generator-controls">
-          {!notesLoading && notes.length > 0 && (
-            <label><span className="sr-only">Source note</span><select onChange={(event) => setSelectedNoteId(event.target.value)} value={activeNoteId}>{notes.map((note) => <option key={note.id} value={note.id}>{note.title}</option>)}</select></label>
-          )}
+          <label className="deck-choice-field">
+            <span>Deck</span>
+            <select aria-label="Deck" onChange={(event) => setDeckChoice(event.target.value)} value={deckChoice}>
+              <option value="new">Create a new deck</option>
+              {!notesLoading && notes.map((note) => <option key={note.id} value={note.id}>{note.title}</option>)}
+            </select>
+          </label>
           <label className="topic-field">
             <span className="sr-only">Study topic</span>
-            <input onChange={(event) => setTopic(event.target.value)} placeholder="Or type a topic, e.g. mitosis checkpoints" value={topic} />
+            <input onChange={(event) => setTopic(event.target.value)} placeholder="Topic, e.g. mitosis checkpoints" value={topic} />
           </label>
-          <button className="secondary-button" disabled={working !== null} onClick={() => void createCards()}>{working === "generate" ? "Making cards…" : "Generate cards"}</button>
+          <label className="deck-source-field">
+            <span className="sr-only">Notes to turn into cards</span>
+            <textarea className="deck-source" maxLength={8000} onChange={(event) => { setSource(event.target.value); setSourceKind("text"); }} placeholder="Or paste notes, or record them below" rows={4} value={source} />
+          </label>
+          <div className="deck-voice-row">
+            <button className="secondary-button" disabled={working !== null} onClick={() => recording ? stopRecording() : void startRecording()} type="button">
+              {recording ? <Square size={15} /> : <Mic size={15} />}
+              {recording ? "Stop and transcribe" : working === "transcribe" ? "Transcribing…" : "Record with AssemblyAI"}
+            </button>
+            <button className="secondary-button" disabled={working !== null || recording} onClick={() => audioInputRef.current?.click()} type="button"><Upload size={15} /> Upload audio</button>
+            <input accept="audio/webm,audio/mp4,audio/ogg,.webm,.mp4,.m4a,.ogg" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void transcribeAudio(file); }} ref={audioInputRef} type="file" />
+            <button className="primary-button" disabled={working !== null || recording} onClick={() => void createCards()} type="button">{working === "generate" ? "Creating deck…" : "Create deck"}</button>
+          </div>
         </div>
       </section>
 
       {(error || formError) && <p className="form-error flashcard-error" role="alert">{formError || error}</p>}
 
       {!loading && flashcards.length === 0 ? (
-        <EmptyState icon={Layers3} title="No cards yet" message="Choose a note or type a topic above and Inko will turn the key ideas into an active-recall deck." />
+        <EmptyState icon={Layers3} title="No cards yet" message="Choose a note, type the ideas, or record them. AssemblyAI transcribes the audio, then Inko turns the key ideas into a deck." />
       ) : !loading && !activeCard ? (
         <EmptyState icon={CheckCircle2} title="You are caught up" message="Nothing is due right now. FSRS will bring each idea back when reviewing helps most." />
       ) : activeCard ? (
@@ -204,6 +319,10 @@ export function FlashcardsView() {
           <div className="review-progress">
             <span><Brain size={17} /> Review queue</span>
             <div className="review-progress-meta">
+              <button aria-pressed={practiceWithInko} className="secondary-button card-read-button" onClick={() => setPracticeWithInko((on) => !on)} type="button">
+                {practiceWithInko ? <Square size={14} /> : <Volume2 size={14} />}
+                {practiceWithInko ? "Stop Inko" : "Practice with Inko"}
+              </button>
               {sessionStreak > 1 && <span className="streak-chip"><Flame size={13} /> {sessionStreak} in a row</span>}
               <strong>{dueCards.length} due now</strong>
             </div>
@@ -222,22 +341,11 @@ export function FlashcardsView() {
             </article>
           </div>
 
-          {!grade ? (
-            <form className="answer-form" onSubmit={checkAnswer}>
-              <label htmlFor="flashcard-answer">Answer in your own words</label>
-              <textarea autoFocus id="flashcard-answer" onChange={(event) => setAnswer(event.target.value)} placeholder="Type or say what you remember…" rows={4} value={answer} />
-              <button className="primary-button large" disabled={working !== null || answer.trim().length === 0}>{working === "grade" ? "Checking meaning…" : "Check answer"}</button>
-            </form>
-          ) : (
-            <div className="grade-panel" data-verdict={grade.verdict}>
-              <div className="grade-summary"><strong>{Math.round(grade.score * 100)}%</strong><div><span>{grade.verdict === "correct" ? "Correct" : grade.verdict === "partial" ? "Nearly there" : "Keep building"}</span><p>{grade.feedback}</p></div></div>
-              <p className="rating-prompt">Inko suggests <strong>{grade.suggested_rating}</strong>. Confirm how recall felt to schedule the card:</p>
-              <div className="rating-grid">
-                {ratings.map((rating) => <button key={rating.value} className="rating-button" data-suggested={grade.suggested_rating === rating.value} disabled={working !== null} onClick={() => void confirmRating(rating.value)}><strong>{rating.label}</strong><small>{rating.hint}</small></button>)}
-              </div>
-              <button className="answer-retry" disabled={working !== null} onClick={() => { setGrade(null); setFlipped(false); }}>Edit my answer</button>
-            </div>
-          )}
+          {reading ? <p className="card-read-status" role="status">Inko is reading this card.</p> : null}
+          <p className="rating-prompt">How well did you remember it?</p>
+          <div className="rating-grid">
+            {ratings.map((rating) => <button key={rating.value} className="rating-button" disabled={working !== null} onClick={() => void confirmRating(rating.value)} type="button"><strong>{rating.label}</strong><small>{rating.hint}</small></button>)}
+          </div>
         </section>
       ) : null}
 

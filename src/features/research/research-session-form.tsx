@@ -10,6 +10,8 @@ type Props = {
   createSession: (question: string) => Promise<unknown>;
   /** Validation / server error surfaced by the hook (null when none). */
   sessionError: string | null;
+  /** Prefill from a chat suggestion such as “Research AI tutors”. */
+  initialQuestion?: string;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -21,8 +23,8 @@ type Props = {
  * (2–500 chars) before calling `createSession`. Inline error is shown on
  * submit when validation fails, satisfying Requirements 8.10, 8.11, and 8.12.
  */
-export function ResearchSessionForm({ createSession, sessionError }: Props) {
-  const [question, setQuestion] = useState("");
+export function ResearchSessionForm({ createSession, sessionError, initialQuestion = "" }: Props) {
+  const [question, setQuestion] = useState(initialQuestion.slice(0, 500));
   const [localError, setLocalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 

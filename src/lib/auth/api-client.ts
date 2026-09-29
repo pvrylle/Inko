@@ -18,7 +18,7 @@ function guestMeter(path: string, method: string): GuestMeter | null {
   if (verb === "POST" && path === "/api/research/sessions") return "researchSessions";
   if (verb === "POST" && path === "/api/voice/token") return "voicePreviews";
   if (verb === "POST" && path === "/api/study/focus/start") return "focusMinutes";
-  if (/^\/api\/(chat|study\/(notes|flashcards|quizzes|plan))/.test(path)) return "aiCalls";
+  if (/^\/api\/(chat|debate|study\/(notes|flashcards|quizzes|plan))/.test(path)) return "aiCalls";
   return null;
 }
 

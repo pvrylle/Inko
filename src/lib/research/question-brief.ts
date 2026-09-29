@@ -233,7 +233,19 @@ export function fallbackQuestionBrief(question: string): QuestionBrief {
 export async function generateQuestionBrief(question: string): Promise<QuestionBrief> {
   try {
     return briefSchema.parse(await generateJson(
-      `You are Inko, a careful research companion. Build a first-pass research brief for this student question. Use well-established public knowledge only. Do not invent paywalled quotes or fake DOIs. If a URL is not confidently real, set url to null and type to document. Give each source a short key like s1. Map findings and contradictions to those keys. noteMarkdown should be useful study notes with headings.\n\nQuestion:\n${question}`,
+      `You are Inko, a careful research companion. Build a first-pass research brief for this student question.
+
+Rules:
+- Each finding is one sentence a student could defend or challenge.
+- Give each source a short key like s1. Every finding sourceKey and every contradiction source key must be one of those keys.
+- Tag a source "supports" when it backs the question, or "contradicts" when it pushes the other way.
+- Use well-established public knowledge only. Do not invent paywalled quotes, paper titles, or DOIs. If a URL is not confidently real, set url to null and type to document.
+- Each contradiction names the tension between two or more of those sources in one or two sentences.
+- Open questions are gaps the student could claim: what is still unproven, local, or missing a primary source.
+- noteMarkdown is short study notes with headings, not an essay.
+
+Question:
+${question}`,
       briefJsonSchema as unknown as Record<string, unknown>,
     ));
   } catch {

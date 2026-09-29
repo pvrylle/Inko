@@ -6,8 +6,8 @@ import type { Note } from "@/lib/data/models";
 import { deleteLocalRecord, readLocalCollection, subscribeToLocalCollection, upsertLocalRecord } from "@/lib/data/local-store";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 
-export async function generateNoteFromContent(userId: string, content: string) {
-  const response = await inkoFetch("/api/study/notes/generate", { method: "POST", body: JSON.stringify({ content, source: "text", callId: crypto.randomUUID() }) });
+export async function generateNoteFromContent(userId: string, content: string, source: "voice" | "text" = "text") {
+  const response = await inkoFetch("/api/study/notes/generate", { method: "POST", body: JSON.stringify({ content, source, callId: crypto.randomUUID() }) });
   const payload = (await response.json()) as { note?: Note; persisted?: boolean; error?: string };
   if (!response.ok || !payload.note) throw new Error(payload.error || "NOTE_GENERATION_FAILED");
   if (!payload.persisted || await usesLocalStudyData()) upsertLocalRecord("notes", userId, payload.note);
