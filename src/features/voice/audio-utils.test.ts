@@ -1,4 +1,4 @@
-import { base64Pcm16ToFloat, floatToBase64Pcm16, resampleFloat32, rmsAmplitude } from "./audio-utils";
+import { base64Pcm16ToFloat, concatFloat32, floatToBase64Pcm16, resampleFloat32, rmsAmplitude } from "./audio-utils";
 
 describe("voice audio utilities", () => {
   it("resamples browser audio to 24kHz", () => {
@@ -17,5 +17,10 @@ describe("voice audio utilities", () => {
   it("calculates normalized amplitude", () => {
     expect(rmsAmplitude(new Float32Array(100).fill(0))).toBe(0);
     expect(rmsAmplitude(new Float32Array(100).fill(0.5))).toBeGreaterThan(0.9);
+  });
+
+  it("joins PCM clips without a gap", () => {
+    const joined = concatFloat32([new Float32Array([1, 2]), new Float32Array([3, 4])]);
+    expect([...joined]).toEqual([1, 2, 3, 4]);
   });
 });

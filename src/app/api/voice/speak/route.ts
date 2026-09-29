@@ -6,11 +6,11 @@ import { checkRateLimit } from "@/lib/security/rate-limit";
 import { streamAnnaSpeech, warmAnnaToken } from "@/lib/voice/anna-tts";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 90;
 
 const bodySchema = z.union([
   z.object({ warmup: z.literal(true) }),
-  z.object({ text: z.string().trim().min(1).max(2_400) }),
+  z.object({ text: z.string().trim().min(1).max(8_000) }),
 ]);
 
 function writeFrame(controller: ReadableStreamDefaultController<Uint8Array>, encoder: TextEncoder, payload: object) {

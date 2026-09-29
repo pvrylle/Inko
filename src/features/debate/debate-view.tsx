@@ -16,6 +16,7 @@ import { inkoFetch } from "@/lib/auth/api-client";
 import { usePublishBrief } from "@/features/page-brief/page-brief";
 import { useOptionalVoiceAgent } from "@/features/voice/voice-agent-provider";
 import { speakInkoLine, stopInkoSpeech } from "@/features/voice/speak-text";
+import { prepareAnnaSpeech } from "@/lib/voice/speak-script";
 import { getDebate, listDebates, saveDebate, type SavedDebate } from "./debate-archive";
 import { buildDebateEvidence, type DebateEvidence } from "./debate-evidence";
 import { useDebateMic } from "./use-debate-mic";
@@ -257,7 +258,7 @@ export function DebateView({
   };
 
   const speakReply = (text: string) => {
-    const spoken = text.replace(/\s*\[\d+\]/g, "").replace(/\s+/g, " ").trim().slice(0, 1800);
+    const spoken = prepareAnnaSpeech(text).slice(0, 8_000);
     if (!spoken) return;
     stopInkoSpeech();
     void speakInkoLine(spoken).then((played) => {

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
+import { prepareAnnaSpeech } from "@/lib/voice/speak-script";
 import { chatSourceTrailer, pullSpeakable } from "@/lib/ai/chat-stream";
 import { inkoFetch } from "@/lib/auth/api-client";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -174,7 +175,7 @@ function replyErrorMessage() {
 }
 
 function spokenAnswer(text: string) {
-  return text.replace(/\s*\[\d+\]/g, "").replace(/\s+/g, " ").trim();
+  return prepareAnnaSpeech(text);
 }
 
 const companionDestinations: Record<string, string> = {
@@ -448,6 +449,7 @@ export function useVoiceAgent() {
     }
     if (chunk) speechQueueRef.current.push(chunk);
     speechStreamOpenRef.current = !done;
+    if (!done) return;
     if (wasSpeaking) {
       window.setTimeout(() => pumpSpeechRef.current(), 60);
       return;
@@ -468,17 +470,10 @@ export function useVoiceAgent() {
 
   useEffect(() => {
     pumpSpeechRef.current = () => {
-      if (speechActiveRef.current) return;
-      if (!speechQueueRef.current.length) {
-        if (speechStreamOpenRef.current) return;
-        finishSpeechTurn();
-        return;
-      }
-      const next = (captionBaseRef.current || !speechStreamOpenRef.current
-        ? speechQueueRef.current.splice(0).join(" ")
-        : speechQueueRef.current.shift() ?? "").replace(/\s+/g, " ").trim();
+      if (speechActiveRef.current || speechStreamOpenRef.current) return;
+      const next = speechQueueRef.current.splice(0).join(" ").replace(/\s+/g, " ").trim();
       if (!next) {
-        if (!speechStreamOpenRef.current) finishSpeechTurn();
+        finishSpeechTurn();
         return;
       }
       speechActiveRef.current = true;
@@ -537,7 +532,7 @@ export function useVoiceAgent() {
         }
       };
       setSpokenCaption(`${base} ${next}`.trim());
-      watchdog = window.setTimeout(complete, 45_000);
+      watchdog = window.setTimeout(complete, Math.min(180_000, 12_000 + next.length * 80));
       void speakWithAnna(next).then((result) => {
         if (settled || epoch !== speechEpochRef.current) return;
         if (result === "played") complete();
@@ -571,17 +566,15 @@ export function useVoiceAgent() {
     const context = audioContextRef.current;
     if (!context) return;
     const samples = base64Pcm16ToFloat(encoded);
+    if (!samples.length) return;
     const buffer = context.createBuffer(1, samples.length, 24_000);
-    buffer.copyToChannel(samples, 0);
+    buffer.getChannelData(0).set(samples);
     const source = context.createBufferSource();
     source.buffer = buffer;
-    source.playbackRate.value = 1.22;
-    const gain = context.createGain();
-    gain.gain.value = 1.6;
-    source.connect(gain).connect(context.destination);
-    const startAt = Math.max(context.currentTime + 0.015, nextPlaybackTimeRef.current);
+    source.connect(context.destination);
+    const startAt = Math.max(context.currentTime + 0.06, nextPlaybackTimeRef.current);
     source.start(startAt);
-    nextPlaybackTimeRef.current = startAt + buffer.duration / source.playbackRate.value;
+    nextPlaybackTimeRef.current = startAt + buffer.duration;
     playbackSourcesRef.current.add(source);
     setAmplitude(rmsAmplitude(samples));
     source.onended = () => {
@@ -1053,7 +1046,6 @@ export function useVoiceAgent() {
                 input: {
                   turn_detection: { vad_threshold: 0.5, min_silence: 2000, max_silence: 2600, interrupt_response: false },
                 },
-                output: { volume: 100 },
               },
             }));
           }

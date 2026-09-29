@@ -12,6 +12,12 @@ describe("splitAnnaSpeakChunks", () => {
     expect(chunks.join(" ").replace(/\s+/g, " ").trim().startsWith("Learning is fun.")).toBe(true);
     expect(chunks.every((chunk) => chunk.length <= 80)).toBe(true);
   });
+
+  it("keeps every sentence when splitting a full reply", () => {
+    const text = "First point is clear. Second point follows. Third point wraps it up.";
+    const chunks = splitAnnaSpeakChunks(text, 40);
+    expect(chunks.join(" ")).toBe(text);
+  });
 });
 
 describe("concatBase64Pcm", () => {

@@ -1,8 +1,10 @@
 import "server-only";
 
+import { prepareAnnaSpeech } from "@/lib/voice/speak-script";
+
 const TOKEN_URL = "https://agents.assemblyai.com/v1/token";
 const SOCKET_URL = "wss://agents.assemblyai.com/v1/ws";
-const MAX_CHARS = 900;
+const MAX_CHARS = 420;
 
 type CachedToken = { value: string; expiresAt: number };
 let cachedToken: CachedToken | null = null;
@@ -21,7 +23,8 @@ export function splitAnnaSpeakChunks(text: string, max = MAX_CHARS) {
       window.lastIndexOf(" "),
       0,
     );
-    const at = breakAt > 40 ? breakAt + 1 : max;
+    const minBreak = Math.min(40, Math.max(8, Math.floor(max * 0.45)));
+    const at = breakAt >= minBreak ? breakAt + 1 : max;
     chunks.push(rest.slice(0, at).trim());
     rest = rest.slice(at).trim();
   }
@@ -90,11 +93,13 @@ async function streamChunk(apiKey: string, spoken: string, onAudio: (audio: stri
 
   await new Promise<void>((resolve, reject) => {
     let settled = false;
+    let quietTimer: ReturnType<typeof setTimeout> | undefined;
     const ws = new WebSocket(`${SOCKET_URL}?token=${encodeURIComponent(token)}`);
     const finish = (error?: Error) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      clearTimeout(quietTimer);
       signal?.removeEventListener("abort", onAbort);
       try { ws.send(JSON.stringify({ type: "session.end" })); } catch { /* already closed */ }
       try { ws.close(); } catch { /* ignore */ }
@@ -102,8 +107,15 @@ async function streamChunk(apiKey: string, spoken: string, onAudio: (audio: stri
       else if (error) reject(error);
       else resolve();
     };
+    const quietAfter = () => {
+      clearTimeout(quietTimer);
+      quietTimer = setTimeout(() => finish(), 1_500);
+    };
     const onAbort = () => finish(new Error("ANNA_TTS_CANCELLED"));
-    const timer = setTimeout(() => finish(heard ? undefined : new Error("ANNA_TTS_TIMEOUT")), 25_000);
+    const timer = setTimeout(
+      () => finish(heard ? undefined : new Error("ANNA_TTS_TIMEOUT")),
+      Math.min(90_000, Math.max(45_000, 12_000 + spoken.length * 80)),
+    );
     signal?.addEventListener("abort", onAbort, { once: true });
 
     ws.addEventListener("open", () => {
@@ -114,7 +126,7 @@ async function streamChunk(apiKey: string, spoken: string, onAudio: (audio: stri
           system_prompt: "You are Inko's speaking voice. After the greeting, stay silent. Do not ask questions or add extra words.",
           greeting: spoken,
           tools: [],
-          output: { voice: "anna", format: { encoding: "audio/pcm" }, volume: 100 },
+          output: { voice: "anna", format: { encoding: "audio/pcm", sample_rate: 24_000 } },
           input: {
             format: { encoding: "audio/pcm" },
             turn_detection: { vad_threshold: 0.9, min_silence: 4000, max_silence: 5000, interrupt_response: false },
@@ -131,8 +143,11 @@ async function streamChunk(apiKey: string, spoken: string, onAudio: (audio: stri
         heard = true;
         try { onAudio(payload.data); } catch { finish(new Error("ANNA_TTS_CANCELLED")); return; }
       }
-      if (payload.type === "reply.done") {
+      if (payload.type === "transcript.agent") {
         if (heard) finish();
+      }
+      if (payload.type === "reply.done") {
+        if (heard) quietAfter();
       }
       if (payload.type === "session.error" || payload.type === "error") finish(new Error("ANNA_TTS_FAILED"));
     });
@@ -150,7 +165,7 @@ async function streamChunk(apiKey: string, spoken: string, onAudio: (audio: stri
 export async function streamAnnaSpeech(text: string, onAudio: (audio: string) => void, signal?: AbortSignal) {
   const apiKey = process.env.ASSEMBLYAI_API_KEY?.trim();
   if (!apiKey) throw new Error("VOICE_NOT_CONFIGURED");
-  const parts = splitAnnaSpeakChunks(text);
+  const parts = splitAnnaSpeakChunks(prepareAnnaSpeech(text));
   if (!parts.length) throw new Error("EMPTY_SPEECH");
   for (const part of parts) {
     if (signal?.aborted) throw new Error("ANNA_TTS_CANCELLED");

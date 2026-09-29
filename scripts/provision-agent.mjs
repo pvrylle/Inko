@@ -56,7 +56,7 @@ const agent = {
     turn_detection: { vad_threshold: 0.5, min_silence: 2000, max_silence: 2600, interrupt_response: false },
     keyterms: ["Inko", "flashcard", "Pomodoro", "FSRS"],
   },
-  output: { format: { encoding: "audio/pcm" }, volume: 92 },
+  output: { format: { encoding: "audio/pcm", sample_rate: 24_000 } },
   tools,
   llm: [publicUrl && brainSecret
     ? { base_url: `${publicUrl}/api/voice/brain`, model, api_key: brainSecret }

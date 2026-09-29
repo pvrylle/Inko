@@ -36,6 +36,17 @@ export function base64Pcm16ToFloat(value: string) {
   return output;
 }
 
+export function concatFloat32(parts: Float32Array[]) {
+  const total = parts.reduce((sum, part) => sum + part.length, 0);
+  const output = new Float32Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    output.set(part, offset);
+    offset += part.length;
+  }
+  return output;
+}
+
 export function rmsAmplitude(samples: Float32Array) {
   if (!samples.length) return 0;
   let sum = 0;

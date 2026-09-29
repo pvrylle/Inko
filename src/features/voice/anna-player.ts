@@ -1,16 +1,20 @@
 "use client";
 
 import { inkoFetch } from "@/lib/auth/api-client";
-import { base64Pcm16ToFloat } from "./audio-utils";
-import { cuteCharacterVoice } from "./speech-voice";
+import { base64Pcm16ToFloat, concatFloat32 } from "./audio-utils";
 
 export type AnnaSpeakResult = "played" | "failed" | "cancelled";
+
+const ANNA_RATE = 24_000;
+const MIN_PLAY_SAMPLES = 2_400;
 
 let speakGeneration = 0;
 let speakAbort: AbortController | null = null;
 let playback: AudioContext | null = null;
 let activeSources = 0;
 let nextTime = 0;
+let pending: Float32Array[] = [];
+let pendingCount = 0;
 
 function audioContext() {
   playback ??= new AudioContext();
@@ -27,6 +31,8 @@ export function stopAnnaPlayback() {
   speakAbort = null;
   activeSources = 0;
   nextTime = 0;
+  pending = [];
+  pendingCount = 0;
   const context = playback;
   playback = null;
   void context?.close().catch(() => undefined);
@@ -45,27 +51,41 @@ export async function warmAnnaVoice() {
   }
 }
 
-function queuePcm(samples: Float32Array, generation: number) {
+function playMerged(samples: Float32Array, generation: number) {
   if (!samples.length || generation !== speakGeneration) return;
   const context = audioContext();
-  const buffer = context.createBuffer(1, samples.length, 24_000);
+  const buffer = context.createBuffer(1, samples.length, ANNA_RATE);
   buffer.getChannelData(0).set(samples);
   const source = context.createBufferSource();
   source.buffer = buffer;
-  source.playbackRate.value = cuteCharacterVoice.rate;
-  const gain = context.createGain();
-  gain.gain.value = 1.55;
-  source.connect(gain).connect(context.destination);
-  const startAt = Math.max(context.currentTime + 0.02, nextTime);
+  source.connect(context.destination);
+  const startAt = Math.max(context.currentTime + 0.06, nextTime);
   activeSources += 1;
   source.start(startAt);
-  nextTime = startAt + buffer.duration / source.playbackRate.value;
+  nextTime = startAt + buffer.duration;
   source.onended = () => {
     activeSources = Math.max(0, activeSources - 1);
   };
 }
 
+function flushPending(generation: number, force: boolean) {
+  if (generation !== speakGeneration || !pendingCount) return;
+  if (!force && pendingCount < MIN_PLAY_SAMPLES) return;
+  const samples = concatFloat32(pending);
+  pending = [];
+  pendingCount = 0;
+  playMerged(samples, generation);
+}
+
+function queuePcm(samples: Float32Array, generation: number) {
+  if (!samples.length || generation !== speakGeneration) return;
+  pending.push(samples);
+  pendingCount += samples.length;
+  flushPending(generation, false);
+}
+
 async function waitForQueuedAudio(generation: number) {
+  flushPending(generation, true);
   const context = playback;
   if (!context || generation !== speakGeneration) return;
   while (generation === speakGeneration && (activeSources > 0 || nextTime > context.currentTime + 0.02)) {
@@ -75,7 +95,7 @@ async function waitForQueuedAudio(generation: number) {
 }
 
 export async function speakWithAnna(text: string): Promise<AnnaSpeakResult> {
-  const spoken = text.replace(/\s+/g, " ").trim().slice(0, 2_400);
+  const spoken = text.replace(/\s+/g, " ").trim().slice(0, 8_000);
   if (!spoken) return "failed";
   const generation = speakGeneration;
   speakAbort ??= new AbortController();
