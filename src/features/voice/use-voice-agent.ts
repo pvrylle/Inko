@@ -11,6 +11,9 @@ import { useOptionalProjects } from "@/features/projects/project-provider";
 import { createResearchSession } from "@/features/research/research-repository";
 import { base64Pcm16ToFloat, floatToBase64Pcm16, resampleFloat32, rmsAmplitude } from "./audio-utils";
 import { persistChatTurn } from "./voice-persistence";
+import { speakWithAnna, warmAnnaVoice } from "./anna-player";
+import { stopInkoSpeech } from "./speak-text";
+import { assignAnnaVoice } from "./speech-voice";
 import { conversationTitleFromMessages } from "@/lib/chat/conversation-title";
 import { replaceStudentMessage } from "@/lib/chat/edit-student-message";
 import { deleteCompanionSession, getCompanionSessionSyncIssue, listCompanionSessions, makeCompanionSession, saveCompanionSession, subscribeToCompanionSessions, type CompanionSession } from "@/lib/data/companion-sessions";
@@ -227,17 +230,6 @@ function studySources(value: unknown): StudySourceLink[] {
   return links;
 }
 
-const cuteVoiceNames = [/ana/i, /aria/i, /jenny/i, /samantha/i, /google uk english female/i, /zira/i];
-
-function pickCuteVoice(voices: SpeechSynthesisVoice[]) {
-  const english = voices.filter((voice) => voice.lang.toLowerCase().startsWith("en"));
-  for (const pattern of cuteVoiceNames) {
-    const match = english.find((voice) => pattern.test(voice.name));
-    if (match) return match;
-  }
-  return english[0];
-}
-
 export function useVoiceAgent() {
   const { userId, isGuest, isReady } = useAuth();
   const router = useRouter();
@@ -434,6 +426,8 @@ export function useVoiceAgent() {
   const speakReply = useCallback((text: string, done = true) => {
     const chunk = text.trim();
     const starting = !speechTurnRef.current;
+    const synth = window.speechSynthesis;
+    const wasSpeaking = Boolean(starting && (synth?.speaking || synth?.pending));
     if (starting) {
       speechEpochRef.current += 1;
       releaseGenerationRef.current += 1;
@@ -449,13 +443,12 @@ export function useVoiceAgent() {
       speechQueueRef.current = [];
       speechActiveRef.current = false;
       speechTurnRef.current = true;
+      stopInkoSpeech();
       dispatch({ type: "AGENT_AUDIO" });
     }
     if (chunk) speechQueueRef.current.push(chunk);
     speechStreamOpenRef.current = !done;
-    const synth = window.speechSynthesis;
-    if (starting && (synth?.speaking || synth?.pending)) {
-      synth.cancel();
+    if (wasSpeaking) {
       window.setTimeout(() => pumpSpeechRef.current(), 60);
       return;
     }
@@ -476,29 +469,20 @@ export function useVoiceAgent() {
   useEffect(() => {
     pumpSpeechRef.current = () => {
       if (speechActiveRef.current) return;
-      const synth = window.speechSynthesis;
-      if (!synth) {
-        const rest = speechQueueRef.current.join(" ");
-        speechQueueRef.current = [];
-        if (rest) {
-          captionBaseRef.current = `${captionBaseRef.current} ${rest}`.trim();
-          setSpokenCaption(captionBaseRef.current);
-        }
-        if (!speechStreamOpenRef.current) finishSpeechTurn();
-        return;
-      }
-      const next = speechQueueRef.current.shift();
-      if (!next) {
+      if (!speechQueueRef.current.length) {
         if (speechStreamOpenRef.current) return;
         finishSpeechTurn();
         return;
       }
+      const next = (captionBaseRef.current || !speechStreamOpenRef.current
+        ? speechQueueRef.current.splice(0).join(" ")
+        : speechQueueRef.current.shift() ?? "").replace(/\s+/g, " ").trim();
+      if (!next) {
+        if (!speechStreamOpenRef.current) finishSpeechTurn();
+        return;
+      }
       speechActiveRef.current = true;
       const epoch = speechEpochRef.current;
-      const utterance = new SpeechSynthesisUtterance(next);
-      utterance.lang = "en-US";
-      utterance.rate = 0.96;
-      utterance.pitch = 1.25;
       const base = captionBaseRef.current;
       let settled = false;
       let watchdog = 0;
@@ -511,42 +495,58 @@ export function useVoiceAgent() {
         speechActiveRef.current = false;
         pumpSpeechRef.current();
       };
-      utterance.onboundary = (event) => {
-        if (event.name !== "word") return;
-        const charLength = "charLength" in event ? Number(event.charLength) : 0;
-        const end = event.charIndex + (Number.isFinite(charLength) ? charLength : 0);
-        const spoken = next.slice(0, Math.max(end, event.charIndex)).trim();
-        if (spoken) setSpokenCaption(`${base} ${spoken}`.trim());
-      };
-      utterance.onstart = () => {
-        window.clearTimeout(watchdog);
-        watchdog = window.setTimeout(complete, Math.min(30_000, 1200 + next.length * 90));
-        window.setTimeout(() => setSpokenCaption((current) => current || `${base} ${next}`.trim()), 400);
-      };
-      utterance.onend = complete;
-      utterance.onerror = complete;
-      watchdog = window.setTimeout(complete, 2500);
-      const begin = () => {
-        if (settled) return;
-        const voice = pickCuteVoice(synth.getVoices());
-        if (voice) {
-          utterance.voice = voice;
-          if (/ana|aria|jenny|samantha/i.test(voice.name)) utterance.pitch = 1.12;
+      const speakBrowser = () => {
+        const synth = window.speechSynthesis;
+        if (!synth) {
+          complete();
+          return;
         }
-        synth.speak(utterance);
-      };
-      if (synth.getVoices().length > 0) begin();
-      else {
-        const onVoices = () => {
-          synth.removeEventListener("voiceschanged", onVoices);
-          begin();
+        const utterance = new SpeechSynthesisUtterance(next);
+        utterance.lang = "en-US";
+        utterance.onboundary = (event) => {
+          if (event.name !== "word") return;
+          const charLength = "charLength" in event ? Number(event.charLength) : 0;
+          const end = event.charIndex + (Number.isFinite(charLength) ? charLength : 0);
+          const spoken = next.slice(0, Math.max(end, event.charIndex)).trim();
+          if (spoken) setSpokenCaption(`${base} ${spoken}`.trim());
         };
-        synth.addEventListener("voiceschanged", onVoices);
-        window.setTimeout(() => {
-          synth.removeEventListener("voiceschanged", onVoices);
-          begin();
-        }, 300);
-      }
+        utterance.onstart = () => {
+          window.clearTimeout(watchdog);
+          watchdog = window.setTimeout(complete, Math.min(30_000, 1200 + next.length * 90));
+          window.setTimeout(() => setSpokenCaption((current) => current || `${base} ${next}`.trim()), 400);
+        };
+        utterance.onend = complete;
+        utterance.onerror = complete;
+        watchdog = window.setTimeout(complete, 2500);
+        const begin = () => {
+          if (settled) return;
+          assignAnnaVoice(utterance, synth.getVoices());
+          synth.speak(utterance);
+        };
+        if (synth.getVoices().length > 0) begin();
+        else {
+          const onVoices = () => {
+            synth.removeEventListener("voiceschanged", onVoices);
+            begin();
+          };
+          synth.addEventListener("voiceschanged", onVoices);
+          window.setTimeout(() => {
+            synth.removeEventListener("voiceschanged", onVoices);
+            begin();
+          }, 300);
+        }
+      };
+      setSpokenCaption(`${base} ${next}`.trim());
+      watchdog = window.setTimeout(complete, 45_000);
+      void speakWithAnna(next).then((result) => {
+        if (settled || epoch !== speechEpochRef.current) return;
+        if (result === "played") complete();
+        else if (result === "cancelled") return;
+        else speakBrowser();
+      }).catch(() => {
+        if (settled || epoch !== speechEpochRef.current) return;
+        speakBrowser();
+      });
     };
   }, [finishSpeechTurn]);
 
@@ -575,10 +575,13 @@ export function useVoiceAgent() {
     buffer.copyToChannel(samples, 0);
     const source = context.createBufferSource();
     source.buffer = buffer;
-    source.connect(context.destination);
+    source.playbackRate.value = 1.22;
+    const gain = context.createGain();
+    gain.gain.value = 1.6;
+    source.connect(gain).connect(context.destination);
     const startAt = Math.max(context.currentTime + 0.015, nextPlaybackTimeRef.current);
     source.start(startAt);
-    nextPlaybackTimeRef.current = startAt + buffer.duration;
+    nextPlaybackTimeRef.current = startAt + buffer.duration / source.playbackRate.value;
     playbackSourcesRef.current.add(source);
     setAmplitude(rmsAmplitude(samples));
     source.onended = () => {
@@ -976,7 +979,8 @@ export function useVoiceAgent() {
   const start = useCallback(async () => {
     if (connection === "connecting" || connection === "connected" || dictating) return;
     const generation = ++voiceStartGenerationRef.current;
-    window.speechSynthesis?.cancel();
+    speechEpochRef.current += 1;
+    stopInkoSpeech();
     speakingRef.current = false;
     setReplySpeaking(false);
     setSpokenCaption("");
@@ -1031,7 +1035,12 @@ export function useVoiceAgent() {
       socketRef.current = socket;
       const activeSocket = () => generation === voiceStartGenerationRef.current && socketRef.current === socket;
       socket.onopen = () => {
-        if (activeSocket()) socket.send(JSON.stringify({ type: "session.update", session: { agent_id: tokenPayload.agentId } }));
+        if (activeSocket()) {
+          socket.send(JSON.stringify({
+            type: "session.update",
+            session: { agent_id: tokenPayload.agentId },
+          }));
+        }
       };
       socket.onmessage = (message) => {
         if (!activeSocket()) return;
@@ -1044,6 +1053,7 @@ export function useVoiceAgent() {
                 input: {
                   turn_detection: { vad_threshold: 0.5, min_silence: 2000, max_silence: 2600, interrupt_response: false },
                 },
+                output: { volume: 100 },
               },
             }));
           }
@@ -1120,6 +1130,8 @@ export function useVoiceAgent() {
 
   const end = useCallback(() => {
     voiceStartGenerationRef.current += 1;
+    speechEpochRef.current += 1;
+    stopInkoSpeech();
     const recorder = recordingRef.current;
     if (recorder?.state === "recording") {
       if (recordingTimeoutRef.current !== null) window.clearTimeout(recordingTimeoutRef.current);
@@ -1137,7 +1149,7 @@ export function useVoiceAgent() {
       speakingRef.current = false;
       carriedSpeechRef.current = "";
       clearSilenceTimer();
-      window.speechSynthesis?.cancel();
+      stopInkoSpeech();
       dictationFinalRef.current = "";
       interimRef.current = "";
       setReplySpeaking(false);
@@ -1175,6 +1187,7 @@ export function useVoiceAgent() {
   const clearConversation = useCallback(() => {
     conversationVersionRef.current += 1;
     voiceStartGenerationRef.current += 1;
+    speechEpochRef.current += 1;
     activeSessionRef.current = null;
     messagesRef.current = [];
     setActiveSessionId(null);
@@ -1183,7 +1196,7 @@ export function useVoiceAgent() {
     speakingRef.current = false;
     carriedSpeechRef.current = "";
     clearSilenceTimer();
-    window.speechSynthesis?.cancel();
+    stopInkoSpeech();
     dictationFinalRef.current = "";
     interimRef.current = "";
     try { recognitionRef.current?.abort(); } catch {}
@@ -1320,7 +1333,8 @@ export function useVoiceAgent() {
       const nextMessages = replaceStudentMessage(messagesRef.current, options.replaceId, trimmed);
       if (!nextMessages) return;
       conversationVersionRef.current += 1;
-      window.speechSynthesis?.cancel();
+      speechEpochRef.current += 1;
+      stopInkoSpeech();
       setReplySpeaking(false);
       setSpokenCaption("");
       setError(null);
@@ -1410,6 +1424,7 @@ export function useVoiceAgent() {
     }
     dispatch({ type: "USER_STOPPED" });
     setDraftReply("");
+    void warmAnnaVoice();
     let response: Response;
     try {
       response = await inkoFetch("/api/chat", {

@@ -15,6 +15,7 @@ import { getLocalResearchProject } from "@/lib/data/research-local";
 import { inkoFetch } from "@/lib/auth/api-client";
 import { usePublishBrief } from "@/features/page-brief/page-brief";
 import { useOptionalVoiceAgent } from "@/features/voice/voice-agent-provider";
+import { speakInkoLine, stopInkoSpeech } from "@/features/voice/speak-text";
 import { getDebate, listDebates, saveDebate, type SavedDebate } from "./debate-archive";
 import { buildDebateEvidence, type DebateEvidence } from "./debate-evidence";
 import { useDebateMic } from "./use-debate-mic";
@@ -256,16 +257,12 @@ export function DebateView({
   };
 
   const speakReply = (text: string) => {
-    const synth = window.speechSynthesis;
     const spoken = text.replace(/\s*\[\d+\]/g, "").replace(/\s+/g, " ").trim().slice(0, 1800);
-    if (!synth || !spoken) return;
-    synth.cancel();
-    const utterance = new SpeechSynthesisUtterance(spoken);
-    utterance.lang = "en-US";
-    utterance.onend = () => {
-      if (resumeMicRef.current) startMicRef.current();
-    };
-    synth.speak(utterance);
+    if (!spoken) return;
+    stopInkoSpeech();
+    void speakInkoLine(spoken).then((played) => {
+      if (played && resumeMicRef.current) startMicRef.current();
+    });
   };
 
   const sendTurn = async (text: string) => {
@@ -334,7 +331,7 @@ export function DebateView({
   startMicRef.current = mic.start;
   stopMicRef.current = mic.stop;
 
-  useEffect(() => () => { window.speechSynthesis?.cancel(); }, []);
+  useEffect(() => () => { stopInkoSpeech(); }, []);
 
   const begin = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -389,7 +386,7 @@ export function DebateView({
   const reset = () => {
     resumeMicRef.current = false;
     mic.stop();
-    window.speechSynthesis?.cancel();
+    stopInkoSpeech();
     setStarted(false);
     setTurns([]);
     setDebateId("");
@@ -472,7 +469,7 @@ export function DebateView({
               {mic.error ? <p className="form-error" role="alert">{mic.error}</p> : null}
               <div>
                 <button className="workspace-command" disabled={mic.listening || !argument.trim() || pending || evidenceState === "loading"} type="submit"><Send size={17} /> Send argument</button>
-                <button aria-pressed={mic.listening} className="debate-mic" disabled={pending || evidenceState === "loading" || !mic.supported} onClick={() => { if (mic.listening) { resumeMicRef.current = false; mic.stop(); } else { window.speechSynthesis?.cancel(); mic.start(); } }} type="button">{mic.listening ? <Square fill="currentColor" size={14} /> : <Mic size={16} />} {mic.listening ? "Stop" : "Speak"}</button>
+                <button aria-pressed={mic.listening} className="debate-mic" disabled={pending || evidenceState === "loading" || !mic.supported} onClick={() => { if (mic.listening) { resumeMicRef.current = false; mic.stop(); } else { stopInkoSpeech(); mic.start(); } }} type="button">{mic.listening ? <Square fill="currentColor" size={14} /> : <Mic size={16} />} {mic.listening ? "Stop" : "Speak"}</button>
                 <button onClick={reset} type="button">All debates</button>
               </div>
             </form>

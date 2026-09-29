@@ -17,6 +17,7 @@ import { commitFlashcardReview, createManualDeck, generateFlashcards } from "./f
 import { emptyDraftCard, filledDraftCards, starterDraftCards, type DraftCard } from "./manual-deck";
 import { useFlashcards } from "./use-flashcards";
 import { usePublishBrief } from "@/features/page-brief/page-brief";
+import { speakInkoLine, stopInkoSpeech } from "@/features/voice/speak-text";
 
 const ratings: { value: StudyRating; label: string; hint: string }[] = [
   { value: "again", label: "Again", hint: "Forgot" },
@@ -106,31 +107,15 @@ export function FlashcardsView() {
     : "";
 
   useEffect(() => {
-    const synth = window.speechSynthesis;
-    if (!practiceWithInko || !spokenLine || !synth) return;
+    if (!practiceWithInko || !spokenLine) return;
     let cancelled = false;
-    const utterance = new SpeechSynthesisUtterance(spokenLine);
-    utterance.lang = "en-US";
-    utterance.rate = 0.96;
-    utterance.pitch = 1.12;
-    utterance.onstart = () => { if (!cancelled) setReading(true); };
-    utterance.onend = () => { if (!cancelled) setReading(false); };
-    utterance.onerror = () => { if (!cancelled) setReading(false); };
-    const begin = () => {
-      if (cancelled) return;
-      const voices = synth.getVoices();
-      const voice = voices.find((item) => /samantha|aria|jenny|ana/i.test(item.name) && item.lang.toLowerCase().startsWith("en"))
-        ?? voices.find((item) => item.lang.toLowerCase().startsWith("en"));
-      if (voice) utterance.voice = voice;
-      synth.cancel();
-      synth.speak(utterance);
-    };
-    if (synth.getVoices().length > 0) begin();
-    else synth.addEventListener("voiceschanged", begin, { once: true });
+    setReading(true);
+    void speakInkoLine(spokenLine).then(() => {
+      if (!cancelled) setReading(false);
+    });
     return () => {
       cancelled = true;
-      synth.removeEventListener("voiceschanged", begin);
-      synth.cancel();
+      stopInkoSpeech();
       setReading(false);
     };
   }, [practiceWithInko, spokenLine]);

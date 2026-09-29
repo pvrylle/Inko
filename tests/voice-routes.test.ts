@@ -14,10 +14,24 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/supabase/admin", () => ({ createAdminSupabaseClient: () => null }));
 vi.mock("@/lib/voice/provider-delete", () => ({ deleteAssemblySession: vi.fn(async () => "deleted") }));
 
+const streamAnnaSpeech = vi.fn();
+const warmAnnaToken = vi.fn();
+const synthesizeAnnaSpeech = vi.fn();
+vi.mock("@/lib/voice/anna-tts", () => ({
+  streamAnnaSpeech: (...args: unknown[]) => streamAnnaSpeech(...args),
+  warmAnnaToken: (...args: unknown[]) => warmAnnaToken(...args),
+  synthesizeAnnaSpeech: (...args: unknown[]) => synthesizeAnnaSpeech(...args),
+  splitAnnaSpeakChunks: (text: string) => [String(text)],
+  concatBase64Pcm: (parts: string[]) => parts.join(""),
+}));
+
 describe("voice routes", () => {
   beforeEach(() => {
     getRequestUser.mockReset();
     createServerSupabaseClient.mockReset();
+    synthesizeAnnaSpeech.mockReset();
+    streamAnnaSpeech.mockReset();
+    warmAnnaToken.mockReset();
     delete process.env.CRON_SECRET;
   });
 
@@ -92,5 +106,48 @@ describe("voice routes", () => {
     const { POST } = await import("@/app/api/cron/voice-cleanup/route");
     const response = await POST(new NextRequest("http://localhost/api/cron/voice-cleanup", { method: "POST" }));
     expect(response.status).toBe(401);
+  });
+
+  it("speaks with AssemblyAI Anna without a signed-in user", async () => {
+    process.env.ASSEMBLYAI_API_KEY = "test-assembly-key";
+    streamAnnaSpeech.mockImplementation(async (_text: string, onAudio: (audio: string) => void) => {
+      onAudio("AAAA");
+    });
+    getRequestUser.mockResolvedValue(null);
+    const { POST } = await import("@/app/api/voice/speak/route");
+    const response = await POST(new NextRequest("http://localhost/api/voice/speak", {
+      method: "POST",
+      body: JSON.stringify({ text: "Hello from Inko." }),
+    }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/x-ndjson");
+    const body = await response.text();
+    expect(body).toContain("\"audio\":\"AAAA\"");
+    expect(body).toContain("\"voice\":\"anna\"");
+    expect(streamAnnaSpeech).toHaveBeenCalledWith("Hello from Inko.", expect.any(Function));
+  });
+
+  it("warms an Anna token before the first sentence", async () => {
+    process.env.ASSEMBLYAI_API_KEY = "test-assembly-key";
+    warmAnnaToken.mockResolvedValue(undefined);
+    getRequestUser.mockResolvedValue(null);
+    const { POST } = await import("@/app/api/voice/speak/route");
+    const response = await POST(new NextRequest("http://localhost/api/voice/speak", {
+      method: "POST",
+      body: JSON.stringify({ warmup: true }),
+    }));
+    expect(response.status).toBe(204);
+    expect(warmAnnaToken).toHaveBeenCalled();
+  });
+
+  it("rejects empty speech for Anna TTS", async () => {
+    process.env.ASSEMBLYAI_API_KEY = "test-assembly-key";
+    getRequestUser.mockResolvedValue(null);
+    const { POST } = await import("@/app/api/voice/speak/route");
+    const response = await POST(new NextRequest("http://localhost/api/voice/speak", {
+      method: "POST",
+      body: JSON.stringify({ text: "   " }),
+    }));
+    expect(response.status).toBe(400);
   });
 });
