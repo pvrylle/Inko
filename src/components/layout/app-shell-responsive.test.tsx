@@ -39,6 +39,7 @@ describe("responsive app rails", () => {
     expect(within(navigation).getByRole("link", { name: "Research" })).toHaveAttribute("aria-current", "page");
     expect(within(navigation).getByRole("button", { name: "New chat" })).not.toHaveAttribute("aria-current");
     expect(within(navigation).getByRole("button", { name: "All chats" })).not.toHaveAttribute("aria-current");
+    expect(within(within(navigation).getByRole("region", { name: "All chats" })).getByRole("button", { name: "Plan biology revision" })).toBeInTheDocument();
   });
   it("lets users hide and restore navigation and Inko", async () => {
     const user = userEvent.setup();

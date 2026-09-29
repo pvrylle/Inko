@@ -11,6 +11,7 @@ import { useOptionalProjects } from "@/features/projects/project-provider";
 import { createResearchSession } from "@/features/research/research-repository";
 import { base64Pcm16ToFloat, floatToBase64Pcm16, resampleFloat32, rmsAmplitude } from "./audio-utils";
 import { persistChatTurn } from "./voice-persistence";
+import { conversationTitleFromMessages } from "@/lib/chat/conversation-title";
 import { deleteCompanionSession, getCompanionSessionSyncIssue, listCompanionSessions, makeCompanionSession, saveCompanionSession, subscribeToCompanionSessions, type CompanionSession } from "@/lib/data/companion-sessions";
 import { executeVoiceTool } from "./voice-tools";
 import type { StudySourceLink, ToolCall, VoiceConnectionState, VoiceMessage, VoiceServerEvent } from "./voice-types";
@@ -355,8 +356,18 @@ export function useVoiceAgent() {
     let cancelled = false;
     void listCompanionSessions(userId, isGuest).then((loaded) => {
       if (cancelled) return;
+      const titled = loaded.map((session) => {
+        const title = conversationTitleFromMessages(session.title, session.messages);
+        return title === session.title ? session : { ...session, title };
+      });
+      for (const session of titled) {
+        const original = loaded.find((item) => item.id === session.id);
+        if (original && original.title !== session.title) {
+          void saveCompanionSession(userId, isGuest, session).catch(() => undefined);
+        }
+      }
       setSessions((current) => {
-        const merged = new Map(loaded.map((item) => [item.id, item]));
+        const merged = new Map(titled.map((item) => [item.id, item]));
         for (const item of current) {
           const saved = merged.get(item.id);
           if (!saved || Date.parse(item.updated_at) >= Date.parse(saved.updated_at)) merged.set(item.id, item);
@@ -364,7 +375,7 @@ export function useVoiceAgent() {
         return [...merged.values()].sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at));
       });
       if (activeSessionRef.current) return;
-      const first = loaded.find((session) => !session.archived_at);
+      const first = titled.find((session) => !session.archived_at);
       if (!first) return;
       activeSessionRef.current = first;
       messagesRef.current = first.messages;
@@ -390,11 +401,11 @@ export function useVoiceAgent() {
     if (message.role === "inko") markReplyPending(false);
     else if (message.role === "student") markReplyPending(true);
     if (userId) {
-      const current = activeSessionRef.current ?? makeCompanionSession(userId, message.role === "student" ? message.text : "New chat");
+      const current = activeSessionRef.current ?? makeCompanionSession(userId);
       if (!activeSessionRef.current) projects?.assignConversation(current.id);
       const next: CompanionSession = {
         ...current,
-        title: current.messages.length === 0 && message.role === "student" ? message.text.slice(0, 80) : current.title,
+        title: conversationTitleFromMessages(current.title, nextMessages),
         messages: nextMessages,
         updated_at: new Date().toISOString(),
       };

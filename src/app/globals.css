@@ -4454,6 +4454,12 @@ body {
 .assistant-shell .sidebar-chat-edit button:hover, .assistant-shell .sidebar-chat-confirm button:hover { background: var(--workspace-accent-soft); }
 .assistant-shell .sidebar-chat-confirm span { color: var(--workspace-ink); flex: 1; font-size: 11px; }
 .assistant-shell .sidebar-chat-archived { color: var(--workspace-muted); flex: 1; font-size: 12px; min-width: 0; overflow: hidden; padding: 8px 10px; text-overflow: ellipsis; white-space: nowrap; }
+.assistant-shell .sidebar-folder { display: grid; gap: 1px; }
+.assistant-shell .sidebar-folder-row { align-items: center; display: flex; min-width: 0; }
+.assistant-shell .sidebar-folder-toggle { align-items: center; background: transparent; border: 0; border-radius: 6px; color: var(--workspace-muted); cursor: pointer; display: inline-flex; flex: 0 0 auto; height: 34px; justify-content: center; width: 26px; }
+.assistant-shell .sidebar-folder-toggle:hover { background: #dce8ff; color: var(--workspace-accent-hover); }
+.assistant-shell .sidebar-folder-row .sidebar-list-item { flex: 1; min-width: 0; padding-left: 6px; }
+.assistant-shell .sidebar-folder-items { border-left: 1px solid var(--workspace-line); display: grid; gap: 1px; margin: 0 0 6px 18px; padding-left: 6px; }
 .assistant-shell .sidebar-list-empty { color: var(--workspace-subtle); font-size: 11px; margin: 8px 10px; }
 .assistant-shell .sidebar-settings { border-top: 1px solid var(--workspace-line); border-radius: 0; margin-top: 8px; padding-top: 13px; }
 .assistant-shell .main-content { background: #fff; min-width: 0; padding: 0; }

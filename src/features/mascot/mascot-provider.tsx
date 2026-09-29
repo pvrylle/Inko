@@ -33,8 +33,12 @@ const SLEEP_AFTER_MS = 90_000;
 export function MascotProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(mascotReducer, initialMascotState);
   const [amplitude, setAmplitudeState] = useState(0);
-  const [character, setCharacterState] = useState<MascotCharacter>(() => readStoredCharacter());
+  const [character, setCharacterState] = useState<MascotCharacter>("octopus");
   const moodTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setCharacterState(readStoredCharacter());
+  }, []);
 
   const setCharacter = useCallback((next: MascotCharacter) => {
     setCharacterState(next);

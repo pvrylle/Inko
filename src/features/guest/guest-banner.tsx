@@ -1,6 +1,7 @@
 "use client";
 
 import { Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useAuthModal } from "@/features/auth/auth-modal-provider";
 import { getGuestLimitStatus } from "@/lib/guest-limits";
@@ -8,9 +9,14 @@ import { getGuestLimitStatus } from "@/lib/guest-limits";
 export function GuestBanner() {
   const { isGuest } = useAuth();
   const { openAuth } = useAuthModal();
-  const status = getGuestLimitStatus();
+  const [ready, setReady] = useState(false);
 
-  if (!isGuest) return null;
+  useEffect(() => {
+    setReady(true);
+  }, []);
+
+  if (!isGuest || !ready) return null;
+  const status = getGuestLimitStatus();
   if (!status.anyNear && !status.anyExceeded) return null;
 
   return (
