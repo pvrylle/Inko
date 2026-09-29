@@ -13,6 +13,21 @@ export async function listFlashcards(userId: string) {
   return data as Flashcard[];
 }
 
+export async function createManualDeck(userId: string, title: string, cards: Array<{ front: string; back: string }>) {
+  const local = await usesLocalStudyData();
+  const response = await inkoFetch("/api/study/flashcards/manual", {
+    method: "POST",
+    body: JSON.stringify({ title, cards }),
+  });
+  const payload = (await response.json()) as { note?: Note; cards?: Flashcard[]; persisted?: boolean; error?: string };
+  if (!response.ok || !payload.note || !payload.cards) throw new Error(payload.error || "FLASHCARD_SAVE_FAILED");
+  if (!payload.persisted || local) {
+    upsertLocalRecord("notes", userId, payload.note);
+    payload.cards.forEach((card) => upsertLocalRecord("flashcards", userId, card));
+  }
+  return payload;
+}
+
 export async function generateFlashcards(userId: string, note: Note) {
   const local = await usesLocalStudyData();
   const response = await inkoFetch("/api/study/flashcards/generate", {

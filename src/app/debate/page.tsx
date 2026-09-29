@@ -7,7 +7,7 @@ function debateMode(value: string | undefined): DebateMode {
   return "debate";
 }
 
-export default async function DebatePage({ searchParams }: { searchParams: Promise<{ topic?: string; claim?: string; mode?: string; session?: string; live?: string }> }) {
+export default async function DebatePage({ searchParams }: { searchParams: Promise<{ topic?: string; claim?: string; mode?: string; session?: string; live?: string; id?: string }> }) {
   const params = await searchParams;
   return (
     <DebateView
@@ -15,6 +15,7 @@ export default async function DebatePage({ searchParams }: { searchParams: Promi
       initialClaim={params.claim?.trim().slice(0, 500) ?? ""}
       initialMode={debateMode(params.mode)}
       initialLive={params.live === "1"}
+      initialDebateId={params.id?.trim().slice(0, 80) ?? ""}
       sessionId={params.session?.trim().slice(0, 80) ?? ""}
     />
   );

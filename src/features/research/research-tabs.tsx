@@ -1,7 +1,14 @@
 "use client";
 
-import { FileText, GitCompare, HelpCircle, Lightbulb } from "lucide-react";
+import { ExternalLink, FileText, GitCompare, HelpCircle, Layers3, Lightbulb } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { useAuth } from "@/components/providers/auth-provider";
+import { generateFlashcards } from "@/features/flashcards/flashcards-repository";
+import { generateNoteFromContent } from "@/features/notes/notes-repository";
+import { useToasts } from "@/features/toast/toast-provider";
+import { useOptionalVoiceAgent } from "@/features/voice/voice-agent-provider";
 import type {
   OpenQuestion,
   ResearchContradiction,
@@ -11,6 +18,7 @@ import type {
 } from "./research-schema";
 import { inlineMarkdown } from "@/components/ui/inline-markdown";
 import { MarkdownNote } from "@/features/notes/markdown-note";
+import { sourceQuickLinks } from "./source-links";
 import type { ResearchTab } from "./use-research";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -114,6 +122,21 @@ function OverviewPanel({
   );
 }
 
+function SourceLinks({ source }: { source: ResearchSource }) {
+  const links = sourceQuickLinks(source);
+  if (links.length === 0) return null;
+  return (
+    <p className="source-quick-links">
+      {links.map((link) => (
+        <a href={link.href} key={`${link.label}-${link.href}`} rel="noopener noreferrer" target="_blank">
+          <ExternalLink aria-hidden="true" size={12} />
+          {link.label}
+        </a>
+      ))}
+    </p>
+  );
+}
+
 /** A single Source card (Requirement 8.5). */
 function SourceCard({ source }: { source: ResearchSource }) {
   return (
@@ -131,16 +154,8 @@ function SourceCard({ source }: { source: ResearchSource }) {
         </span>
       </div>
       <h3 className="source-card-title">{source.title}</h3>
-      {source.url && (
-        <a
-          className="source-card-url"
-          href={source.url}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {source.url}
-        </a>
-      )}
+      {source.meta ? <p className="source-card-meta">{source.meta}</p> : null}
+      <SourceLinks source={source} />
     </article>
   );
 }
@@ -323,13 +338,50 @@ function ContradictionsPanel({
 
 /** Notes tab — structured markdown the brief writes for this session. */
 function NotesPanel({ session, noteMarkdown }: { session: ResearchSession; noteMarkdown?: string }) {
+  const router = useRouter();
+  const { userId } = useAuth();
+  const { showToast } = useToasts();
+  const voice = useOptionalVoiceAgent();
+  const [busy, setBusy] = useState(false);
+  const markdown = noteMarkdown?.trim() || "";
+
+  const createFlashcards = async () => {
+    if (busy) return;
+    if (!markdown) {
+      showToast({ tone: "info", title: "Need notes first", message: "Wait for Inko to write session notes, then make flashcards." });
+      return;
+    }
+    if (!userId) {
+      window.dispatchEvent(new Event("inko:guest-limit"));
+      showToast({ tone: "info", title: "Create a free account to make flashcards." });
+      return;
+    }
+    setBusy(true);
+    try {
+      const note = await generateNoteFromContent(userId, markdown);
+      const cards = await generateFlashcards(userId, note);
+      voice?.pinSessionLink({ kind: "flashcards", title: session.title || session.question, href: "/flashcards" });
+      showToast({ tone: "success", title: `${cards.length} flashcard${cards.length === 1 ? "" : "s"} ready`, message: session.title || session.question });
+      router.push("/flashcards");
+    } catch {
+      showToast({ tone: "info", title: "Flashcards could not be created.", message: "Try again in a moment." });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="research-panel research-notes-panel">
-      <p className="research-notes-hint">
-        {noteMarkdown ? "Notes Inko wrote from the sources in this session." : "Structured notes for this session will appear here once generated."}
-      </p>
+      <div className="research-notes-toolbar">
+        <p className="research-notes-hint">
+          {markdown ? "Notes Inko wrote from the sources in this session." : "Structured notes for this session will appear here once generated."}
+        </p>
+        <button className="research-notes-cards" disabled={busy || !markdown} onClick={() => void createFlashcards()} type="button">
+          <Layers3 size={16} /> {busy ? "Making cards…" : "Create flashcards"}
+        </button>
+      </div>
       <div aria-label="Session notes">
-        <MarkdownNote markdown={noteMarkdown || `Session: ${session.question}`} />
+        <MarkdownNote markdown={markdown || `Session: ${session.question}`} />
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ChevronLeft, ChevronRight, Flame, Layers3, Mic, Plus, RotateCcw, Sparkles, Square, Upload, Volume2 } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Flame, Layers3, Mic, Plus, RotateCcw, Square, Trash2, Upload, Volume2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { inkoFetch } from "@/lib/auth/api-client";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -13,7 +13,8 @@ import { usesLocalStudyData } from "@/lib/data/local-study";
 import { upsertLocalRecord } from "@/lib/data/local-store";
 import type { Flashcard, Note, StudyRating } from "@/lib/data/models";
 import { topicToNote } from "@/lib/study/topic-note";
-import { commitFlashcardReview, generateFlashcards } from "./flashcards-repository";
+import { commitFlashcardReview, createManualDeck, generateFlashcards } from "./flashcards-repository";
+import { emptyDraftCard, filledDraftCards, starterDraftCards, type DraftCard } from "./manual-deck";
 import { useFlashcards } from "./use-flashcards";
 import { usePublishBrief } from "@/features/page-brief/page-brief";
 
@@ -31,6 +32,7 @@ export function FlashcardsView() {
   const { celebrate: mascotCelebrate, dispatch } = useMascot();
   const { celebrate } = useToasts();
   const [topic, setTopic] = useState("");
+  const [drafts, setDrafts] = useState<DraftCard[]>(starterDraftCards);
   const [making, setMaking] = useState(false);
   const [reviewNoteId, setReviewNoteId] = useState<string | null>(null);
   const [queue, setQueue] = useState<string[]>([]);
@@ -254,6 +256,44 @@ export function FlashcardsView() {
     }
   };
 
+  const createManualCards = async () => {
+    if (!userId) return;
+    const cards = filledDraftCards(drafts);
+    const title = topic.trim().slice(0, 160) || cards[0]?.front.slice(0, 80) || "Flashcards";
+    if (cards.length === 0) {
+      setFormError("Add a term and a definition on at least one card.");
+      return;
+    }
+    setWorking("generate");
+    setFormError(null);
+    try {
+      const created = await createManualDeck(userId, title, cards);
+      await reload();
+      setReviewClock((current) => Math.max(current, ...created.cards.map((card) => Date.parse(card.due))));
+      openDeck(created.note.id, created.cards);
+      setTopic("");
+      setSource("");
+      setDrafts(starterDraftCards());
+      mascotCelebrate("Your new cards are ready!");
+      celebrate("Deck ready", `${created.cards.length} card${created.cards.length === 1 ? "" : "s"}`);
+    } catch (caught) {
+      const code = caught instanceof Error ? caught.message : "FLASHCARD_SAVE_FAILED";
+      setFormError(code === "AUTH_REQUIRED" ? "Sign in to save this deck." : code === "RATE_LIMITED" ? "Give it a moment, then save again." : "Those cards could not be saved. Please try again.");
+    } finally {
+      setWorking(null);
+    }
+  };
+
+  const updateDraft = (id: string, field: "front" | "back", value: string) => {
+    setDrafts((current) => current.map((card) => card.id === id ? { ...card, [field]: value } : card));
+  };
+
+  const addDraft = () => setDrafts((current) => current.length >= 40 ? current : [...current, emptyDraftCard()]);
+
+  const removeDraft = (id: string) => {
+    setDrafts((current) => current.length === 1 ? current : current.filter((card) => card.id !== id));
+  };
+
   const confirmRating = async (rating: StudyRating) => {
     if (!userId || !activeCard) return;
     setWorking("review");
@@ -282,7 +322,7 @@ export function FlashcardsView() {
 
   return (
     <div className="content-page page-enter">
-      <PageHeading eyebrow="Remember for longer" title="Flashcards" description="Pick a topic deck to review, or make a new one. Next moves through that deck, and Inko can read each card aloud." />
+      <PageHeading eyebrow="Remember for longer" title="Flashcards" description="Pick a deck to review, or create a set the Gizmo way: title, then a term and definition on each card." />
 
       {(error || formError) && <p className="form-error flashcard-error" role="alert">{formError || error}</p>}
 
@@ -324,21 +364,58 @@ export function FlashcardsView() {
           </div>
         </section>
       ) : making ? (
-        <section className="deck-generator" aria-label="Create a flashcard deck">
-          <div>
-            <span className="deck-generator-icon"><Sparkles size={19} /></span>
-            <div><h2>New deck</h2><p>Type a topic, paste notes, or record them. AssemblyAI turns the audio into cards.</p></div>
-            <button className="secondary-button card-read-button" onClick={() => setMaking(false)} type="button">Cancel</button>
+        <section className="gizmo-deck" aria-label="Create a flashcard deck">
+          <div className="gizmo-deck-head">
+            <div>
+              <h2>Create a set</h2>
+              <p>Add a title, then type a term and definition on each card.</p>
+            </div>
+            <div className="gizmo-deck-actions">
+              <button className="secondary-button card-read-button" onClick={() => { setMaking(false); setDrafts(starterDraftCards()); }} type="button">Cancel</button>
+              <button className="primary-button" disabled={working !== null || recording} onClick={() => void createManualCards()} type="button">{working === "generate" && filledDraftCards(drafts).length > 0 ? "Saving…" : "Create"}</button>
+            </div>
           </div>
-          <div className="deck-generator-controls">
-            <label className="topic-field">
-              <span className="sr-only">Study topic</span>
-              <input onChange={(event) => setTopic(event.target.value)} placeholder="Topic, e.g. mitosis checkpoints" value={topic} />
-            </label>
-            <label className="deck-source-field">
-              <span className="sr-only">Notes to turn into cards</span>
-              <textarea className="deck-source" maxLength={8000} onChange={(event) => { setSource(event.target.value); setSourceKind("text"); }} placeholder="Or paste notes, or record them below" rows={4} value={source} />
-            </label>
+          <label className="gizmo-title">
+            <span>Title</span>
+            <input maxLength={160} onChange={(event) => setTopic(event.target.value)} placeholder="Enter a title, like “Biology — Chapter 22”" value={topic} />
+          </label>
+          <ol className="gizmo-card-list">
+            {drafts.map((card, index) => (
+              <li className="gizmo-card" key={card.id}>
+                <div className="gizmo-card-bar">
+                  <span>{index + 1}</span>
+                  <button aria-label={`Remove card ${index + 1}`} className="gizmo-card-remove" disabled={drafts.length === 1} onClick={() => removeDraft(card.id)} type="button"><Trash2 size={16} /></button>
+                </div>
+                <div className="gizmo-card-fields">
+                  <label>
+                    <textarea maxLength={1000} onChange={(event) => updateDraft(card.id, "front", event.target.value)} placeholder="Enter term" rows={3} value={card.front} />
+                    <span>TERM</span>
+                  </label>
+                  <label>
+                    <textarea
+                      maxLength={4000}
+                      onChange={(event) => updateDraft(card.id, "back", event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !event.shiftKey && index === drafts.length - 1) {
+                          event.preventDefault();
+                          addDraft();
+                        }
+                      }}
+                      placeholder="Enter definition"
+                      rows={3}
+                      value={card.back}
+                    />
+                    <span>DEFINITION</span>
+                  </label>
+                </div>
+              </li>
+            ))}
+          </ol>
+          <button className="gizmo-add-card" disabled={drafts.length >= 40} onClick={addDraft} type="button"><Plus size={18} /> Add card</button>
+          <details className="gizmo-generate">
+            <summary>Or make cards from notes or audio</summary>
+            <p>Paste notes or record them. Inko turns that into a deck.</p>
+            <textarea className="deck-source" maxLength={8000} onChange={(event) => { setSource(event.target.value); setSourceKind("text"); }} placeholder="Paste notes here" rows={4} value={source} />
             <div className="deck-voice-row">
               <button className="secondary-button" disabled={working !== null} onClick={() => recording ? stopRecording() : void startRecording()} type="button">
                 {recording ? <Square size={15} /> : <Mic size={15} />}
@@ -346,18 +423,18 @@ export function FlashcardsView() {
               </button>
               <button className="secondary-button" disabled={working !== null || recording} onClick={() => audioInputRef.current?.click()} type="button"><Upload size={15} /> Upload audio</button>
               <input accept="audio/webm,audio/mp4,audio/ogg,.webm,.mp4,.m4a,.ogg" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void transcribeAudio(file); }} ref={audioInputRef} type="file" />
-              <button className="primary-button" disabled={working !== null || recording} onClick={() => void createCards()} type="button">{working === "generate" ? "Creating deck…" : "Create deck"}</button>
+              <button className="primary-button" disabled={working !== null || recording} onClick={() => void createCards()} type="button">{working === "generate" ? "Creating deck…" : "Generate with Inko"}</button>
             </div>
-          </div>
+          </details>
         </section>
       ) : (
         <section aria-label="Choose a deck">
-          {!loading && decks.length === 0 ? <EmptyState icon={Layers3} title="No decks yet" message="Create a deck from a topic, notes, or a recording." /> : null}
+          {!loading && decks.length === 0 ? <EmptyState icon={Layers3} title="No decks yet" message="Create a set by typing a term and a definition on each card." /> : null}
           <div className="deck-board">
-            <button className="deck-pick" data-new="true" onClick={() => setMaking(true)} type="button">
+            <button className="deck-pick" data-new="true" onClick={() => { setDrafts(starterDraftCards()); setMaking(true); }} type="button">
               <span><Plus size={18} /></span>
               <strong>New deck</strong>
-              <small>Topic, notes, or audio</small>
+              <small>Term and definition</small>
             </button>
             {decks.map((deck) => (
               <button className="deck-pick" key={deck.noteId} onClick={() => openDeck(deck.noteId, deck.cards)} type="button">
