@@ -105,6 +105,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
   const [allChatsOpen, setAllChatsOpen] = useState(true);
+  const [openProjectIds, setOpenProjectIds] = useState<Record<string, boolean>>({});
   const [guideStep, setGuideStep] = useState<0 | 1 | 2 | null>(null);
 
   useEffect(() => {
