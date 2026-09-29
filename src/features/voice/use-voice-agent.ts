@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
+import { chatSourceTrailer, pullSpeakable } from "@/lib/ai/chat-stream";
 import { inkoFetch } from "@/lib/auth/api-client";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useMascot } from "@/features/mascot/mascot-provider";
@@ -59,6 +60,28 @@ async function hasAudioInputDevice() {
 // fresh page load, which throws a spurious NotFoundError even though a mic is
 // present. We retry a couple of times (as long as a device actually exists)
 // before surfacing the "no microphone" error to the student.
+const microphoneConstraints: MediaTrackConstraints = {
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
+};
+
+const replyPauseMs = 2_000;
+const resumeGapMs = 400;
+const networkRestartLimit = 5;
+
+export type VoicePhase = "idle" | "connecting" | "listening" | "pausing" | "working" | "speaking" | "ending" | "error";
+
+async function openMicrophone() {
+  try {
+    return await navigator.mediaDevices.getUserMedia({ audio: microphoneConstraints });
+  } catch (caught) {
+    const unsupported = caught instanceof DOMException && (caught.name === "OverconstrainedError" || caught.name === "ConstraintNotSatisfiedError");
+    if (!unsupported) throw caught;
+    return navigator.mediaDevices.getUserMedia({ audio: true });
+  }
+}
+
 async function acquireMicrophone() {
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new DOMException("Media capture is unavailable.", "NotSupportedError");
@@ -69,10 +92,7 @@ async function acquireMicrophone() {
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
-      // Use the browser's default input device without restrictive channel or
-      // processing constraints. This works with more USB, Bluetooth, virtual,
-      // and built-in microphones; AssemblyAI receives the normalized PCM below.
-      return await navigator.mediaDevices.getUserMedia({ audio: true });
+      return await openMicrophone();
     } catch (caught) {
       lastError = caught;
       const isMissing = caught instanceof DOMException && (caught.name === "NotFoundError" || caught.name === "DevicesNotFoundError");
@@ -238,6 +258,10 @@ export function useVoiceAgent() {
   const [dictating, setDictating] = useState(false);
   const [replyPending, setReplyPending] = useState(false);
   const replyPendingRef = useRef(false);
+  const [replySpeaking, setReplySpeaking] = useState(false);
+  const [spokenCaption, setSpokenCaption] = useState("");
+  const [pauseArmed, setPauseArmed] = useState(false);
+  const [pauseEpoch, setPauseEpoch] = useState(0);
 
   const socketRef = useRef<WebSocket | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -259,16 +283,29 @@ export function useVoiceAgent() {
   const interimRef = useRef("");
   const handsFreeRef = useRef(false);
   const pauseForReplyRef = useRef(false);
+  const speakingRef = useRef(false);
+  const carriedSpeechRef = useRef("");
   const silenceTimerRef = useRef<number | null>(null);
   const recoverableErrorsRef = useRef(0);
+  const releaseGenerationRef = useRef(0);
+  const levelFadeRef = useRef<number | null>(null);
+  const speechQueueRef = useRef<string[]>([]);
+  const speechActiveRef = useRef(false);
+  const speechTurnRef = useRef(false);
+  const speechStreamOpenRef = useRef(false);
+  const speechEpochRef = useRef(0);
+  const captionBaseRef = useRef("");
+  const pumpSpeechRef = useRef<() => void>(() => {});
   const sendTextRef = useRef<(text: string) => void>(() => {});
   const resumeListeningRef = useRef<() => void>(() => {});
-  const startDictationRef = useRef<() => boolean>(() => false);
+  const startDictationRef = useRef<(preserve?: boolean) => boolean>(() => false);
 
   const clearSilenceTimer = useCallback(() => {
-    if (silenceTimerRef.current === null) return;
-    window.clearTimeout(silenceTimerRef.current);
-    silenceTimerRef.current = null;
+    if (silenceTimerRef.current !== null) {
+      window.clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    setPauseArmed(false);
   }, []);
 
   const stopInputMeter = useCallback(() => {
@@ -283,36 +320,21 @@ export function useVoiceAgent() {
     setAmplitude(0);
   }, [setAmplitude]);
 
-  const startInputMeter = useCallback(async () => {
-    stopInputMeter();
-    const generation = inputMeterGenerationRef.current;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (generation !== inputMeterGenerationRef.current) {
-        stream.getTracks().forEach((track) => track.stop());
+  const pulseLevel = useCallback(() => {
+    if (levelFadeRef.current !== null) window.clearInterval(levelFadeRef.current);
+    const started = performance.now();
+    setAmplitude(0.7);
+    levelFadeRef.current = window.setInterval(() => {
+      const elapsed = performance.now() - started;
+      if (elapsed >= 400) {
+        if (levelFadeRef.current !== null) window.clearInterval(levelFadeRef.current);
+        levelFadeRef.current = null;
+        setAmplitude(0);
         return;
       }
-      const context = new AudioContext();
-      const analyser = context.createAnalyser();
-      analyser.fftSize = 1024;
-      context.createMediaStreamSource(stream).connect(analyser);
-      const samples = new Float32Array(analyser.fftSize);
-      const meter = { stream, context, frame: 0 };
-      inputMeterRef.current = meter;
-      let previous = 0;
-      const tick = (time: number) => {
-        if (inputMeterRef.current !== meter) return;
-        meter.frame = window.requestAnimationFrame(tick);
-        if (time - previous < 50) return;
-        previous = time;
-        analyser.getFloatTimeDomainData(samples);
-        setAmplitude(Math.min(1, rmsAmplitude(samples) * 6));
-      };
-      meter.frame = window.requestAnimationFrame(tick);
-    } catch {
-      // Dictation may still work even if a separate audio meter is unavailable.
-    }
-  }, [setAmplitude, stopInputMeter]);
+      setAmplitude(0.7 * (1 - elapsed / 400));
+    }, 50);
+  }, [setAmplitude]);
 
   const markReplyPending = useCallback((pending: boolean) => {
     replyPendingRef.current = pending;
@@ -388,67 +410,124 @@ export function useVoiceAgent() {
     if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify(payload));
   }, []);
 
-  const speakReply = useCallback((text: string) => {
-    setPartialTranscript(text);
-    dispatch({ type: "AGENT_AUDIO" });
+  const speakReply = useCallback((text: string, done = true) => {
+    const chunk = text.trim();
+    const starting = !speechTurnRef.current;
+    if (starting) {
+      speechEpochRef.current += 1;
+      releaseGenerationRef.current += 1;
+      clearSilenceTimer();
+      try { recognitionRef.current?.abort(); } catch {}
+      recognitionRef.current = null;
+      stopInputMeter();
+      pauseForReplyRef.current = true;
+      speakingRef.current = true;
+      setReplySpeaking(true);
+      setSpokenCaption("");
+      captionBaseRef.current = "";
+      speechQueueRef.current = [];
+      speechActiveRef.current = false;
+      speechTurnRef.current = true;
+      dispatch({ type: "AGENT_AUDIO" });
+    }
+    if (chunk) speechQueueRef.current.push(chunk);
+    speechStreamOpenRef.current = !done;
     const synth = window.speechSynthesis;
-    if (!synth) {
-      setPartialTranscript("");
-      dispatch({ type: "REPLY_DONE" });
-      resumeListeningRef.current();
+    if (starting && (synth?.speaking || synth?.pending)) {
+      synth.cancel();
+      window.setTimeout(() => pumpSpeechRef.current(), 60);
       return;
     }
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "en-US";
-    utterance.rate = 0.96;
-    utterance.pitch = 1.25;
-    let finished = false;
-    let watchdog = 0;
-    const finishSpeaking = () => {
-      if (finished) return;
-      finished = true;
-      window.clearTimeout(watchdog);
-      setPartialTranscript("");
-      dispatch({ type: "REPLY_DONE" });
-      resumeListeningRef.current();
-    };
-    utterance.onstart = () => {
-      window.clearTimeout(watchdog);
-      watchdog = window.setTimeout(finishSpeaking, Math.min(30_000, 1200 + text.length * 90));
-    };
-    utterance.onend = finishSpeaking;
-    utterance.onerror = finishSpeaking;
-    watchdog = window.setTimeout(finishSpeaking, 2500);
-    const begin = () => {
-      if (finished) return;
-      const voice = pickCuteVoice(synth.getVoices());
-      if (voice) {
-        utterance.voice = voice;
-        if (/ana|aria|jenny|samantha/i.test(voice.name)) utterance.pitch = 1.12;
-      }
-      const kick = () => {
-        if (!finished) synth.speak(utterance);
-      };
-      if (synth.speaking || synth.pending) {
-        synth.cancel();
-        window.setTimeout(kick, 60);
-      } else {
-        kick();
-      }
-    };
-    if (synth.getVoices().length > 0) begin();
-    else {
-      const onVoices = () => {
-        synth.removeEventListener("voiceschanged", onVoices);
-        begin();
-      };
-      synth.addEventListener("voiceschanged", onVoices);
-      window.setTimeout(() => {
-        synth.removeEventListener("voiceschanged", onVoices);
-        begin();
-      }, 300);
-    }
+    pumpSpeechRef.current();
+  }, [clearSilenceTimer, dispatch, stopInputMeter]);
+
+  const finishSpeechTurn = useCallback(() => {
+    speechTurnRef.current = false;
+    speechActiveRef.current = false;
+    speechStreamOpenRef.current = false;
+    speechQueueRef.current = [];
+    captionBaseRef.current = "";
+    setPartialTranscript("");
+    dispatch({ type: "REPLY_DONE" });
+    resumeListeningRef.current();
   }, [dispatch, setPartialTranscript]);
+
+  useEffect(() => {
+    pumpSpeechRef.current = () => {
+      if (speechActiveRef.current) return;
+      const synth = window.speechSynthesis;
+      if (!synth) {
+        const rest = speechQueueRef.current.join(" ");
+        speechQueueRef.current = [];
+        if (rest) {
+          captionBaseRef.current = `${captionBaseRef.current} ${rest}`.trim();
+          setSpokenCaption(captionBaseRef.current);
+        }
+        if (!speechStreamOpenRef.current) finishSpeechTurn();
+        return;
+      }
+      const next = speechQueueRef.current.shift();
+      if (!next) {
+        if (speechStreamOpenRef.current) return;
+        finishSpeechTurn();
+        return;
+      }
+      speechActiveRef.current = true;
+      const epoch = speechEpochRef.current;
+      const utterance = new SpeechSynthesisUtterance(next);
+      utterance.lang = "en-US";
+      utterance.rate = 0.96;
+      utterance.pitch = 1.25;
+      const base = captionBaseRef.current;
+      let settled = false;
+      let watchdog = 0;
+      const complete = () => {
+        if (settled || epoch !== speechEpochRef.current) return;
+        settled = true;
+        window.clearTimeout(watchdog);
+        captionBaseRef.current = `${base} ${next}`.trim();
+        setSpokenCaption(captionBaseRef.current);
+        speechActiveRef.current = false;
+        pumpSpeechRef.current();
+      };
+      utterance.onboundary = (event) => {
+        if (event.name !== "word") return;
+        const charLength = "charLength" in event ? Number(event.charLength) : 0;
+        const end = event.charIndex + (Number.isFinite(charLength) ? charLength : 0);
+        const spoken = next.slice(0, Math.max(end, event.charIndex)).trim();
+        if (spoken) setSpokenCaption(`${base} ${spoken}`.trim());
+      };
+      utterance.onstart = () => {
+        window.clearTimeout(watchdog);
+        watchdog = window.setTimeout(complete, Math.min(30_000, 1200 + next.length * 90));
+        window.setTimeout(() => setSpokenCaption((current) => current || `${base} ${next}`.trim()), 400);
+      };
+      utterance.onend = complete;
+      utterance.onerror = complete;
+      watchdog = window.setTimeout(complete, 2500);
+      const begin = () => {
+        if (settled) return;
+        const voice = pickCuteVoice(synth.getVoices());
+        if (voice) {
+          utterance.voice = voice;
+          if (/ana|aria|jenny|samantha/i.test(voice.name)) utterance.pitch = 1.12;
+        }
+        synth.speak(utterance);
+      };
+      if (synth.getVoices().length > 0) begin();
+      else {
+        const onVoices = () => {
+          synth.removeEventListener("voiceschanged", onVoices);
+          begin();
+        };
+        synth.addEventListener("voiceschanged", onVoices);
+        window.setTimeout(() => {
+          synth.removeEventListener("voiceschanged", onVoices);
+          begin();
+        }, 300);
+      }
+    };
+  }, [finishSpeechTurn]);
 
   const flushToolResults = useCallback(() => {
     if (latestEventRef.current !== "reply.done") return;
@@ -483,7 +562,18 @@ export function useVoiceAgent() {
     setAmplitude(rmsAmplitude(samples));
     source.onended = () => {
       playbackSourcesRef.current.delete(source);
-      if (!playbackSourcesRef.current.size) setAmplitude(0);
+      if (playbackSourcesRef.current.size) return;
+      setAmplitude(0);
+      if (latestEventRef.current !== "reply.done") return;
+      const generation = ++releaseGenerationRef.current;
+      window.setTimeout(() => {
+        if (generation !== releaseGenerationRef.current) return;
+        if (playbackSourcesRef.current.size > 0 || speechActiveRef.current || speechStreamOpenRef.current) return;
+        speakingRef.current = false;
+        pauseForReplyRef.current = false;
+        setReplySpeaking(false);
+        setSpokenCaption("");
+      }, resumeGapMs);
     };
   }, [setAmplitude]);
 
@@ -548,6 +638,7 @@ export function useVoiceAgent() {
         }
         break;
       case "input.speech.started":
+        if (speakingRef.current || pauseForReplyRef.current || replyPendingRef.current || playbackSourcesRef.current.size > 0) break;
         stopPlayback();
         dispatch({ type: "USER_STARTED" });
         break;
@@ -555,20 +646,34 @@ export function useVoiceAgent() {
         dispatch({ type: "USER_STOPPED" });
         break;
       case "transcript.user.delta":
+        if (speakingRef.current || pauseForReplyRef.current || replyPendingRef.current || playbackSourcesRef.current.size > 0) break;
         setPartialTranscript(event.text);
         break;
       case "transcript.user":
-        setPartialTranscript("");
+        if (speakingRef.current || pauseForReplyRef.current || replyPendingRef.current || playbackSourcesRef.current.size > 0) break;
+        pauseForReplyRef.current = true;
+        clearSilenceTimer();
+        try { recognitionRef.current?.abort(); } catch {}
+        recognitionRef.current = null;
+        stopInputMeter();
+        setPartialTranscript(event.text);
         addMessage({ id: crypto.randomUUID(), role: "student", text: event.text, createdAt: new Date().toISOString() });
         break;
       case "reply.started":
         dispatch({ type: "USER_STOPPED" });
         break;
       case "reply.audio":
+        speakingRef.current = true;
+        setReplySpeaking(true);
+        setPartialTranscript("");
         dispatch({ type: "AGENT_AUDIO" });
         playAudio(event.data);
         break;
       case "transcript.agent":
+        speakingRef.current = true;
+        setReplySpeaking(true);
+        setPartialTranscript("");
+        setSpokenCaption(event.text);
         addMessage({ id: crypto.randomUUID(), role: "inko", text: event.text, createdAt: new Date().toISOString(), interrupted: event.interrupted });
         break;
       case "tool.call":
@@ -576,10 +681,25 @@ export function useVoiceAgent() {
         break;
       case "reply.done":
         if (event.status === "interrupted") stopPlayback();
+        if (playbackSourcesRef.current.size === 0) {
+          const generation = ++releaseGenerationRef.current;
+          window.setTimeout(() => {
+            if (generation !== releaseGenerationRef.current) return;
+            if (playbackSourcesRef.current.size > 0 || speechActiveRef.current || speechStreamOpenRef.current) return;
+            speakingRef.current = false;
+            pauseForReplyRef.current = false;
+            setReplySpeaking(false);
+            setSpokenCaption("");
+          }, resumeGapMs);
+        }
         dispatch({ type: "REPLY_DONE" });
         flushToolResults();
         break;
       case "session.ended":
+        speakingRef.current = false;
+        pauseForReplyRef.current = false;
+        setReplySpeaking(false);
+        setSpokenCaption("");
         if (replyPendingRef.current) setError(replyErrorMessage());
         markReplyPending(false);
         setConnection("idle");
@@ -597,11 +717,11 @@ export function useVoiceAgent() {
         void finalizeProviderSession();
         break;
     }
-  }, [addMessage, cleanUpMedia, dispatch, finalizeProviderSession, flushToolResults, handleToolCall, markReplyPending, playAudio, stopPlayback]);
+  }, [addMessage, cleanUpMedia, clearSilenceTimer, dispatch, finalizeProviderSession, flushToolResults, handleToolCall, markReplyPending, playAudio, stopInputMeter, stopPlayback]);
 
   // Browser speech stays open. A short pause ends the sentence and Inko answers,
   // then listening starts again until the student taps to hang up.
-  const startDictation = useCallback(() => {
+  const startDictation = useCallback((preserve = false) => {
     const RecognitionCtor = getSpeechRecognitionConstructor();
     if (!RecognitionCtor) {
       const message = "Live voice isn't available and this browser can't capture speech. Use Chrome or Edge, or type your question below.";
@@ -610,7 +730,13 @@ export function useVoiceAgent() {
       dispatch({ type: "ERROR", message });
       return false;
     }
-    if (recognitionRef.current) return true;
+    if (recognitionRef.current || speakingRef.current) return Boolean(recognitionRef.current);
+
+    if (!preserve) {
+      carriedSpeechRef.current = "";
+      dictationFinalRef.current = "";
+      interimRef.current = "";
+    }
 
     try {
       const recognition = new RecognitionCtor();
@@ -621,54 +747,58 @@ export function useVoiceAgent() {
       recognition.continuous = false;
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
-      dictationFinalRef.current = "";
-      interimRef.current = "";
 
       const commitUtterance = () => {
         clearSilenceTimer();
+        if (speakingRef.current || pauseForReplyRef.current || replyPendingRef.current || !handsFreeRef.current) return;
         const text = `${dictationFinalRef.current} ${interimRef.current}`.trim();
-        if (text.replace(/[^\p{L}\p{N}]/gu, "").length < 2 || !handsFreeRef.current) return;
+        if (text.replace(/[^\p{L}\p{N}]/gu, "").length < 2) return;
         dictationFinalRef.current = "";
         interimRef.current = "";
+        carriedSpeechRef.current = "";
         pauseForReplyRef.current = true;
-        setPartialTranscript("");
         setConnection("connected");
         dispatch({ type: "USER_STOPPED" });
-        try { recognition.stop(); } catch {}
+        try { recognitionRef.current?.abort(); } catch {}
+        recognitionRef.current = null;
+        stopInputMeter();
         sendTextRef.current(text);
       };
 
       recognition.onstart = () => {
         setDictating(true);
         setConnection("connected");
-        setPartialTranscript("");
         dispatch({ type: "USER_STARTED" });
-        void startInputMeter();
       };
 
-      // Rebuild the whole transcript from every result on each event. Chrome
-      // resends and revises earlier results, so appending duplicates words.
+      // Rebuild this recognition session, then prefix words carried over from
+      // the session Chrome ended early. Only two seconds of silence sends it.
       recognition.onresult = (event) => {
-        let finalText = "";
+        if (speakingRef.current || pauseForReplyRef.current || replyPendingRef.current) {
+          try { recognition.abort(); } catch {}
+          return;
+        }
+        let sessionFinal = "";
         let interim = "";
-        let endsFinal = false;
         for (let index = 0; index < event.results.length; index += 1) {
           const result = event.results[index];
           const transcript = (result[0]?.transcript ?? "").trim();
           if (!transcript) continue;
-          if (result.isFinal) finalText += ` ${transcript}`;
+          if (result.isFinal) sessionFinal += ` ${transcript}`;
           else interim += ` ${transcript}`;
-          endsFinal = result.isFinal;
         }
-        dictationFinalRef.current = finalText.trim();
+        dictationFinalRef.current = [carriedSpeechRef.current, sessionFinal.trim()].filter(Boolean).join(" ");
         interimRef.current = interim.trim();
         const spoken = `${dictationFinalRef.current} ${interimRef.current}`.trim();
         setPartialTranscript(spoken);
         setError(null);
+        pulseLevel();
         clearSilenceTimer();
         if (spoken.replace(/[^\p{L}\p{N}]/gu, "").length < 2) return;
         recoverableErrorsRef.current = 0;
-        silenceTimerRef.current = window.setTimeout(commitUtterance, endsFinal ? 250 : 700);
+        setPauseArmed(true);
+        setPauseEpoch((value) => value + 1);
+        silenceTimerRef.current = window.setTimeout(commitUtterance, replyPauseMs);
       };
 
       recognition.onerror = (event) => {
@@ -678,6 +808,16 @@ export function useVoiceAgent() {
         // the page is online. Keep the session open and let onend restart it.
         if (event.error === "network" && navigator.onLine) {
           recoverableErrorsRef.current += 1;
+          if (recoverableErrorsRef.current >= networkRestartLimit) {
+            const message = "Voice needs a quick reset — tap to try again";
+            handsFreeRef.current = false;
+            pauseForReplyRef.current = false;
+            clearSilenceTimer();
+            setDictating(false);
+            setError(message);
+            setConnection("error");
+            dispatch({ type: "ERROR", message });
+          }
           return;
         }
         const message = getDictationErrorMessage(event.error);
@@ -696,22 +836,12 @@ export function useVoiceAgent() {
         stopInputMeter();
         setDictating(false);
         if (recognitionRef.current === recognition) recognitionRef.current = null;
-        clearSilenceTimer();
-        const leftover = `${dictationFinalRef.current} ${interimRef.current}`.trim();
-        const meaningful = leftover.replace(/[^\p{L}\p{N}]/gu, "").length >= 2;
-        if (handsFreeRef.current && !pauseForReplyRef.current && meaningful) {
-          pauseForReplyRef.current = true;
-          dictationFinalRef.current = "";
-          interimRef.current = "";
-          setPartialTranscript("");
-          dispatch({ type: "USER_STOPPED" });
-          sendTextRef.current(leftover);
-          return;
-        }
-        if (!handsFreeRef.current || pauseForReplyRef.current) return;
+        if (!handsFreeRef.current || pauseForReplyRef.current || replyPendingRef.current || speakingRef.current) return;
+        carriedSpeechRef.current = `${dictationFinalRef.current} ${interimRef.current}`.trim();
+        interimRef.current = "";
         const delay = 350 + Math.min(recoverableErrorsRef.current, 6) * 400;
         window.setTimeout(() => {
-          if (handsFreeRef.current && !pauseForReplyRef.current && !recognitionRef.current) startDictationRef.current();
+          if (handsFreeRef.current && !pauseForReplyRef.current && !replyPendingRef.current && !speakingRef.current && !recognitionRef.current) startDictationRef.current(true);
         }, delay);
       };
 
@@ -720,9 +850,9 @@ export function useVoiceAgent() {
       return true;
     } catch (caught) {
       recognitionRef.current = null;
-      if (caught instanceof DOMException && caught.name === "InvalidStateError" && handsFreeRef.current) {
+      if (caught instanceof DOMException && caught.name === "InvalidStateError" && handsFreeRef.current && !speakingRef.current) {
         window.setTimeout(() => {
-          if (handsFreeRef.current && !pauseForReplyRef.current && !recognitionRef.current) startDictationRef.current();
+          if (handsFreeRef.current && !pauseForReplyRef.current && !replyPendingRef.current && !speakingRef.current && !recognitionRef.current) startDictationRef.current(preserve);
         }, 300);
         return true;
       }
@@ -732,7 +862,7 @@ export function useVoiceAgent() {
       dispatch({ type: "ERROR", message });
       return false;
     }
-  }, [clearSilenceTimer, dispatch, setPartialTranscript, startInputMeter, stopInputMeter]);
+  }, [clearSilenceTimer, dispatch, pulseLevel, setPartialTranscript, stopInputMeter]);
 
   const startRecording = useCallback(async () => {
     if (!window.MediaRecorder) {
@@ -818,6 +948,10 @@ export function useVoiceAgent() {
     if (connection === "connecting" || connection === "connected" || dictating) return;
     const generation = ++voiceStartGenerationRef.current;
     window.speechSynthesis?.cancel();
+    speakingRef.current = false;
+    setReplySpeaking(false);
+    setSpokenCaption("");
+    setPartialTranscript("");
     setError(null);
     setConnection("connecting");
 
@@ -870,7 +1004,20 @@ export function useVoiceAgent() {
       };
       socket.onmessage = (message) => {
         if (!activeSocket()) return;
-        try { handleEvent(JSON.parse(String(message.data)) as VoiceServerEvent); } catch { setError("Inko received an unreadable voice event."); }
+        try {
+          const event = JSON.parse(String(message.data)) as VoiceServerEvent;
+          if (event.type === "session.ready") {
+            socket.send(JSON.stringify({
+              type: "session.update",
+              session: {
+                input: {
+                  turn_detection: { vad_threshold: 0.5, min_silence: 2000, max_silence: 2600, interrupt_response: false },
+                },
+              },
+            }));
+          }
+          handleEvent(event);
+        } catch { setError("Inko received an unreadable voice event."); }
       };
       socket.onerror = () => {
         if (activeSocket()) handleEvent({ type: "session.error", code: "SOCKET_ERROR", message: "The voice connection could not be opened." });
@@ -892,8 +1039,9 @@ export function useVoiceAgent() {
       worklet.port.onmessage = ({ data }: MessageEvent<Float32Array>) => {
         if (!activeSocket() || !readyRef.current || socket.readyState !== WebSocket.OPEN) return;
         const samples = resampleFloat32(data, context.sampleRate);
-        // Drive the shared listening visual from the student's microphone,
-        // then let reply audio take over the same meter while Inko speaks.
+        // Drop microphone frames for the whole reply so talking over Inko
+        // cannot interrupt playback or start a new transcript.
+        if (speakingRef.current || pauseForReplyRef.current || replyPendingRef.current || playbackSourcesRef.current.size > 0) return;
         setAmplitude(Math.min(1, rmsAmplitude(samples) * 5));
         socket.send(JSON.stringify({ type: "input.audio", audio: floatToBase64Pcm16(samples) }));
       };
@@ -915,15 +1063,23 @@ export function useVoiceAgent() {
       setConnection("error");
       dispatch({ type: "ERROR", message });
     }
-  }, [cleanUpMedia, connection, dictating, dispatch, finalizeProviderSession, handleEvent, liveVoice, markReplyPending, setAmplitude, startDictation, startRecording]);
+  }, [cleanUpMedia, connection, dictating, dispatch, finalizeProviderSession, handleEvent, liveVoice, markReplyPending, setAmplitude, setPartialTranscript, startDictation, startRecording]);
 
   const resumeListening = useCallback(() => {
-    pauseForReplyRef.current = false;
-    if (!handsFreeRef.current) {
-      setConnection("idle");
-      return;
-    }
-    startDictation();
+    const generation = ++releaseGenerationRef.current;
+    window.setTimeout(() => {
+      if (generation !== releaseGenerationRef.current) return;
+      if (speechActiveRef.current || speechStreamOpenRef.current || playbackSourcesRef.current.size > 0) return;
+      speakingRef.current = false;
+      pauseForReplyRef.current = false;
+      setReplySpeaking(false);
+      setSpokenCaption("");
+      if (!handsFreeRef.current) {
+        setConnection("idle");
+        return;
+      }
+      startDictation();
+    }, resumeGapMs);
   }, [startDictation]);
 
   useEffect(() => {
@@ -947,10 +1103,14 @@ export function useVoiceAgent() {
     if (handsFreeRef.current || recognitionRef.current) {
       handsFreeRef.current = false;
       pauseForReplyRef.current = false;
+      speakingRef.current = false;
+      carriedSpeechRef.current = "";
       clearSilenceTimer();
       window.speechSynthesis?.cancel();
       dictationFinalRef.current = "";
       interimRef.current = "";
+      setReplySpeaking(false);
+      setSpokenCaption("");
       setPartialTranscript("");
       setDictating(false);
       markReplyPending(false);
@@ -960,6 +1120,9 @@ export function useVoiceAgent() {
       recognitionRef.current = null;
       return;
     }
+    speakingRef.current = false;
+    setReplySpeaking(false);
+    setSpokenCaption("");
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       setConnection("ending");
       send({ type: "session.end" });
@@ -986,6 +1149,8 @@ export function useVoiceAgent() {
     setActiveSessionId(null);
     handsFreeRef.current = false;
     pauseForReplyRef.current = false;
+    speakingRef.current = false;
+    carriedSpeechRef.current = "";
     clearSilenceTimer();
     window.speechSynthesis?.cancel();
     dictationFinalRef.current = "";
@@ -1007,6 +1172,8 @@ export function useVoiceAgent() {
     cleanUpMedia();
     void finalizeProviderSession();
     setPartialTranscript("");
+    setSpokenCaption("");
+    setReplySpeaking(false);
     setDictating(false);
     setError(null);
     markReplyPending(false);
@@ -1102,7 +1269,7 @@ export function useVoiceAgent() {
 
   const sendText = useCallback(async (text: string) => {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed || replyPendingRef.current) return;
     const studentMessage: VoiceMessage = { id: crypto.randomUUID(), role: "student", text: trimmed, createdAt: new Date().toISOString() };
     addMessage(studentMessage);
     const version = conversationVersionRef.current;
@@ -1260,26 +1427,57 @@ export function useVoiceAgent() {
       return;
     }
     const decoder = new TextDecoder();
-    let reply = "";
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (version !== conversationVersionRef.current) { await reader.cancel(); return; }
-      reply += decoder.decode(value, { stream: true });
-      const visible = reply.trim();
-      if (visible) setPartialTranscript(visible);
+    let raw = "";
+    let committed = 0;
+    let failed = false;
+    const feed = (force: boolean) => {
+      const markerAt = raw.indexOf(chatSourceTrailer);
+      const visible = markerAt === -1 ? raw : raw.slice(0, markerAt);
+      const spoken = spokenAnswer(visible);
+      if (committed > spoken.length) committed = spoken.length;
+      const fresh = spoken.slice(committed);
+      const pulled = pullSpeakable(fresh, force);
+      committed += fresh.length - pulled.rest.length;
+      for (const sentence of pulled.speak) speakReply(sentence, false);
+    };
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (version !== conversationVersionRef.current) { await reader.cancel(); return; }
+        raw += decoder.decode(value, { stream: true });
+        feed(false);
+      }
+      raw += decoder.decode();
+    } catch {
+      failed = true;
     }
-    reply = reply.trim();
     if (version !== conversationVersionRef.current) return;
-    if (!reply) {
+    const markerAt = raw.lastIndexOf(chatSourceTrailer);
+    const answer = (markerAt === -1 ? raw : raw.slice(0, markerAt)).trim();
+    let sources: StudySourceLink[] = [];
+    if (markerAt !== -1) {
+      try {
+        const trailer = JSON.parse(raw.slice(markerAt + chatSourceTrailer.length)) as { sources?: unknown };
+        sources = studySources(trailer.sources);
+      } catch {
+        sources = [];
+      }
+    }
+    if (!answer || (failed && !speechTurnRef.current)) {
       markReplyPending(false);
       setError(replyErrorMessage());
       dispatch({ type: "ERROR", message: replyErrorMessage() });
       resumeListeningRef.current();
       return;
     }
-    addMessage({ id: crypto.randomUUID(), role: "inko", text: reply, createdAt: new Date().toISOString() });
-    speakReply(reply);
+    feed(true);
+    if (speechTurnRef.current) speakReply("", true);
+    else speakReply(spokenAnswer(answer));
+    pauseForReplyRef.current = true;
+    speakingRef.current = true;
+    setReplySpeaking(true);
+    addMessage({ id: crypto.randomUUID(), role: "inko", text: answer, createdAt: new Date().toISOString(), sources });
   }, [addMessage, clearSilenceTimer, dispatch, linkResearchSession, markReplyPending, pathname, projects, router, send, speakReply, userId]);
 
   const sendAttachment = useCallback(async (file: File, question: string) => {
@@ -1343,5 +1541,21 @@ export function useVoiceAgent() {
     };
   }, [cleanUpMedia, finalizeProviderSession, stopInputMeter]);
 
-  return { connection, messages, sessions, activeSessionId, sessionError, openConversation, linkResearchSession, renameConversation, archiveConversation, restoreConversation, removeConversation, partialTranscript, error, dictating, replyPending, start, end, sendText, sendAttachment, clearConversation };
+  const phase: VoicePhase = connection === "error" || (Boolean(error) && connection === "idle")
+    ? "error"
+    : connection === "ending"
+      ? "ending"
+      : replySpeaking
+        ? "speaking"
+        : replyPending
+          ? "working"
+          : connection === "connecting"
+            ? "connecting"
+            : pauseArmed
+              ? "pausing"
+              : connection === "connected"
+                ? "listening"
+                : "idle";
+
+  return { connection, phase, pauseEpoch, messages, sessions, activeSessionId, sessionError, openConversation, linkResearchSession, renameConversation, archiveConversation, restoreConversation, removeConversation, partialTranscript, spokenCaption, replySpeaking, error, dictating, replyPending, start, end, sendText, sendAttachment, clearConversation };
 }

@@ -3248,7 +3248,11 @@ body {
 .voice-capsule-mic:hover:not(:disabled) { box-shadow: 0 16px 32px rgba(53, 104, 244, 0.42); transform: translateY(-2px); }
 .voice-capsule-mic:active:not(:disabled) { transform: scale(0.95); }
 .voice-capsule-mic:disabled { cursor: wait; opacity: 0.7; }
-.voice-capsule-mic[data-active="true"] { animation: capture-button-pulse 1.5s ease-in-out infinite; background: linear-gradient(145deg, #18c8aa, #168ed8); }
+.voice-capsule-mic[data-phase="listening"] { animation: capture-button-pulse 1.5s ease-in-out infinite; background: linear-gradient(145deg, #18c8aa, #168ed8); }
+.voice-capsule-ring { inset: -7px; pointer-events: none; position: absolute; }
+.voice-capsule-ring svg { display: block; height: 100%; transform: rotate(-90deg); width: 100%; }
+.voice-capsule-ring circle { animation: mic-pause-ring 2s linear forwards; fill: none; stroke: #3568f4; stroke-dasharray: 100; stroke-dashoffset: 100; stroke-width: 2.5; }
+@keyframes mic-pause-ring { to { stroke-dashoffset: 0; } }
 .voice-capsule-ripple { border: 1px solid rgba(53, 104, 244, 0.24); border-radius: 50%; inset: -6px; position: absolute; }
 .voice-capsule-mic[data-active="true"] .voice-capsule-ripple { border-color: rgba(32, 201, 176, 0.34); }
 .voice-capsule-hint { color: #6c7fac; font-size: 12px; font-weight: 650; margin: 12px 0 0; }
@@ -4485,9 +4489,10 @@ body {
 .assistant-character { align-items: center; border-bottom: 1px solid var(--workspace-line); display: flex; flex: 0 0 auto; flex-direction: column; justify-content: center; min-height: 235px; padding: 18px; }
 .assistant-character-mascot.inko-mascot-wrap { height: 162px; width: 162px; }
 .assistant-character > span { color: var(--workspace-muted); font-size: 12px; margin-top: 4px; }
-.assistant-live { color: var(--workspace-ink); flex: 1; overflow-y: auto; padding: 24px 22px; text-align: center; }
-.assistant-live > span { color: var(--workspace-subtle); font-size: 11px; font-weight: 700; text-transform: uppercase; }
-.assistant-live > p { font-size: 14px; line-height: 1.5; margin: 12px auto; max-width: 245px; overflow-wrap: anywhere; }
+.assistant-live { align-items: center; color: var(--workspace-ink); display: flex; flex: 1; flex-direction: column; justify-content: center; min-height: 0; overflow-y: auto; padding: 24px 22px; text-align: center; }
+.assistant-live > span { color: var(--workspace-subtle); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.assistant-live > p:not(.assistant-error), .assistant-live > .assistant-caption { font-size: 18px; line-height: 1.45; margin: 12px auto 0; max-width: 280px; overflow-wrap: anywhere; }
+.assistant-live > .assistant-pending { font-size: 13px; margin-top: 10px; }
 .assistant-thread { display: flex; flex: 1; flex-direction: column; gap: 17px; min-height: 0; overflow-y: auto; padding: 18px; scrollbar-width: thin; }
 .assistant-empty { color: var(--workspace-subtle); font-size: 13px; line-height: 1.5; text-align: center; }
 .assistant-turn { border-bottom: 1px solid var(--workspace-line); padding-bottom: 14px; }
@@ -4506,7 +4511,9 @@ body {
 .assistant-composer-area .voice-capsule-wrap { margin: 6px auto 0; }
 .assistant-composer-area .voice-capsule { background: transparent; border: 0; box-shadow: none; gap: 4px; max-width: 188px; padding: 0; }
 .assistant-composer-area .voice-capsule-mic { background: var(--workspace-accent); box-shadow: none; height: 46px; width: 46px; }
-.assistant-composer-area .voice-capsule-mic[data-active="true"] { background: #cf5f6b; }
+.assistant-composer-area .voice-capsule-mic[data-phase="listening"],
+.assistant-composer-area .voice-capsule-mic[data-phase="pausing"],
+.assistant-composer-area .voice-capsule-mic[data-phase="ending"] { background: #cf5f6b; }
 .assistant-composer-area .voice-capsule-hint { color: var(--workspace-muted); font-size: 11px; line-height: 1.4; margin: 3px 0 0; max-width: 280px; text-align: center; }
 .assistant-history { flex: 1; min-height: 0; overflow-y: auto; padding: 15px; }
 .assistant-history-heading { align-items: center; color: var(--workspace-muted); display: flex; font-size: 12px; justify-content: space-between; margin: 4px 0 14px; }

@@ -72,17 +72,17 @@ export function parseDuckDuckGoResults(html: string) {
   return sources.map((source) => ({ ...source, title: titles.get(source.url) ?? source.title }));
 }
 
-async function searchDuckDuckGo(query: string) {
+async function searchDuckDuckGo(query: string, timeoutMs: number) {
   const response = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
     headers: { "user-agent": USER_AGENT, accept: "text/html" },
-    signal: AbortSignal.timeout(6_000),
+    signal: AbortSignal.timeout(timeoutMs),
     cache: "no-store",
   });
   if (!response.ok) return [];
   return parseDuckDuckGoResults(await response.text());
 }
 
-async function searchWikipedia(query: string) {
+async function searchWikipedia(query: string, timeoutMs: number) {
   const params = new URLSearchParams({
     action: "query",
     generator: "search",
@@ -97,7 +97,7 @@ async function searchWikipedia(query: string) {
   });
   const response = await fetch(`https://en.wikipedia.org/w/api.php?${params}`, {
     headers: { "user-agent": USER_AGENT, accept: "application/json" },
-    signal: AbortSignal.timeout(6_000),
+    signal: AbortSignal.timeout(timeoutMs),
     cache: "no-store",
   });
   if (!response.ok) return [];
@@ -118,17 +118,17 @@ async function searchWikipedia(query: string) {
 }
 
 /** Real pages for a study question. Web results first, encyclopedia pages if search is empty. */
-export async function searchStudySources(question: string) {
+export async function searchStudySources(question: string, timeoutMs = 6_000) {
   const query = question.replace(/\s+/g, " ").trim().slice(0, 180);
   if (query.length < 2) return [];
   try {
-    const web = await searchDuckDuckGo(query);
+    const web = await searchDuckDuckGo(query, timeoutMs);
     if (web.length > 0) return web;
   } catch {
     // The search page can be unavailable. The encyclopedia lookup below still grounds the answer.
   }
   try {
-    return await searchWikipedia(query);
+    return await searchWikipedia(query, timeoutMs);
   } catch {
     return [];
   }

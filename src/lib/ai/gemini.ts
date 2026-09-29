@@ -183,27 +183,38 @@ export async function generateGeminiChat(input: {
   contents: Array<{ role: "user" | "model"; parts: GeminiChatPart[] }>;
   tools: Array<{ name: string; description: string; parameters: Record<string, unknown> }>;
 }) {
-  return withGeminiFallback(async (client) => {
-    const response = await client.models.generateContent({
-      model: getGeminiModel(),
-      contents: input.contents,
-      config: {
-        systemInstruction: input.system || undefined,
-        temperature: 0.4,
-        ...(input.tools.length > 0 ? { tools: [{ functionDeclarations: input.tools }] } : {}),
-      },
-    });
-    const parts = response.candidates?.[0]?.content?.parts ?? [];
-    const text = parts.map((part) => part.text ?? "").join("").trim();
-    const calls = parts.flatMap((part) => {
-      const call = part.functionCall;
-      if (!call?.name) return [];
-      const args = call.args && typeof call.args === "object" ? call.args as Record<string, unknown> : {};
-      return [{ name: call.name, args }];
-    });
-    if (!text && calls.length === 0) throw new Error("GEMINI_EMPTY_RESPONSE");
-    return { text, calls, model: getGeminiModel() };
-  });
+  const models = [getGeminiChatModel(), getGeminiModel()].filter((model, index, all) => all.indexOf(model) === index);
+  let lastError: unknown;
+  for (const model of models) {
+    try {
+      return await withGeminiFallback(async (client) => {
+        const response = await client.models.generateContent({
+          model,
+          contents: input.contents,
+          config: {
+            systemInstruction: input.system || undefined,
+            temperature: 0.4,
+            ...(input.tools.length > 0 ? { tools: [{ functionDeclarations: input.tools }] } : {}),
+          },
+        });
+        const parts = response.candidates?.[0]?.content?.parts ?? [];
+        const text = parts.map((part) => part.text ?? "").join("").trim();
+        const calls = parts.flatMap((part) => {
+          const call = part.functionCall;
+          if (!call?.name) return [];
+          const args = call.args && typeof call.args === "object" ? call.args as Record<string, unknown> : {};
+          return [{ name: call.name, args }];
+        });
+        if (!text && calls.length === 0) throw new Error("GEMINI_EMPTY_RESPONSE");
+        return { text, calls, model };
+      });
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : "";
+      if (message !== "GEMINI_UNAVAILABLE" && message !== "GEMINI_MODEL_UNAVAILABLE") throw error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("GEMINI_FAILED");
 }
 
 export async function generateGeminiJson(prompt: string, responseJsonSchema: Record<string, unknown>) {

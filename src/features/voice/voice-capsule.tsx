@@ -2,38 +2,36 @@
 
 import { Mic, Square } from "lucide-react";
 import { useMascot } from "@/features/mascot/mascot-provider";
-import { useVoiceAgent } from "./use-voice-agent";
+import { useVoiceAgent, type VoicePhase } from "./use-voice-agent";
 import { useOptionalVoiceAgent, type VoiceAgentController } from "./voice-agent-provider";
 
 // Explicit bar heights (px) form the resting sound-wave shape on each side of
 // the mic. Kept as real values because CSS calc() has no modulo operator.
 const WAVE = [7, 11, 16, 22, 18, 12, 8, 14, 20, 25, 19, 13, 9, 6];
 
-function captionFor(
-  connection: VoiceAgentController["connection"],
-  partial: string,
-  messages: VoiceAgentController["messages"],
-  error: string | null,
-  replyPending: boolean,
-  compact: boolean,
-) {
-  const last = messages.at(-1);
-  const spoken = last?.role === "inko" ? last.text : "";
-  const heard = spoken.replace(/\s*\[\d+\]/g, "").replace(/\s+/g, " ").trim();
-  if (replyPending && !error) return "Inko is working on your answer…";
-  if (partial && partial !== spoken && partial !== heard) return partial;
-  if (compact && last?.role === "inko") return "Ask a follow-up";
-  if (last?.role === "inko") return spoken;
-  if (connection === "idle" && error) return error;
-  return hintFor(connection, partial);
+function resolvePhase(controller: VoiceAgentController): VoicePhase {
+  if (controller.phase) return controller.phase;
+  if (controller.connection === "error" || (controller.connection === "idle" && controller.error)) return "error";
+  if (controller.connection === "ending") return "ending";
+  if (controller.replySpeaking) return "speaking";
+  if (controller.replyPending) return "working";
+  if (controller.connection === "connecting") return "connecting";
+  if (controller.connection === "connected") return "listening";
+  return "idle";
 }
 
-function hintFor(connection: VoiceAgentController["connection"], partial: string) {
-  switch (connection) {
+function captionFor(phase: VoicePhase) {
+  switch (phase) {
+    case "speaking":
+      return "Inko is speaking";
+    case "working":
+      return "Inko is working";
+    case "pausing":
+      return "Pause to send";
+    case "listening":
+      return "Listening";
     case "connecting":
       return "Connecting voice…";
-    case "connected":
-      return partial || "Listening — I’ll answer when you pause";
     case "ending":
       return "Wrapping up…";
     case "error":
@@ -58,38 +56,40 @@ function Wave({ side, amp, active }: { side: "left" | "right"; amp: number; acti
 }
 
 function VoiceCapsuleView({ controller, compact = false }: { controller: VoiceAgentController; compact?: boolean }) {
-  const { connection, messages, partialTranscript, error, replyPending, start, end } = controller;
-  const { amplitude, state } = useMascot();
-  const active = connection === "connected" || connection === "connecting" || connection === "ending";
-  const capturing = connection === "connected" && state.presence === "listening";
+  const { connection, error, start, end } = controller;
+  const { amplitude } = useMascot();
+  const phase = resolvePhase(controller);
+  const sessionOpen = phase === "connecting" || phase === "listening" || phase === "pausing" || phase === "working" || phase === "speaking" || phase === "ending";
+  const showStop = phase === "listening" || phase === "pausing" || phase === "ending";
   const amp = Math.min(1, amplitude);
-  const voiceVisible = active && amp > 0.04;
+  const voiceVisible = (phase === "listening" || phase === "pausing") && amp > 0.04;
   return (
     <div className="voice-capsule-wrap" data-compact={compact}>
-      <div className="voice-capsule" data-active={active} data-capturing={capturing}>
+      <div className="voice-capsule" data-phase={phase} data-capturing={voiceVisible}>
         <Wave side="left" amp={amp} active={voiceVisible} />
 
         <button
-          aria-label={active ? "End voice session" : "Start talking to Inko"}
-          aria-pressed={active}
+          aria-label={sessionOpen ? "End voice session" : "Start talking to Inko"}
+          aria-pressed={sessionOpen}
           className="voice-capsule-mic"
-          data-active={active}
+          data-phase={phase}
           disabled={connection === "ending"}
-          onClick={active ? end : () => void start()}
+          onClick={sessionOpen ? end : () => void start()}
           type="button"
         >
           <span className="voice-capsule-ripple" aria-hidden="true" />
-          {active ? <Square aria-hidden="true" fill="currentColor" size={20} /> : <Mic aria-hidden="true" size={24} strokeWidth={2.4} />}
+          {phase === "pausing" ? <span key={controller.pauseEpoch ?? 0} className="voice-capsule-ring" aria-hidden="true"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" pathLength="100" /></svg></span> : null}
+          {showStop ? <Square aria-hidden="true" fill="currentColor" size={20} /> : <Mic aria-hidden="true" size={24} strokeWidth={2.4} />}
         </button>
 
         <Wave side="right" amp={amp} active={voiceVisible} />
       </div>
 
-      <p className="voice-capsule-hint" data-partial={partialTranscript ? "true" : "false"} aria-live="polite">
-        {captionFor(connection, partialTranscript, messages, error, replyPending, compact)}
+      <p className="voice-capsule-hint" aria-live="polite">
+        {captionFor(phase)}
       </p>
 
-      {error && !compact ? <p className="voice-capsule-error" role="status">{error}</p> : null}
+      {error && !compact && phase === "error" ? <p className="voice-capsule-error" role="status">{error}</p> : null}
     </div>
   );
 }

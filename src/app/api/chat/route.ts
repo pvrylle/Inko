@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getRequestUser } from "@/lib/auth/request-user";
-import { generateStudyAnswer } from "@/lib/ai/gemini";
+import { chatSourceTrailer } from "@/lib/ai/chat-stream";
+import { generateFastGeminiTextStream } from "@/lib/ai/gemini";
 import { checkRateLimit } from "@/lib/security/rate-limit";
 import { searchStudySources, type StudySource } from "@/lib/research/web-search";
 
@@ -12,15 +13,6 @@ const bodySchema = z.object({
     text: z.string().trim().min(1).max(5000),
   })).max(12).optional(),
 });
-
-function aiErrorStatus(code: string) {
-  return code === "AI_NOT_CONFIGURED" || code === "GEMINI_NOT_CONFIGURED" || code === "OPENAI_NOT_CONFIGURED" ? 503 : 502;
-}
-
-function normalizeAiError(code: string) {
-  if (code === "GEMINI_NOT_CONFIGURED" || code === "OPENAI_NOT_CONFIGURED") return "AI_NOT_CONFIGURED";
-  return code;
-}
 
 function studyPrompt(question: string, sources: StudySource[], history: Array<{ role: "student" | "inko"; text: string }>) {
   const context = history.length
@@ -53,17 +45,24 @@ export async function POST(request: NextRequest) {
   const searchQuery = body.data.message.length < 35 && previousQuestion
     ? `${previousQuestion} ${body.data.message}`.slice(0, 500)
     : body.data.message;
-  const sources = await searchStudySources(searchQuery);
-  let text: string;
-  try {
-    text = await generateStudyAnswer(studyPrompt(body.data.message, sources, history));
-  } catch (error) {
-    const code = normalizeAiError(error instanceof Error ? error.message : "AI_FAILED");
-    return NextResponse.json({ error: code }, { status: aiErrorStatus(code) });
-  }
-
-  return NextResponse.json({
-    text,
-    sources: sources.map(({ title, url }) => ({ title, url })),
+  const sources = await searchStudySources(searchQuery, 2_500);
+  const links = sources.map(({ title, url }) => ({ title, url }));
+  const prompt = studyPrompt(body.data.message, sources, history);
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const piece of generateFastGeminiTextStream(prompt)) {
+          if (piece) controller.enqueue(encoder.encode(piece));
+        }
+        controller.enqueue(encoder.encode(`${chatSourceTrailer}${JSON.stringify({ sources: links })}`));
+        controller.close();
+      } catch (error) {
+        controller.error(error);
+      }
+    },
+  });
+  return new Response(stream, {
+    headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
   });
 }

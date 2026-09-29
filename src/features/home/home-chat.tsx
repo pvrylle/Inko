@@ -53,7 +53,8 @@ export function HomeChat({ controller, home = false, onClose }: { controller: Vo
   const threadRef = useRef<HTMLDivElement>(null);
   const active = controller.sessions.find((session) => session.id === activeSessionId);
   const visibleSessions = controller.sessions.filter((session) => !session.archived_at && (!projects?.activeId || projects.conversationProjects[session.id] === projects.activeId));
-  const status = error ? "Needs attention" : replyPending ? "Thinking" : controller.connection === "connected" ? "Listening" : "Ready";
+  const { partialTranscript, spokenCaption, replySpeaking } = controller;
+  const status = error ? "Needs attention" : replySpeaking ? "Speaking" : replyPending ? "Thinking" : controller.connection === "connected" ? "Listening" : "Ready";
 
   useEffect(() => {
     const thread = threadRef.current;
@@ -140,8 +141,28 @@ export function HomeChat({ controller, home = false, onClose }: { controller: Vo
           </div>
           {home ? (
             <div className="assistant-live" aria-live="polite">
-              <span>{controller.partialTranscript ? replyPending ? "Inko" : "Hearing you" : replyPending ? "Thinking" : "Voice companion"}</span>
-              <p>{controller.partialTranscript || (replyPending ? "Working through your question..." : "I'm here whenever you need me.")}</p>
+              {replySpeaking ? (
+                <>
+                  <span>Inko</span>
+                  <p className="assistant-caption">{spokenCaption || "…"}</p>
+                </>
+              ) : partialTranscript ? (
+                <>
+                  <span>You</span>
+                  <p className="assistant-caption">{partialTranscript}</p>
+                  {replyPending ? <p className="assistant-pending">Inko is working</p> : null}
+                </>
+              ) : replyPending ? (
+                <>
+                  <span>Inko</span>
+                  <p className="assistant-caption">Inko is working</p>
+                </>
+              ) : (
+                <>
+                  <span>Voice companion</span>
+                  <p>I&apos;m here whenever you need me.</p>
+                </>
+              )}
               {error ? <p className="assistant-error" role="status">{error}</p> : null}
             </div>
           ) : (

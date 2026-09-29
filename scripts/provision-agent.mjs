@@ -53,7 +53,7 @@ const agent = {
   voice: { voice_id: "anna" },
   input: {
     format: { encoding: "audio/pcm" },
-    turn_detection: { vad_threshold: 0.5, min_silence: 700, max_silence: 2200, interrupt_response: true },
+    turn_detection: { vad_threshold: 0.5, min_silence: 2000, max_silence: 2600, interrupt_response: false },
     keyterms: ["Inko", "flashcard", "Pomodoro", "FSRS"],
   },
   output: { format: { encoding: "audio/pcm" }, volume: 92 },
