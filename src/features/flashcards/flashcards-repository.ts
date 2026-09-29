@@ -21,11 +21,13 @@ export async function createManualDeck(userId: string, title: string, cards: Arr
   });
   const payload = (await response.json()) as { note?: Note; cards?: Flashcard[]; persisted?: boolean; error?: string };
   if (!response.ok || !payload.note || !payload.cards) throw new Error(payload.error || "FLASHCARD_SAVE_FAILED");
+  const note = payload.note;
+  const savedCards = payload.cards;
   if (!payload.persisted || local) {
-    upsertLocalRecord("notes", userId, payload.note);
-    payload.cards.forEach((card) => upsertLocalRecord("flashcards", userId, card));
+    upsertLocalRecord("notes", userId, note);
+    savedCards.forEach((card) => upsertLocalRecord("flashcards", userId, card));
   }
-  return payload;
+  return { note, cards: savedCards, persisted: payload.persisted };
 }
 
 export async function generateFlashcards(userId: string, note: Note) {

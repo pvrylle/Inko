@@ -18,20 +18,22 @@ export function buildDebateEvidence(input: {
   findings: FindingInput[];
   contradictions: ContradictionInput[];
 }): DebateEvidence[] {
-  const sources = input.sources.flatMap((source) => {
+  const sources: DebateEvidence[] = input.sources.flatMap((source) => {
     const text = clip([source.title, source.meta?.trim()].filter(Boolean).join(" — "));
     if (!text) return [];
     const tag = source.tag === "supports" || source.tag === "contradicts" ? source.tag : undefined;
-    return [{ kind: "source" as const, text, ...(tag ? { tag } : {}) }];
+    const item: DebateEvidence = { kind: "source", text };
+    if (tag) item.tag = tag;
+    return [item];
   }).slice(0, 12);
 
-  const findings = input.findings.flatMap((finding) => {
+  const findings: DebateEvidence[] = input.findings.flatMap((finding) => {
     const source = input.sources.find((item) => item.id === finding.source_id);
     const text = clip(source ? `${finding.statement} (source: ${source.title})` : finding.statement);
     return text ? [{ kind: "finding" as const, text }] : [];
   }).slice(0, 8);
 
-  const contradictions = input.contradictions.flatMap((item) => {
+  const contradictions: DebateEvidence[] = input.contradictions.flatMap((item) => {
     const text = clip(item.explanation);
     return text ? [{ kind: "contradiction" as const, text }] : [];
   }).slice(0, 4);

@@ -49,7 +49,7 @@ function queuePcm(samples: Float32Array, generation: number) {
   if (!samples.length || generation !== speakGeneration) return;
   const context = audioContext();
   const buffer = context.createBuffer(1, samples.length, 24_000);
-  buffer.copyToChannel(samples, 0);
+  buffer.getChannelData(0).set(samples);
   const source = context.createBufferSource();
   source.buffer = buffer;
   source.playbackRate.value = cuteCharacterVoice.rate;
