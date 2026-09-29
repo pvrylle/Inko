@@ -12,6 +12,7 @@ import { createResearchSession } from "@/features/research/research-repository";
 import { base64Pcm16ToFloat, floatToBase64Pcm16, resampleFloat32, rmsAmplitude } from "./audio-utils";
 import { persistChatTurn } from "./voice-persistence";
 import { conversationTitleFromMessages } from "@/lib/chat/conversation-title";
+import { replaceStudentMessage } from "@/lib/chat/edit-student-message";
 import { deleteCompanionSession, getCompanionSessionSyncIssue, listCompanionSessions, makeCompanionSession, saveCompanionSession, subscribeToCompanionSessions, type CompanionSession } from "@/lib/data/companion-sessions";
 import { executeVoiceTool } from "./voice-tools";
 import type { ChatSessionLink, StudySourceLink, ToolCall, VoiceConnectionState, VoiceMessage, VoiceServerEvent } from "./voice-types";
@@ -400,29 +401,31 @@ export function useVoiceAgent() {
     });
   }, [userId]);
 
-  const addMessage = useCallback((message: VoiceMessage) => {
-    const nextMessages = [...messagesRef.current, message];
+  const commitMessages = useCallback((nextMessages: VoiceMessage[], pending?: VoiceMessage["role"]) => {
     messagesRef.current = nextMessages;
     setMessages(nextMessages);
     setDraftReply("");
-    if (message.role === "inko") markReplyPending(false);
-    else if (message.role === "student") markReplyPending(true);
-    if (userId) {
-      const current = activeSessionRef.current ?? makeCompanionSession(userId);
-      if (!activeSessionRef.current) projects?.assignConversation(current.id);
-      const next: CompanionSession = {
-        ...current,
-        title: conversationTitleFromMessages(current.title, nextMessages),
-        messages: nextMessages,
-        updated_at: new Date().toISOString(),
-      };
-      activeSessionRef.current = next;
-      setActiveSessionId(next.id);
-      setSessions((items) => [next, ...items.filter((item) => item.id !== next.id)]);
-      void saveCompanionSession(userId, isGuest, next).catch(() => setSessionError("This conversation could not be saved."));
-      if (voiceSessionIdRef.current) void persistChatTurn(userId, voiceSessionIdRef.current, message).catch(() => undefined);
-    }
+    if (pending === "inko") markReplyPending(false);
+    else if (pending === "student") markReplyPending(true);
+    if (!userId) return;
+    const current = activeSessionRef.current ?? makeCompanionSession(userId);
+    if (!activeSessionRef.current) projects?.assignConversation(current.id);
+    const next: CompanionSession = {
+      ...current,
+      title: conversationTitleFromMessages(current.title, nextMessages),
+      messages: nextMessages,
+      updated_at: new Date().toISOString(),
+    };
+    activeSessionRef.current = next;
+    setActiveSessionId(next.id);
+    setSessions((items) => [next, ...items.filter((item) => item.id !== next.id)]);
+    void saveCompanionSession(userId, isGuest, next).catch(() => setSessionError("This conversation could not be saved."));
   }, [isGuest, markReplyPending, projects, userId]);
+
+  const addMessage = useCallback((message: VoiceMessage) => {
+    commitMessages([...messagesRef.current, message], message.role);
+    if (userId && voiceSessionIdRef.current) void persistChatTurn(userId, voiceSessionIdRef.current, message).catch(() => undefined);
+  }, [commitMessages, userId]);
 
   const send = useCallback((payload: object) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify(payload));
@@ -1310,11 +1313,22 @@ export function useVoiceAgent() {
     void deleteCompanionSession(userId, isGuest, id).catch(() => setSessionError("This conversation could not be deleted."));
   }, [clearConversation, isGuest, userId]);
 
-  const sendText = useCallback(async (text: string) => {
+  const sendText = useCallback(async (text: string, options?: { replaceId?: string }) => {
     const trimmed = text.trim();
-    if (!trimmed || replyPendingRef.current) return;
-    const studentMessage: VoiceMessage = { id: crypto.randomUUID(), role: "student", text: trimmed, createdAt: new Date().toISOString() };
-    addMessage(studentMessage);
+    if (!trimmed) return;
+    if (options?.replaceId) {
+      const nextMessages = replaceStudentMessage(messagesRef.current, options.replaceId, trimmed);
+      if (!nextMessages) return;
+      conversationVersionRef.current += 1;
+      window.speechSynthesis?.cancel();
+      setReplySpeaking(false);
+      setSpokenCaption("");
+      setError(null);
+      commitMessages(nextMessages, "student");
+    } else {
+      if (replyPendingRef.current) return;
+      addMessage({ id: crypto.randomUUID(), role: "student", text: trimmed, createdAt: new Date().toISOString() });
+    }
     const version = conversationVersionRef.current;
     const newProject = projectCommand(trimmed);
     if (newProject && projects) {
@@ -1518,7 +1532,11 @@ export function useVoiceAgent() {
     speakingRef.current = true;
     setReplySpeaking(true);
     addMessage({ id: crypto.randomUUID(), role: "inko", text: answer, createdAt: new Date().toISOString(), sources });
-  }, [addMessage, brief, clearSilenceTimer, dispatch, linkResearchSession, markReplyPending, projects, router, speakReply, userId]);
+  }, [addMessage, brief, clearSilenceTimer, commitMessages, dispatch, linkResearchSession, markReplyPending, projects, router, speakReply, userId]);
+
+  const editMessage = useCallback((id: string, text: string) => {
+    void sendText(text, { replaceId: id });
+  }, [sendText]);
 
   const sendAttachment = useCallback(async (file: File, question: string) => {
     if (!file.size || file.size > 8 * 1024 * 1024 || !["application/pdf", "image/png", "image/jpeg", "image/webp"].includes(file.type)) {
@@ -1597,5 +1615,5 @@ export function useVoiceAgent() {
                 ? "listening"
                 : "idle";
 
-  return { connection, phase, pauseEpoch, messages, sessions, activeSessionId, sessionError, openConversation, linkResearchSession, pinSessionLink, renameConversation, archiveConversation, restoreConversation, removeConversation, partialTranscript, spokenCaption, draftReply, replySpeaking, error, dictating, replyPending, start, end, sendText, sendAttachment, clearConversation };
+  return { connection, phase, pauseEpoch, messages, sessions, activeSessionId, sessionError, openConversation, linkResearchSession, pinSessionLink, renameConversation, archiveConversation, restoreConversation, removeConversation, partialTranscript, spokenCaption, draftReply, replySpeaking, error, dictating, replyPending, start, end, sendText, editMessage, sendAttachment, clearConversation };
 }

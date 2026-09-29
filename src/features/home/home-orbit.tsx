@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowUp, FileImage, FileText, Mic, Paperclip, Square, X } from "lucide-react";
+import { ArrowUp, FileImage, FileText, Mic, Paperclip, Pencil, Square, X } from "lucide-react";
 import { type DragEvent, type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { ContentTopbar } from "@/components/layout/content-topbar";
 import { useOptionalProjects } from "@/features/projects/project-provider";
 import { useOptionalVoiceAgent } from "@/features/voice/voice-agent-provider";
 import { ChatSuggestions, SessionDirectory, sessionLinksFrom } from "./chat-suggestions";
+import { StudentMessageEdit } from "./student-message-edit";
 import { StudyAnswerText } from "./study-answer-card";
 import { ProjectWorkspacePanel, type ProjectTab } from "./project-workspace-panel";
 
@@ -25,6 +26,7 @@ export function HomeOrbit() {
   const activeTab = tabState.projectId === (activeProject?.id ?? null) ? tabState.tab : "chat";
   const setActiveTab = (tab: ProjectTab) => setTabState({ projectId: activeProject?.id ?? null, tab });
   const [draft, setDraft] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [attachment, setAttachment] = useState<File | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -123,9 +125,27 @@ export function HomeOrbit() {
               <div className="home-conversation-messages">
                 {messages.map((message) => (
                   <article className="home-conversation-message" data-role={message.role} key={message.id}>
-                    <span>{message.role === "inko" ? "Inko" : "You"}</span>
+                    <div className="home-message-head">
+                      <span>{message.role === "inko" ? "Inko" : "You"}</span>
+                      {message.role === "student" && editingId !== message.id ? (
+                        <button aria-label="Edit your message" className="home-message-edit" onClick={() => setEditingId(message.id)} title="Edit" type="button">
+                          <Pencil size={14} />
+                          Edit
+                        </button>
+                      ) : null}
+                    </div>
                     {message.attachment ? <div className="home-message-file">{message.attachment.type === "application/pdf" ? <FileText size={16} /> : <FileImage size={16} />}{message.attachment.name}</div> : null}
-                    {message.link ? <SessionDirectory links={[message.link]} /> : message.role === "inko" ? <StudyAnswerText sources={message.sources ?? []} text={message.text} /> : <p>{message.text}</p>}
+                    {editingId === message.id && message.role === "student" ? (
+                      <StudentMessageEdit
+                        busy={Boolean(controller?.replyPending)}
+                        onCancel={() => setEditingId(null)}
+                        onSave={(text) => {
+                          setEditingId(null);
+                          controller?.editMessage(message.id, text);
+                        }}
+                        text={message.text}
+                      />
+                    ) : message.link ? <SessionDirectory links={[message.link]} /> : message.role === "inko" ? <StudyAnswerText sources={message.sources ?? []} text={message.text} /> : <p>{message.text}</p>}
                     {message.sources?.length ? <details><summary>Sources ({message.sources.length})</summary><ul>{message.sources.map((source) => <li key={source.url}><a href={source.url} rel="noopener noreferrer" target="_blank">{source.title}</a></li>)}</ul></details> : null}
                   </article>
                 ))}

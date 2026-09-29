@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUp, Check, History, MoreHorizontal, Plus, User, X } from "lucide-react";
+import { ArrowUp, Check, History, MoreHorizontal, Pencil, Plus, User, X } from "lucide-react";
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { InkoMascot } from "@/features/mascot/inko-mascot";
@@ -10,6 +10,7 @@ import { VoiceCapsule } from "@/features/voice/voice-capsule";
 import type { VoiceAgentController } from "@/features/voice/voice-agent-provider";
 import type { VoiceMessage } from "@/features/voice/voice-types";
 import { ChatSuggestions } from "./chat-suggestions";
+import { StudentMessageEdit } from "./student-message-edit";
 import { usePageBrief } from "@/features/page-brief/page-brief";
 import { AnswerToolIcons, StudyAnswerText } from "./study-answer-card";
 
@@ -30,15 +31,43 @@ function ChatHead({ inko }: { inko: boolean }) {
   );
 }
 
-function ChatTurn({ message, question, sessionId, onResearchSessionCreated }: { message: VoiceMessage; question: string; sessionId: string | null; onResearchSessionCreated: (id: string) => void }) {
+function ChatTurn({
+  message,
+  question,
+  sessionId,
+  editing,
+  onEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onResearchSessionCreated,
+}: {
+  message: VoiceMessage;
+  question: string;
+  sessionId: string | null;
+  editing: boolean;
+  onEdit: () => void;
+  onCancelEdit: () => void;
+  onSaveEdit: (text: string) => void;
+  onResearchSessionCreated: (id: string) => void;
+}) {
   const isInko = message.role === "inko";
   const sources = message.sources ?? [];
   return (
     <article className="assistant-turn" data-role={message.role}>
       {isInko ? <ChatHead inko /> : null}
       <div className="assistant-bubble">
-        <span className="assistant-turn-speaker">{isInko ? "Inko" : "You"}</span>
-        {isInko ? <StudyAnswerText sources={sources} text={message.text} /> : <p>{message.text}</p>}
+        <div className="home-message-head">
+          <span className="assistant-turn-speaker">{isInko ? "Inko" : "You"}</span>
+          {!isInko && !editing ? (
+            <button aria-label="Edit your message" className="home-message-edit" onClick={onEdit} title="Edit" type="button">
+              <Pencil size={13} />
+              Edit
+            </button>
+          ) : null}
+        </div>
+        {editing && !isInko ? (
+          <StudentMessageEdit busy={false} onCancel={onCancelEdit} onSave={onSaveEdit} text={message.text} />
+        ) : isInko ? <StudyAnswerText sources={sources} text={message.text} /> : <p>{message.text}</p>}
         {isInko && sources.length > 0 ? (
           <details className="assistant-turn-more">
             <summary>{sources.length} sources and actions</summary>
@@ -64,6 +93,7 @@ export function HomeChat({ controller, home = false, onClose }: { controller: Vo
   const [draft, setDraft] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
   const threadRef = useRef<HTMLDivElement>(null);
@@ -196,7 +226,20 @@ export function HomeChat({ controller, home = false, onClose }: { controller: Vo
             <div className="assistant-thread" ref={threadRef}>
               {messages.length === 0 ? <p className="assistant-empty">Tell me what you want to work on.</p> : null}
               {messages.map((message, index) => (
-                <ChatTurn key={message.id} message={message} question={questionBefore(messages, index)} sessionId={active?.research_session_id ?? null} onResearchSessionCreated={controller.linkResearchSession} />
+                <ChatTurn
+                  key={message.id}
+                  message={message}
+                  question={questionBefore(messages, index)}
+                  sessionId={active?.research_session_id ?? null}
+                  editing={editingMessageId === message.id}
+                  onEdit={() => setEditingMessageId(message.id)}
+                  onCancelEdit={() => setEditingMessageId(null)}
+                  onSaveEdit={(text) => {
+                    setEditingMessageId(null);
+                    controller.editMessage(message.id, text);
+                  }}
+                  onResearchSessionCreated={controller.linkResearchSession}
+                />
               ))}
               {draftReply ? (
                 <article aria-live="polite" className="assistant-turn" data-role="inko">
